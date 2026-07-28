@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Brand from "./Brand";
 import { registerStudent, signIn } from "../lib/api";
+import { navigateFresh } from "../lib/sessionNavigation";
 
 export default function AuthExperience({ role = "student" }) {
   const { search } = useLocation();
@@ -28,7 +29,7 @@ export default function AuthExperience({ role = "student" }) {
   const enterWorkspace = (session, token) => {
     if (token) localStorage.setItem("careerforge_token", token);
     localStorage.setItem("careerforge_session", JSON.stringify(session));
-    window.location.assign(workspacePath);
+    navigateFresh(workspacePath);
   };
 
   useEffect(() => {

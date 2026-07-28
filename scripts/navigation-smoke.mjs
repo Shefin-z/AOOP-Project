@@ -95,7 +95,12 @@ vm.runInThisContext(fs.readFileSync(path.join(assetsDir, bundleName), "utf8"), {
 await window.happyDOM.waitUntilComplete();
 
 async function clickAndAssert(href, expectedPath, expectedText, label) {
-  const links = [...document.querySelectorAll(`a[href="${href}"]`)];
+  const expectedUrl = new URL(href, window.location.origin);
+  const links = [...document.querySelectorAll("a")].filter((item) => {
+    const candidate = new URL(item.href, window.location.origin);
+    return candidate.pathname === expectedUrl.pathname &&
+      (!expectedUrl.search || candidate.search === expectedUrl.search);
+  });
   const link = label
     ? links.find((item) => item.textContent.replace(/\s+/g, " ").trim().includes(label))
     : links[0];

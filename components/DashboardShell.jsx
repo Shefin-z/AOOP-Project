@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Bell, ChevronDown, LogOut, Menu, Search, X } from "lucide-react";
 import Brand from "./Brand";
+import { navigateFresh } from "../lib/sessionNavigation";
 
 function getSessionName(role) {
   try {
@@ -39,7 +40,7 @@ export default function DashboardShell({
   const logout = () => {
     localStorage.removeItem("careerforge_session");
     localStorage.removeItem("careerforge_token");
-    window.location.assign("/");
+    navigateFresh("/");
   };
 
   const sidebar = (

@@ -1,8 +1,9 @@
 import { Flame } from "lucide-react";
+import { freshPath } from "../lib/sessionNavigation";
 
 export default function Brand({ href = "/", compact = false }) {
   return (
-    <a href={href} className="inline-flex items-center gap-2.5 text-ink" aria-label="CareerForge home">
+    <a href={freshPath(href)} className="inline-flex items-center gap-2.5 text-ink" aria-label="CareerForge home">
       <span className="grid h-9 w-9 place-items-center rounded-[13px] bg-ink text-white shadow-md">
         <Flame size={compact ? 16 : 19} strokeWidth={2.2} />
       </span>
