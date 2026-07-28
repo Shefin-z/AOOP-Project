@@ -23,6 +23,13 @@ export default function AuthExperience({ role = "student" }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const workspacePath = isAdmin ? "/admin" : "/student";
+
+  const enterWorkspace = (session, token) => {
+    if (token) localStorage.setItem("careerforge_token", token);
+    localStorage.setItem("careerforge_session", JSON.stringify(session));
+    window.location.assign(workspacePath);
+  };
 
   useEffect(() => {
     if (!isAdmin) {
@@ -56,9 +63,7 @@ export default function AuthExperience({ role = "student" }) {
             password: data.get("password"),
             role,
           });
-      localStorage.setItem("careerforge_token", result.token);
-      localStorage.setItem("careerforge_session", JSON.stringify(result.user));
-      navigate(isAdmin ? "/admin" : "/student");
+      enterWorkspace(result.user, result.token);
     } catch (requestError) {
       if (requestError.status) {
         setError(requestError.message);
@@ -66,8 +71,7 @@ export default function AuthExperience({ role = "student" }) {
         return;
       }
       // The deployed design demo remains explorable when the local API is offline.
-      localStorage.setItem("careerforge_session", JSON.stringify(demoSession));
-      window.setTimeout(() => navigate(isAdmin ? "/admin" : "/student"), 400);
+      enterWorkspace(demoSession);
     }
   };
 
@@ -190,7 +194,7 @@ export default function AuthExperience({ role = "student" }) {
                 <div className="my-6 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted/70">
                   <span className="h-px flex-1 bg-ink/10" />or continue with<span className="h-px flex-1 bg-ink/10" />
                 </div>
-                <button onClick={() => navigate("/student")} className="btn-secondary w-full">
+                <button onClick={() => enterWorkspace(demoSessionForGoogle())} className="btn-secondary w-full">
                   <span className="grid h-6 w-6 place-items-center rounded-full bg-white text-sm font-black text-cobalt">G</span>
                   Google account
                 </button>
@@ -208,4 +212,12 @@ export default function AuthExperience({ role = "student" }) {
       </div>
     </main>
   );
+}
+
+function demoSessionForGoogle() {
+  return {
+    role: "student",
+    name: "Nadia Ahmed",
+    email: "student@careerforge.com",
+  };
 }

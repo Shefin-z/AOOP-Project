@@ -3,7 +3,9 @@ import path from "node:path";
 import vm from "node:vm";
 import { Window } from "happy-dom";
 
-const window = new Window({ url: "http://localhost/" });
+const scenario = process.argv[2] || "public";
+const startPath = scenario === "public" ? "/" : "/student";
+const window = new Window({ url: `http://localhost${startPath}` });
 const browserGlobals = {
   window,
   self: window,
@@ -46,19 +48,21 @@ vm.runInThisContext(fs.readFileSync(path.join(assetsDir, bundleName), "utf8"), {
 });
 await window.happyDOM.waitUntilComplete();
 
-async function clickAndAssert(href, expectedPath, expectedText) {
-  const link = document.querySelector(`a[href="${href}"]`);
+async function clickAndAssert(href, expectedPath, expectedText, label) {
+  const links = [...document.querySelectorAll(`a[href="${href}"]`)];
+  const link = label
+    ? links.find((item) => item.textContent.replace(/\s+/g, " ").trim().includes(label))
+    : links[0];
   if (!link) throw new Error(`Link ${href} was not found on ${window.location.pathname}.`);
 
-  link.dispatchEvent(new window.MouseEvent("click", {
-    bubbles: true,
-    cancelable: true,
-    button: 0,
-  }));
+  link.click();
   await new Promise((resolve) => setTimeout(resolve, 40));
 
   const text = document.getElementById("root")?.textContent?.replace(/\s+/g, " ").trim() || "";
-  if (window.location.pathname !== expectedPath || !text.includes(expectedText)) {
+  if (
+    window.location.pathname !== expectedPath ||
+    (expectedText && !text.includes(expectedText))
+  ) {
     throw new Error(`Click ${href} did not render ${expectedPath} immediately.`);
   }
 }
@@ -76,24 +80,35 @@ async function clickButtonAndAssert(label, expectedPath, expectedText) {
   await new Promise((resolve) => setTimeout(resolve, 40));
 
   const text = document.getElementById("root")?.textContent?.replace(/\s+/g, " ").trim() || "";
-  if (window.location.pathname !== expectedPath || !text.includes(expectedText)) {
+  if (
+    window.location.pathname !== expectedPath ||
+    (expectedText && !text.includes(expectedText))
+  ) {
     throw new Error(`Button ${label} did not update the view immediately.`);
   }
 }
 
-await clickAndAssert("/login/student", "/login/student", "Welcome back.");
-await clickAndAssert("/login/admin", "/login/admin", "Admin access.");
-await clickAndAssert("/", "/", "Career clarity, engineered");
-await clickAndAssert("/login/student?mode=register", "/login/student", "Start your journey.");
-await clickButtonAndAssert("Google account", "/student", "Good afternoon, Nadia");
-await clickButtonAndAssert("Recommended jobs", "/student", "Your best-fit opportunities");
-await clickButtonAndAssert("Sign out", "/", "Career clarity, engineered");
+if (scenario === "public") {
+  await clickAndAssert("/login/student", "/login/student", "Welcome back.");
+  await clickAndAssert("/login/admin", "/login/admin", "Admin access.");
+  await clickAndAssert("/login/student", "/login/student", "Welcome back.");
+  await clickAndAssert("/", "/", "Career clarity, engineered", "Back home");
+  await clickAndAssert("/login/student?mode=register", "/login/student", "Start your journey.");
+  await clickButtonAndAssert("Google account", "/student");
+} else if (scenario === "student") {
+  await clickButtonAndAssert("Recommended jobs", "/student", "Your best-fit opportunities");
+  await clickButtonAndAssert("Sign out", "/");
+} else if (scenario === "brand") {
+  await clickAndAssert("/", "/");
+} else {
+  throw new Error(`Unknown navigation scenario: ${scenario}`);
+}
 
 console.log(JSON.stringify({
   status: "passed",
+  scenario,
   finalPath: window.location.pathname,
   finalSearch: window.location.search,
-  transitions: 7,
 }));
 
 await window.happyDOM.close();

@@ -33,7 +33,7 @@ export default function DashboardShell({
   const logout = () => {
     localStorage.removeItem("careerforge_session");
     localStorage.removeItem("careerforge_token");
-    navigateRoute("/");
+    window.location.assign("/");
   };
 
   const sidebar = (
