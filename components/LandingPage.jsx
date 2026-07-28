@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Brand from "./Brand";
 import ThemeToggle from "./ThemeToggle";
+import AdaptiveHeroImage from "./AdaptiveHeroImage";
 
 const features = [
   {
@@ -142,11 +143,11 @@ export default function LandingPage() {
               <span className="grid h-9 w-9 place-items-center rounded-xl bg-jade text-white"><Zap size={17} /></span>
               <span><b className="block text-sm">Readiness +12%</b><small className="text-muted">this month</small></span>
             </div>
-            <div className="overflow-hidden rounded-[40px] border-[8px] border-white/45 shadow-lift">
-              <img
-                src="/careerforge-hero.png"
-                alt="Graduate exploring an AI-guided career path"
-                className="aspect-[1.55/1] w-full object-cover object-center lg:aspect-[1.45/1]"
+            <div className="hero-stage overflow-hidden rounded-[40px] border-[8px] border-white/45 shadow-lift">
+              <AdaptiveHeroImage
+                alt="Two students exploring their AI-guided career path together"
+                className="aspect-[1.55/1] w-full lg:aspect-[1.45/1]"
+                imageClassName="object-cover object-center"
               />
             </div>
             <div className="absolute -bottom-5 right-4 glass-strong hidden w-[230px] rounded-[22px] p-4 sm:block">

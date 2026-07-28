@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Brand from "./Brand";
 import ThemeToggle from "./ThemeToggle";
+import AdaptiveHeroImage from "./AdaptiveHeroImage";
 import { registerStudent, signIn } from "../lib/api";
 import { navigateFresh } from "../lib/sessionNavigation";
 
@@ -83,10 +84,10 @@ export default function AuthExperience({ role = "student" }) {
     <main className="min-h-screen bg-canvas p-3 sm:p-5">
       <div className="mx-auto grid min-h-[calc(100vh-24px)] max-w-[1500px] overflow-hidden rounded-[30px] border border-white/75 bg-white/55 shadow-lift backdrop-blur-xl sm:min-h-[calc(100vh-40px)] lg:grid-cols-[.95fr_1.05fr]">
         <section className="relative hidden overflow-hidden bg-[#DED2BE] p-8 lg:block">
-          <img
-            src="/careerforge-hero.png"
-            alt="CareerForge career journey"
-            className="absolute inset-0 h-full w-full object-cover object-[62%_center]"
+          <AdaptiveHeroImage
+            alt="Two students building their CareerForge journey together"
+            className="absolute inset-0"
+            imageClassName="object-cover object-[62%_center]"
           />
           <div className="absolute inset-0 bg-ink/10" />
           <div className="absolute left-8 top-8 glass-strong rounded-2xl px-4 py-3">

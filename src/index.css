@@ -306,6 +306,97 @@ textarea:focus-visible {
   mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
 }
 
+.hero-stage {
+  position: relative;
+  isolation: isolate;
+  transform: perspective(1200px) translateZ(0);
+  transition:
+    transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 600ms ease;
+}
+
+.hero-stage:hover {
+  transform: perspective(1200px) translateY(-4px) rotateX(0.7deg) rotateY(-0.7deg);
+  box-shadow: 0 34px 90px rgba(73, 65, 49, 0.2);
+}
+
+.adaptive-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: #eadfce;
+}
+
+.adaptive-hero-image {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  transition:
+    opacity 700ms ease,
+    transform 1100ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 700ms ease;
+  will-change: opacity, transform;
+}
+
+.adaptive-hero::after {
+  position: absolute;
+  inset: -70% -35%;
+  z-index: 1;
+  pointer-events: none;
+  content: "";
+  opacity: 0.42;
+  background: linear-gradient(
+    112deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.72) 49%,
+    transparent 60%
+  );
+  transform: translateX(-42%) rotate(5deg);
+  transition:
+    transform 1200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 600ms ease;
+}
+
+.adaptive-hero:hover .adaptive-hero-image,
+.hero-stage:hover .adaptive-hero-image {
+  transform: scale(1.035);
+}
+
+.adaptive-hero:hover::after,
+.hero-stage:hover .adaptive-hero::after {
+  opacity: 0.58;
+  transform: translateX(42%) rotate(5deg);
+}
+
+:root[data-theme="dark"] .adaptive-hero {
+  background: #050505;
+}
+
+:root[data-theme="dark"] .adaptive-hero::after {
+  opacity: 0.3;
+  background: linear-gradient(
+    112deg,
+    transparent 38%,
+    rgba(229, 151, 121, 0.35) 48%,
+    rgba(111, 140, 255, 0.22) 52%,
+    transparent 61%
+  );
+}
+
+:root[data-theme="dark"] .hero-stage {
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.82),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme="dark"] .hero-stage:hover {
+  box-shadow:
+    0 34px 110px rgba(0, 0, 0, 0.92),
+    0 0 52px rgba(229, 151, 121, 0.1);
+}
+
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -324,6 +415,20 @@ textarea:focus-visible {
 @media (max-width: 767px) {
   .display-title {
     font-size: clamp(2.9rem, 15vw, 4.6rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-stage,
+  .adaptive-hero-image,
+  .adaptive-hero::after {
+    transition: none;
+  }
+
+  .hero-stage:hover,
+  .adaptive-hero:hover .adaptive-hero-image,
+  .hero-stage:hover .adaptive-hero-image {
+    transform: none;
   }
 }
 
