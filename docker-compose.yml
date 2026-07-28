@@ -1,0 +1,71 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: careerforge
+      MYSQL_USER: careerforge
+      MYSQL_PASSWORD: careerforge
+    ports:
+      - "3306:3306"
+    volumes:
+      - careerforge_mysql:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ucareerforge", "-pcareerforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ai:
+    build: ./ai-service
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: careerforge
+      MYSQL_PASSWORD: careerforge
+      MYSQL_DATABASE: careerforge
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      CLIENT_ORIGIN: http://localhost:3000
+      JWT_SECRET: change-this-before-production
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: careerforge
+      MYSQL_PASSWORD: careerforge
+      MYSQL_DATABASE: careerforge
+      AI_SERVICE_URL: http://ai:8000
+    ports:
+      - "4000:4000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      ai:
+        condition: service_started
+
+  web:
+    build: .
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  careerforge_mysql:

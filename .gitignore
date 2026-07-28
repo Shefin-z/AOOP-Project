@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+.env
+.env.local
+*.log
+.DS_Store
+deploy-archive.tar.gz
+__pycache__
+*.pyc
+.venv

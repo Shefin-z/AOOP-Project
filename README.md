@@ -1,0 +1,69 @@
+# CareerForge
+
+CareerForge is a full-stack AI career-development platform for university students. The project includes a premium, responsive glassmorphism UI and separate Student and Admin experiences.
+
+## Technology
+
+- Frontend: React 19, Next.js 16, Tailwind CSS, Lucide icons
+- Backend: Node.js, Express, JWT authentication, bcrypt, MySQL2
+- Data: MySQL 8.4 with normalized schema and seed data
+- AI service: Python 3.12+, FastAPI, explainable job matching, career-readiness scoring, skill-gap analytics, and cover-letter generation
+- Delivery: Docker Compose and ChatGPT Sites configuration
+
+## Included experiences
+
+- Landing page and separate Student/Admin sign-in
+- Student dashboard, personalized jobs, application tracking, AI cover letters, Resume/Career Vault, assessments, analytics, learning, community, events, achievements, and profile management
+- Admin overview, user management, assessments, question bank, resources, events, jobs, community moderation, application funnel, performance monitoring, and system settings
+- Responsive mobile navigation, modals, filters, search, quiz state, reports, CRUD interactions, file selectors, toast feedback, and print-to-PDF resume export
+
+## Quick start with Docker
+
+```bash
+docker compose up --build
+```
+
+Open:
+
+- Web: `http://localhost:3000`
+- Express API: `http://localhost:4000/api/health`
+- Python AI docs: `http://localhost:8000/docs`
+- MySQL: `localhost:3306`
+
+The first MySQL startup automatically applies `database/schema.sql` and `database/seed.sql`.
+
+## Manual development
+
+```bash
+npm install
+copy .env.example .env
+npm run dev:all
+```
+
+Run the Python service in another terminal:
+
+```bash
+python -m pip install -r ai-service/requirements.txt
+python -m uvicorn main:app --app-dir ai-service --reload --port 8000
+```
+
+MySQL must be available using the connection settings in `.env`.
+
+## Demo credentials
+
+Both seeded accounts use the password `careerforge`.
+
+- Student: `student@careerforge.com`
+- Admin: `admin@careerforge.com`
+
+When the frontend is viewed without local services (for example, the hosted design preview), authentication safely falls back to demo mode so the full product experience remains explorable. With the Express API online, the real JWT/MySQL flow is used.
+
+## Verification commands
+
+```bash
+npm run build
+npm audit --omit=dev
+node --check server/src/app.js
+python -m py_compile ai-service/main.py
+python -m pip check
+```
