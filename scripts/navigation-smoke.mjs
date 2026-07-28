@@ -10,9 +10,45 @@ const startPath = {
   brand: "/student",
   "login-student": "/login/student",
   "login-admin": "/login/admin",
+  signup: "/login/student?mode=register",
+  "guard-student": "/student",
+  "guard-admin": "/admin",
 }[scenario];
 if (!startPath) throw new Error(`Unknown navigation scenario: ${scenario}`);
 const window = new Window({ url: `http://localhost${startPath}` });
+if (scenario === "student" || scenario === "brand") {
+  window.localStorage.setItem("careerforge_token", "navigation-test-token");
+  window.localStorage.setItem("careerforge_session", JSON.stringify({
+    role: "student",
+    name: "Test Student",
+    email: "test.student@example.com",
+  }));
+}
+
+const mockFetch = async (url, options = {}) => {
+  const body = JSON.parse(options.body || "{}");
+  if (String(url).endsWith("/auth/register")) {
+    return new window.Response(JSON.stringify({
+      message: "Account created successfully. Sign in to continue.",
+      user: { name: body.name, email: body.email, role: "student" },
+    }), { status: 201, headers: { "Content-Type": "application/json" } });
+  }
+  if (String(url).endsWith("/auth/login")) {
+    return new window.Response(JSON.stringify({
+      token: "navigation-test-token",
+      user: {
+        name: body.role === "admin" ? "Private Administrator" : "New Student",
+        email: body.email,
+        role: body.role,
+      },
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+  return new window.Response(JSON.stringify({ error: "Not found" }), {
+    status: 404,
+    headers: { "Content-Type": "application/json" },
+  });
+};
+
 const browserGlobals = {
   window,
   self: window,
@@ -23,6 +59,8 @@ const browserGlobals = {
   localStorage: window.localStorage,
   sessionStorage: window.sessionStorage,
   FormData: window.FormData,
+  Response: window.Response,
+  fetch: mockFetch,
   Event: window.Event,
   CustomEvent: window.CustomEvent,
   MouseEvent: window.MouseEvent,
@@ -100,6 +138,11 @@ async function submitLoginAndAssert(expectedPath) {
   const form = document.querySelector("form");
   if (!form) throw new Error(`Login form was not found on ${window.location.pathname}.`);
 
+  const email = form.querySelector('input[name="email"]');
+  const password = form.querySelector('input[name="password"]');
+  email.value = expectedPath === "/admin" ? "private.admin@example.com" : "student@example.com";
+  password.value = "private-password";
+
   form.dispatchEvent(new window.Event("submit", {
     bubbles: true,
     cancelable: true,
@@ -111,13 +154,45 @@ async function submitLoginAndAssert(expectedPath) {
   }
 }
 
+function assertCredentialsAreBlank() {
+  const email = document.querySelector('input[name="email"]');
+  const password = document.querySelector('input[name="password"]');
+  if (!email || !password || email.value || password.value) {
+    throw new Error(`Credentials are prefilled on ${window.location.pathname}.`);
+  }
+}
+
+async function registerThenSignIn() {
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  const registrationForm = document.querySelector("form");
+  registrationForm.querySelector('input[name="name"]').value = "New Student";
+  registrationForm.querySelector('input[name="email"]').value = "new.student@example.com";
+  registrationForm.querySelector('input[name="password"]').value = "private-password";
+  registrationForm.querySelector('input[type="checkbox"]').checked = true;
+  registrationForm.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((resolve) => setTimeout(resolve, 80));
+
+  const successText = document.getElementById("root")?.textContent || "";
+  if (
+    window.location.pathname !== "/login/student" ||
+    !successText.includes("Account created successfully") ||
+    document.querySelector('input[name="email"]').value ||
+    document.querySelector('input[name="password"]').value
+  ) {
+    throw new Error("Registration did not return a blank sign-in form.");
+  }
+
+  await submitLoginAndAssert("/student");
+}
+
 if (scenario === "public") {
   await clickAndAssert("/login/student", "/login/student", "Welcome back.");
+  assertCredentialsAreBlank();
   await clickAndAssert("/login/admin", "/login/admin", "Admin access.");
+  assertCredentialsAreBlank();
   await clickAndAssert("/login/student", "/login/student", "Welcome back.");
   await clickAndAssert("/", "/", "Career clarity, engineered", "Back home");
   await clickAndAssert("/login/student?mode=register", "/login/student", "Start your journey.");
-  await clickButtonAndAssert("Google account", "/student");
 } else if (scenario === "student") {
   await clickButtonAndAssert("Recommended jobs", "/student", "Your best-fit opportunities");
   await clickButtonAndAssert("Sign out", "/");
@@ -127,6 +202,14 @@ if (scenario === "public") {
   await submitLoginAndAssert("/student");
 } else if (scenario === "login-admin") {
   await submitLoginAndAssert("/admin");
+} else if (scenario === "signup") {
+  await registerThenSignIn();
+} else if (scenario === "guard-student") {
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  if (window.location.pathname !== "/login/student") throw new Error("Unauthenticated student route was not blocked.");
+} else if (scenario === "guard-admin") {
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  if (window.location.pathname !== "/login/admin") throw new Error("Unauthenticated admin route was not blocked.");
 } else {
   throw new Error(`Unknown navigation scenario: ${scenario}`);
 }

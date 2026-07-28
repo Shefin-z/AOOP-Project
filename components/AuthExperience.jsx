@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "../lib/router";
+import { Link, useLocation } from "../lib/router";
 import {
   ArrowLeft,
   ArrowRight,
@@ -16,13 +16,13 @@ import Brand from "./Brand";
 import { registerStudent, signIn } from "../lib/api";
 
 export default function AuthExperience({ role = "student" }) {
-  const navigate = useNavigate();
   const { search } = useLocation();
   const isAdmin = role === "admin";
   const [mode, setMode] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const workspacePath = isAdmin ? "/admin" : "/student";
 
   const enterWorkspace = (session, token) => {
@@ -39,39 +39,41 @@ export default function AuthExperience({ role = "student" }) {
 
   const submit = async (event) => {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    if (!data.get("email") || !data.get("password")) {
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const name = String(data.get("name") || "").trim();
+    const email = String(data.get("email") || "").trim().toLowerCase();
+    const password = String(data.get("password") || "");
+
+    if (!email || !password || (mode === "register" && !name)) {
       setError("Please enter your email and password.");
       return;
     }
+    if (password.length < 8) {
+      setError("Password must contain at least 8 characters.");
+      return;
+    }
     setError("");
+    setSuccess("");
     setLoading(true);
-    const demoSession = {
-      role,
-      name: isAdmin ? "Farhan Rahman" : data.get("name") || "Nadia Ahmed",
-      email: data.get("email"),
-    };
+
     try {
-      const result = mode === "register"
-        ? await registerStudent({
-            name: data.get("name"),
-            email: data.get("email"),
-            password: data.get("password"),
-          })
-        : await signIn({
-            email: data.get("email"),
-            password: data.get("password"),
-            role,
-          });
-      enterWorkspace(result.user, result.token);
-    } catch (requestError) {
-      if (requestError.status) {
-        setError(requestError.message);
-        setLoading(false);
+      if (mode === "register") {
+        await registerStudent({ name, email, password });
+        form.reset();
+        setShowPassword(false);
+        setMode("login");
+        setSuccess("Account created successfully. Sign in with your new email and password.");
+        window.history.replaceState({}, "", "/login/student");
         return;
       }
-      // The deployed design demo remains explorable when the local API is offline.
-      enterWorkspace(demoSession);
+
+      const result = await signIn({ email, password, role });
+      enterWorkspace(result.user, result.token);
+    } catch (requestError) {
+      setError(requestError.message || "Authentication is temporarily unavailable.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -137,7 +139,7 @@ export default function AuthExperience({ role = "student" }) {
                 {["login", "register"].map((item) => (
                   <button
                     key={item}
-                    onClick={() => { setMode(item); setError(""); }}
+                    onClick={() => { setMode(item); setError(""); setSuccess(""); setShowPassword(false); }}
                     className={`min-h-10 rounded-xl text-sm font-bold transition ${mode === item ? "bg-white text-ink shadow-sm" : "text-muted"}`}
                   >
                     {item === "login" ? "Sign in" : "Create account"}
@@ -146,13 +148,13 @@ export default function AuthExperience({ role = "student" }) {
               </div>
             )}
 
-            <form onSubmit={submit} className="space-y-4">
+            <form key={`${role}-${mode}`} onSubmit={submit} className="space-y-4">
               {mode === "register" && (
                 <label className="block">
                   <span className="mb-2 block text-xs font-bold text-ink">Full name</span>
                   <span className="relative block">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={17} />
-                    <input name="name" className="input pl-11" placeholder="e.g. Nadia Ahmed" />
+                    <input name="name" autoComplete="name" className="input pl-11" placeholder="Your full name" />
                   </span>
                 </label>
               )}
@@ -160,7 +162,13 @@ export default function AuthExperience({ role = "student" }) {
                 <span className="mb-2 block text-xs font-bold text-ink">{isAdmin ? "Work email" : "Email address"}</span>
                 <span className="relative block">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={17} />
-                  <input name="email" type="email" className="input pl-11" defaultValue={isAdmin ? "admin@careerforge.com" : "student@careerforge.com"} placeholder="you@example.com" />
+                  <input
+                    name="email"
+                    type="email"
+                    autoComplete="username"
+                    className="input pl-11"
+                    placeholder={isAdmin ? "Your private admin email" : "you@example.com"}
+                  />
                 </span>
               </label>
               <label className="block">
@@ -170,7 +178,13 @@ export default function AuthExperience({ role = "student" }) {
                 </span>
                 <span className="relative block">
                   <LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={17} />
-                  <input name="password" type={showPassword ? "text" : "password"} className="input pl-11 pr-11" defaultValue="careerforge" placeholder="Minimum 8 characters" />
+                  <input
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete={mode === "register" ? "new-password" : "current-password"}
+                    className="input pl-11 pr-11"
+                    placeholder="Minimum 8 characters"
+                  />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted" aria-label="Toggle password visibility">
                     {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                   </button>
@@ -183,23 +197,12 @@ export default function AuthExperience({ role = "student" }) {
                 </label>
               )}
               {error && <p className="rounded-xl bg-coral/10 px-3 py-2 text-xs font-semibold text-coral">{error}</p>}
+              {success && <p className="rounded-xl bg-jade/10 px-3 py-2 text-xs font-semibold text-jade">{success}</p>}
               <button disabled={loading} className={`w-full ${isAdmin ? "btn-primary !bg-plum hover:!bg-[#64465b]" : "btn-accent"}`}>
                 {loading ? "Preparing your workspace..." : mode === "register" ? "Create student account" : `Enter ${isAdmin ? "admin portal" : "workspace"}`}
                 {!loading && <ArrowRight size={17} />}
               </button>
             </form>
-
-            {!isAdmin && (
-              <>
-                <div className="my-6 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted/70">
-                  <span className="h-px flex-1 bg-ink/10" />or continue with<span className="h-px flex-1 bg-ink/10" />
-                </div>
-                <button onClick={() => enterWorkspace(demoSessionForGoogle())} className="btn-secondary w-full">
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-white text-sm font-black text-cobalt">G</span>
-                  Google account
-                </button>
-              </>
-            )}
 
             <p className="mt-7 text-center text-xs text-muted">
               {isAdmin ? "Student trying to sign in?" : "Platform administrator?"}{" "}
@@ -212,12 +215,4 @@ export default function AuthExperience({ role = "student" }) {
       </div>
     </main>
   );
-}
-
-function demoSessionForGoogle() {
-  return {
-    role: "student",
-    name: "Nadia Ahmed",
-    email: "student@careerforge.com",
-  };
 }

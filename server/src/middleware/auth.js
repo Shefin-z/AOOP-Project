@@ -1,6 +1,9 @@
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = process.env.JWT_SECRET || "careerforge-local-development-secret";
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === "production" ? "" : "careerforge-local-development-secret");
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET is required in production.");
+}
 
 function authenticate(req, res, next) {
   const header = req.headers.authorization || "";

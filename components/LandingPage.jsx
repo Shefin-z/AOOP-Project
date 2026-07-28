@@ -261,7 +261,7 @@ export default function LandingPage() {
             <h2 className="mt-4 font-display text-5xl leading-[1] tracking-[-0.05em] sm:text-6xl">Stop planning around potential. <i>Build it.</i></h2>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/login/student?mode=register" className="btn-primary !bg-white !text-ink">Create free account <ArrowRight size={17} /></Link>
-              <Link to="/login/admin" className="btn-secondary !border-white/20 !bg-white/10 !text-white hover:!bg-white/20">Explore admin demo</Link>
+              <Link to="/login/admin" className="btn-secondary !border-white/20 !bg-white/10 !text-white hover:!bg-white/20">Administrator portal</Link>
             </div>
           </div>
           <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full border-[70px] border-white/10" />

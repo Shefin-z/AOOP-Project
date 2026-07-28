@@ -49,14 +49,35 @@ python -m uvicorn main:app --app-dir ai-service --reload --port 8000
 
 MySQL must be available using the connection settings in `.env`.
 
-## Demo credentials
+## Authentication setup
 
-Both seeded accounts use the password `careerforge`.
+No account credentials are committed or prefilled. Students create an account and
+then sign in with their own email and password. Production authentication requires
+the Express API and MySQL connection configured through environment variables.
 
-- Student: `student@careerforge.com`
-- Admin: `admin@careerforge.com`
+Create the private administrator after applying the database schema:
 
-When the frontend is viewed without local services (for example, the hosted design preview), authentication safely falls back to demo mode so the full product experience remains explorable. With the Express API online, the real JWT/MySQL flow is used.
+```bash
+set ADMIN_NAME=Your Name
+set ADMIN_EMAIL=your-private-admin@example.com
+set ADMIN_PASSWORD=use-a-long-private-password
+npm run admin:create
+```
+
+Use the equivalent environment-variable syntax for your shell. Never commit the
+real administrator values.
+
+For Vercel production, connect a TiDB Cloud cluster to the project so the
+`TIDB_*` connection variables are injected, add a long random `JWT_SECRET`, and
+then initialize the remote database:
+
+```bash
+npm run db:setup
+npm run admin:create
+```
+
+The Vercel function in `api/index.js` serves the Express API on the same origin
+as the frontend.
 
 ## Verification commands
 

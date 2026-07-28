@@ -1,14 +1,6 @@
-USE careerforge;
-
-INSERT INTO users (name, email, password_hash, role, status) VALUES
-  ('Nadia Ahmed', 'student@careerforge.com', '$2a$12$KBQ9gK0Wdi7xryVbIHo3nenybLNMPIW.n5TnhXaNmCKblL1P5cj0O', 'student', 'active'),
-  ('Farhan Rahman', 'admin@careerforge.com', '$2a$12$ej6VIp5PPlf3dT9q.uYIAex9LIO8dOrt/ihmsAB3r.i2x.xveEaMa', 'admin', 'active')
-ON DUPLICATE KEY UPDATE name=VALUES(name), password_hash=VALUES(password_hash), role=VALUES(role), status='active';
-
-INSERT INTO student_profiles (user_id, university, degree, graduation_year, target_role, location, readiness_score, profile_completion)
-SELECT id, 'North South University', 'BSc in Computer Science', 2027, 'Product Analyst', 'Dhaka, Bangladesh', 78, 92
-FROM users WHERE email='student@careerforge.com'
-ON DUPLICATE KEY UPDATE university=VALUES(university), degree=VALUES(degree), target_role=VALUES(target_role), readiness_score=78, profile_completion=92;
+-- Accounts are never committed as seed data.
+-- Students register through the public API. Create the private administrator
+-- with `npm run admin:create` after setting the ADMIN_* environment variables.
 
 INSERT INTO skills (name, category) VALUES
   ('JavaScript', 'Development'),
@@ -22,14 +14,6 @@ INSERT INTO skills (name, category) VALUES
   ('Statistics', 'Analytics'),
   ('Figma', 'Design')
 ON DUPLICATE KEY UPDATE category=VALUES(category);
-
-INSERT INTO user_skills (user_id, skill_id, score, source)
-SELECT u.id, s.id,
-  CASE s.name WHEN 'JavaScript' THEN 82 WHEN 'React' THEN 79 WHEN 'SQL' THEN 76 WHEN 'Product Analytics' THEN 72 WHEN 'Professional Communication' THEN 91 ELSE 68 END,
-  'assessment'
-FROM users u JOIN skills s ON s.name IN ('JavaScript','React','SQL','Product Analytics','Product Thinking','Professional Communication')
-WHERE u.email='student@careerforge.com'
-ON DUPLICATE KEY UPDATE score=VALUES(score), source=VALUES(source);
 
 INSERT INTO companies (name, description, website, employee_rating, review_count) VALUES
   ('Pathao', 'A leading digital services platform in Bangladesh.', 'https://pathao.com', 4.7, 248),
@@ -114,7 +98,3 @@ INSERT INTO achievements (code, title, description, icon, xp_reward, criteria) V
   ('interview_ready', 'Interview Ready', 'Reach an 80% readiness score.', 'target', 160, JSON_OBJECT('readiness_score', 80)),
   ('application_ace', 'Application Ace', 'Submit ten tailored applications.', 'briefcase', 140, JSON_OBJECT('applications', 10))
 ON DUPLICATE KEY UPDATE title=VALUES(title), criteria=VALUES(criteria);
-
-INSERT INTO community_posts (user_id, content, tags, status)
-SELECT id, 'Just finished my first technical interview. Writing my STAR stories before the interview made the behavioral round feel much more structured.', JSON_ARRAY('Interview prep','Small wins'), 'visible'
-FROM users WHERE email='student@careerforge.com';

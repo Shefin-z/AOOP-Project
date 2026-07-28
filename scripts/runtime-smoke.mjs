@@ -5,6 +5,15 @@ import { Window } from "happy-dom";
 
 const targetPath = process.argv[2] || "/";
 const window = new Window({ url: `http://localhost${targetPath}` });
+const protectedRole = targetPath === "/admin" ? "admin" : targetPath === "/student" ? "student" : null;
+if (protectedRole) {
+  window.localStorage.setItem("careerforge_token", "runtime-test-token");
+  window.localStorage.setItem("careerforge_session", JSON.stringify({
+    role: protectedRole,
+    name: protectedRole === "admin" ? "Private Administrator" : "Test Student",
+    email: `${protectedRole}@example.com`,
+  }));
+}
 
 const browserGlobals = {
   window,

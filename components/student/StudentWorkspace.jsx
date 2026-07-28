@@ -118,6 +118,11 @@ const quizQuestions = [
 ];
 
 export default function StudentWorkspace() {
+  let sessionName = "Student";
+  try {
+    sessionName = JSON.parse(localStorage.getItem("careerforge_session"))?.name || sessionName;
+  } catch {}
+  const firstName = sessionName.split(/\s+/)[0];
   const [active, setActive] = useState("overview");
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null);
@@ -156,7 +161,7 @@ export default function StudentWorkspace() {
         navItems={navItems}
         active={active}
         onNavigate={setActive}
-        title={pageMeta[active][0]}
+        title={active === "overview" ? `Good afternoon, ${firstName}` : pageMeta[active][0]}
         subtitle={pageMeta[active][1]}
         actions={pageActions[active]}
       >

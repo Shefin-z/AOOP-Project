@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "../lib/router";
 import { Bell, ChevronDown, LogOut, Menu, Search, X } from "lucide-react";
 import Brand from "./Brand";
+
+function getSessionName(role) {
+  try {
+    const session = JSON.parse(localStorage.getItem("careerforge_session"));
+    if (session?.role === role && session?.name) return session.name;
+  } catch {}
+  return role === "admin" ? "Administrator" : "Student";
+}
 
 export default function DashboardShell({
   role,
@@ -13,10 +20,9 @@ export default function DashboardShell({
   subtitle,
   actions,
 }) {
-  const navigateRoute = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [name, setName] = useState(role === "admin" ? "Farhan Rahman" : "Nadia Ahmed");
+  const [name, setName] = useState(() => getSessionName(role));
 
   useEffect(() => {
     try {
