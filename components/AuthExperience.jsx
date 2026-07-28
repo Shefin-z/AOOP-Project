@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import Brand from "./Brand";
 import ThemeToggle from "./ThemeToggle";
-import AdaptiveHeroImage from "./AdaptiveHeroImage";
+import AuthVisual from "./AuthVisual";
 import { registerStudent, signIn } from "../lib/api";
 import { navigateFresh } from "../lib/sessionNavigation";
 
@@ -83,17 +83,12 @@ export default function AuthExperience({ role = "student" }) {
   return (
     <main className="min-h-screen bg-canvas p-3 sm:p-5">
       <div className="mx-auto grid min-h-[calc(100vh-24px)] max-w-[1500px] overflow-hidden rounded-[30px] border border-white/75 bg-white/55 shadow-lift backdrop-blur-xl sm:min-h-[calc(100vh-40px)] lg:grid-cols-[.95fr_1.05fr]">
-        <section className="relative hidden overflow-hidden bg-[#DED2BE] p-8 lg:block">
-          <AdaptiveHeroImage
-            alt="Two students building their CareerForge journey together"
-            className="absolute inset-0"
-            imageClassName="object-cover object-[62%_center]"
-          />
-          <div className="absolute inset-0 bg-ink/10" />
-          <div className="absolute left-8 top-8 glass-strong rounded-2xl px-4 py-3">
+        <section className="auth-media-panel relative hidden overflow-hidden bg-[#DED2BE] p-8 lg:block">
+          <AuthVisual role={isAdmin ? "admin" : "student"} />
+          <div className="auth-brand-card absolute left-8 top-8 glass-strong rounded-2xl px-4 py-3">
             <Brand />
           </div>
-          <div className="absolute bottom-8 left-8 right-8 rounded-[28px] border border-white/60 bg-white/75 p-7 shadow-glass backdrop-blur-2xl">
+          <div className="auth-story-card absolute bottom-8 left-8 right-8 rounded-[28px] border border-white/60 bg-white/75 p-7 shadow-glass backdrop-blur-2xl">
             <div className="eyebrow mb-4 !text-ink">
               {isAdmin ? <ShieldCheck size={14} /> : <Sparkles size={14} />}
               {isAdmin ? "Secure operations portal" : "Your guided career workspace"}
