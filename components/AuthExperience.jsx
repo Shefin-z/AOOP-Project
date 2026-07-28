@@ -13,6 +13,7 @@ import {
   User,
 } from "lucide-react";
 import Brand from "./Brand";
+import ThemeToggle from "./ThemeToggle";
 import { registerStudent, signIn } from "../lib/api";
 import { navigateFresh } from "../lib/sessionNavigation";
 
@@ -115,7 +116,10 @@ export default function AuthExperience({ role = "student" }) {
         <section className="flex min-h-full flex-col p-5 sm:p-8 lg:p-12 xl:p-16">
           <div className="flex items-center justify-between">
             <div className="lg:hidden"><Brand /></div>
-            <Link to="/" className="btn-ghost ml-auto"><ArrowLeft size={16} /> Back home</Link>
+            <div className="ml-auto flex items-center gap-2">
+              <ThemeToggle />
+              <Link to="/" className="btn-ghost"><ArrowLeft size={16} /> Back home</Link>
+            </div>
           </div>
 
           <div className="mx-auto my-auto w-full max-w-[470px] py-10">

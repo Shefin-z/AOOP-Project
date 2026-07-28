@@ -7,6 +7,7 @@ import StudentWorkspace from "../components/student/StudentWorkspace";
 import AdminWorkspace from "../components/admin/AdminWorkspace";
 import { RouterProvider, useLocation } from "../lib/router";
 import { clearNavigationToken, navigateFresh } from "../lib/sessionNavigation";
+import { ThemeProvider } from "../lib/theme";
 
 const RECOVERY_KEY = "careerforge:route-recovery";
 
@@ -89,10 +90,12 @@ function App() {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <AppErrorBoundary>
-      <RouterProvider>
-        <App />
-      </RouterProvider>
-    </AppErrorBoundary>
+    <ThemeProvider>
+      <AppErrorBoundary>
+        <RouterProvider>
+          <App />
+        </RouterProvider>
+      </AppErrorBoundary>
+    </ThemeProvider>
   </React.StrictMode>,
 );

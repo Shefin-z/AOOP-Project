@@ -19,6 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import Brand from "./Brand";
+import ThemeToggle from "./ThemeToggle";
 
 const features = [
   {
@@ -76,11 +77,13 @@ export default function LandingPage() {
             ))}
           </div>
           <div className="hidden items-center gap-2 sm:flex">
+            <ThemeToggle />
             <Link to="/login/admin" className="btn-ghost">Admin</Link>
             <Link to="/login/student" className="btn-primary min-h-11 px-4">
               Student login <ArrowRight size={16} />
             </Link>
           </div>
+          <ThemeToggle className="sm:hidden" />
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             className="grid h-10 w-10 place-items-center rounded-xl bg-ink text-white sm:hidden"

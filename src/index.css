@@ -12,6 +12,16 @@
   --jade: #4e7864;
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #000000;
+  --paper: #0d0d0e;
+  --ink: #f6f7fb;
+  --cobalt: #8ea6ff;
+  --coral: #ff9f7f;
+  --jade: #76c6a4;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -157,6 +167,125 @@ textarea:focus-visible {
   .progress-track {
     @apply h-2 overflow-hidden rounded-full bg-ink/[0.08];
   }
+
+  .theme-toggle {
+    @apply grid h-10 w-10 place-items-center rounded-xl border border-ink/[0.08] bg-white/60 text-ink transition hover:-translate-y-0.5 hover:bg-white;
+  }
+}
+
+/* Pure-black mode deliberately keeps the page canvas at #000 while using
+   near-black surfaces for readable glass panels and form controls. */
+:root[data-theme="dark"] body {
+  background: #000;
+  color: #f6f7fb;
+}
+
+:root[data-theme="dark"] .bg-canvas {
+  background-color: #000 !important;
+}
+
+:root[data-theme="dark"] .bg-canvas\/80 {
+  background-color: rgba(0, 0, 0, 0.88) !important;
+}
+
+:root[data-theme="dark"] .glass {
+  border-color: rgba(255, 255, 255, 0.14);
+  background-color: rgba(13, 13, 14, 0.84);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+
+:root[data-theme="dark"] .glass-strong,
+:root[data-theme="dark"] .modal-card {
+  border-color: rgba(255, 255, 255, 0.16);
+  background-color: rgba(17, 17, 18, 0.96);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
+}
+
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .metric-card {
+  border-color: rgba(255, 255, 255, 0.12);
+  background-color: #0d0d0e;
+  box-shadow: 0 14px 45px rgba(0, 0, 0, 0.52);
+}
+
+:root[data-theme="dark"] .btn-secondary,
+:root[data-theme="dark"] .input,
+:root[data-theme="dark"] .tag,
+:root[data-theme="dark"] .table-shell,
+:root[data-theme="dark"] .theme-toggle {
+  border-color: rgba(255, 255, 255, 0.14);
+  background-color: #111113;
+  color: #f6f7fb;
+}
+
+:root[data-theme="dark"] .btn-secondary:hover,
+:root[data-theme="dark"] .theme-toggle:hover,
+:root[data-theme="dark"] .dash-side-link:hover {
+  background-color: #1b1b1e;
+}
+
+:root[data-theme="dark"] .input:focus {
+  border-color: rgba(142, 166, 255, 0.72);
+  background-color: #151518;
+  box-shadow: 0 0 0 4px rgba(142, 166, 255, 0.14);
+}
+
+:root[data-theme="dark"] .input::placeholder {
+  color: #747985;
+}
+
+:root[data-theme="dark"] .text-ink {
+  color: #f6f7fb !important;
+}
+
+:root[data-theme="dark"] .text-muted,
+:root[data-theme="dark"] .text-muted\/65,
+:root[data-theme="dark"] .text-muted\/70 {
+  color: #a7adba !important;
+}
+
+:root[data-theme="dark"] [class*="border-ink"] {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .bg-white\/35,
+:root[data-theme="dark"] .bg-white\/50,
+:root[data-theme="dark"] .bg-white\/55,
+:root[data-theme="dark"] .bg-white\/60,
+:root[data-theme="dark"] .bg-white\/65,
+:root[data-theme="dark"] .bg-white\/70,
+:root[data-theme="dark"] .bg-white\/75,
+:root[data-theme="dark"] .bg-white\/80,
+:root[data-theme="dark"] .bg-white\/85,
+:root[data-theme="dark"] .bg-paper\/80,
+:root[data-theme="dark"] .bg-\[\#DED2BE\] {
+  background-color: #111113 !important;
+}
+
+:root[data-theme="dark"] .bg-\[\#DED2BE\] {
+  background-image: none;
+}
+
+:root[data-theme="dark"] .border-white\/45,
+:root[data-theme="dark"] .border-white\/60,
+:root[data-theme="dark"] .border-white\/70,
+:root[data-theme="dark"] .border-white\/75,
+:root[data-theme="dark"] .border-white\/80 {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+:root[data-theme="dark"] .modal-backdrop {
+  background-color: rgba(0, 0, 0, 0.82);
+}
+
+:root[data-theme="dark"] option {
+  background: #111113;
+  color: #f6f7fb;
+}
+
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.24);
 }
 
 .noise {

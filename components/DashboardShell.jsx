@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Bell, ChevronDown, LogOut, Menu, Search, X } from "lucide-react";
 import Brand from "./Brand";
+import ThemeToggle from "./ThemeToggle";
 import { navigateFresh } from "../lib/sessionNavigation";
 
 function getSessionName(role) {
@@ -97,6 +98,7 @@ export default function DashboardShell({
             <input className="input min-h-10 bg-white/55 pl-10" placeholder={role === "admin" ? "Search users, jobs, content..." : "Search jobs, resources, community..."} />
           </label>
           <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <button className="relative grid h-10 w-10 place-items-center rounded-xl border border-ink/[0.08] bg-white/60 text-muted transition hover:bg-white hover:text-ink">
               <Bell size={17} />
               <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-coral" />
