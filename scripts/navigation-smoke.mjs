@@ -4,7 +4,14 @@ import vm from "node:vm";
 import { Window } from "happy-dom";
 
 const scenario = process.argv[2] || "public";
-const startPath = scenario === "public" ? "/" : "/student";
+const startPath = {
+  public: "/",
+  student: "/student",
+  brand: "/student",
+  "login-student": "/login/student",
+  "login-admin": "/login/admin",
+}[scenario];
+if (!startPath) throw new Error(`Unknown navigation scenario: ${scenario}`);
 const window = new Window({ url: `http://localhost${startPath}` });
 const browserGlobals = {
   window,
@@ -15,6 +22,7 @@ const browserGlobals = {
   history: window.history,
   localStorage: window.localStorage,
   sessionStorage: window.sessionStorage,
+  FormData: window.FormData,
   Event: window.Event,
   CustomEvent: window.CustomEvent,
   MouseEvent: window.MouseEvent,
@@ -88,6 +96,21 @@ async function clickButtonAndAssert(label, expectedPath, expectedText) {
   }
 }
 
+async function submitLoginAndAssert(expectedPath) {
+  const form = document.querySelector("form");
+  if (!form) throw new Error(`Login form was not found on ${window.location.pathname}.`);
+
+  form.dispatchEvent(new window.Event("submit", {
+    bubbles: true,
+    cancelable: true,
+  }));
+  await new Promise((resolve) => setTimeout(resolve, 80));
+
+  if (window.location.pathname !== expectedPath) {
+    throw new Error(`Login form did not navigate to ${expectedPath}.`);
+  }
+}
+
 if (scenario === "public") {
   await clickAndAssert("/login/student", "/login/student", "Welcome back.");
   await clickAndAssert("/login/admin", "/login/admin", "Admin access.");
@@ -100,6 +123,10 @@ if (scenario === "public") {
   await clickButtonAndAssert("Sign out", "/");
 } else if (scenario === "brand") {
   await clickAndAssert("/", "/");
+} else if (scenario === "login-student") {
+  await submitLoginAndAssert("/student");
+} else if (scenario === "login-admin") {
+  await submitLoginAndAssert("/admin");
 } else {
   throw new Error(`Unknown navigation scenario: ${scenario}`);
 }
