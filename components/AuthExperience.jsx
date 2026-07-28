@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "../lib/router";
+import { Link, useLocation, useNavigate } from "../lib/router";
 import {
   ArrowLeft,
   ArrowRight,
@@ -17,6 +17,7 @@ import { registerStudent, signIn } from "../lib/api";
 
 export default function AuthExperience({ role = "student" }) {
   const navigate = useNavigate();
+  const { search } = useLocation();
   const isAdmin = role === "admin";
   const [mode, setMode] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
@@ -24,10 +25,10 @@ export default function AuthExperience({ role = "student" }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!isAdmin && new URLSearchParams(window.location.search).get("mode") === "register") {
-      setMode("register");
+    if (!isAdmin) {
+      setMode(new URLSearchParams(search).get("mode") === "register" ? "register" : "login");
     }
-  }, [isAdmin]);
+  }, [isAdmin, search]);
 
   const submit = async (event) => {
     event.preventDefault();
