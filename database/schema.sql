@@ -93,8 +93,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_jobs_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
-  INDEX idx_jobs_status_category (status, category),
-  FULLTEXT INDEX ft_jobs_text (title, description, requirements)
+  INDEX idx_jobs_status_category (status, category)
 );
 
 CREATE TABLE IF NOT EXISTS job_skills (
