@@ -1,8 +1,5 @@
-"use client";
-
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useNavigate } from "../lib/router";
 import { Bell, ChevronDown, LogOut, Menu, Search, X } from "lucide-react";
 import Brand from "./Brand";
 
@@ -16,7 +13,7 @@ export default function DashboardShell({
   subtitle,
   actions,
 }) {
-  const router = useRouter();
+  const navigateRoute = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [name, setName] = useState(role === "admin" ? "Farhan Rahman" : "Nadia Ahmed");
@@ -36,7 +33,7 @@ export default function DashboardShell({
   const logout = () => {
     localStorage.removeItem("careerforge_session");
     localStorage.removeItem("careerforge_token");
-    router.push("/");
+    navigateRoute("/");
   };
 
   const sidebar = (

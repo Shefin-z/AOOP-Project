@@ -4,7 +4,7 @@ CareerForge is a full-stack AI career-development platform for university studen
 
 ## Technology
 
-- Frontend: React 19, Next.js 16, Tailwind CSS, Lucide icons
+- Frontend: React 19, Vite 7, Tailwind CSS, Lucide icons
 - Backend: Node.js, Express, JWT authentication, bcrypt, MySQL2
 - Data: MySQL 8.4 with normalized schema and seed data
 - AI service: Python 3.12+, FastAPI, explainable job matching, career-readiness scoring, skill-gap analytics, and cover-letter generation

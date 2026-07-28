@@ -1,9 +1,5 @@
-"use client";
-
-import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Link, useNavigate } from "../lib/router";
 import {
   ArrowLeft,
   ArrowRight,
@@ -20,7 +16,7 @@ import Brand from "./Brand";
 import { registerStudent, signIn } from "../lib/api";
 
 export default function AuthExperience({ role = "student" }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const isAdmin = role === "admin";
   const [mode, setMode] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
@@ -61,7 +57,7 @@ export default function AuthExperience({ role = "student" }) {
           });
       localStorage.setItem("careerforge_token", result.token);
       localStorage.setItem("careerforge_session", JSON.stringify(result.user));
-      router.push(isAdmin ? "/admin" : "/student");
+      navigate(isAdmin ? "/admin" : "/student");
     } catch (requestError) {
       if (requestError.status) {
         setError(requestError.message);
@@ -70,7 +66,7 @@ export default function AuthExperience({ role = "student" }) {
       }
       // The deployed design demo remains explorable when the local API is offline.
       localStorage.setItem("careerforge_session", JSON.stringify(demoSession));
-      window.setTimeout(() => router.push(isAdmin ? "/admin" : "/student"), 400);
+      window.setTimeout(() => navigate(isAdmin ? "/admin" : "/student"), 400);
     }
   };
 
@@ -78,12 +74,10 @@ export default function AuthExperience({ role = "student" }) {
     <main className="min-h-screen bg-canvas p-3 sm:p-5">
       <div className="mx-auto grid min-h-[calc(100vh-24px)] max-w-[1500px] overflow-hidden rounded-[30px] border border-white/75 bg-white/55 shadow-lift backdrop-blur-xl sm:min-h-[calc(100vh-40px)] lg:grid-cols-[.95fr_1.05fr]">
         <section className="relative hidden overflow-hidden bg-[#DED2BE] p-8 lg:block">
-          <Image
+          <img
             src="/careerforge-hero.png"
             alt="CareerForge career journey"
-            fill
-            priority
-            className="object-cover object-[62%_center]"
+            className="absolute inset-0 h-full w-full object-cover object-[62%_center]"
           />
           <div className="absolute inset-0 bg-ink/10" />
           <div className="absolute left-8 top-8 glass-strong rounded-2xl px-4 py-3">
@@ -113,7 +107,7 @@ export default function AuthExperience({ role = "student" }) {
         <section className="flex min-h-full flex-col p-5 sm:p-8 lg:p-12 xl:p-16">
           <div className="flex items-center justify-between">
             <div className="lg:hidden"><Brand /></div>
-            <Link href="/" className="btn-ghost ml-auto"><ArrowLeft size={16} /> Back home</Link>
+            <Link to="/" className="btn-ghost ml-auto"><ArrowLeft size={16} /> Back home</Link>
           </div>
 
           <div className="mx-auto my-auto w-full max-w-[470px] py-10">
@@ -195,7 +189,7 @@ export default function AuthExperience({ role = "student" }) {
                 <div className="my-6 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted/70">
                   <span className="h-px flex-1 bg-ink/10" />or continue with<span className="h-px flex-1 bg-ink/10" />
                 </div>
-                <button onClick={() => router.push("/student")} className="btn-secondary w-full">
+                <button onClick={() => navigate("/student")} className="btn-secondary w-full">
                   <span className="grid h-6 w-6 place-items-center rounded-full bg-white text-sm font-black text-cobalt">G</span>
                   Google account
                 </button>
@@ -204,7 +198,7 @@ export default function AuthExperience({ role = "student" }) {
 
             <p className="mt-7 text-center text-xs text-muted">
               {isAdmin ? "Student trying to sign in?" : "Platform administrator?"}{" "}
-              <Link className="font-bold text-cobalt hover:underline" href={isAdmin ? "/login/student" : "/login/admin"}>
+              <Link className="font-bold text-cobalt hover:underline" to={isAdmin ? "/login/student" : "/login/admin"}>
                 Go to {isAdmin ? "student login" : "admin portal"}
               </Link>
             </p>

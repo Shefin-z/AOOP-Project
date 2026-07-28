@@ -1,8 +1,5 @@
-"use client";
-
-import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
+import { Link } from "../lib/router";
 import {
   ArrowRight,
   BarChart3,
@@ -21,7 +18,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import Brand from "../components/Brand";
+import Brand from "./Brand";
 
 const features = [
   {
@@ -79,8 +76,8 @@ export default function LandingPage() {
             ))}
           </div>
           <div className="hidden items-center gap-2 sm:flex">
-            <Link href="/login/admin" className="btn-ghost">Admin</Link>
-            <Link href="/login/student" className="btn-primary min-h-11 px-4">
+            <Link to="/login/admin" className="btn-ghost">Admin</Link>
+            <Link to="/login/student" className="btn-primary min-h-11 px-4">
               Student login <ArrowRight size={16} />
             </Link>
           </div>
@@ -98,8 +95,8 @@ export default function LandingPage() {
               <a key={item} href={`#${item.toLowerCase().replaceAll(" ", "-")}`} onClick={() => setMenuOpen(false)} className="dash-side-link">{item}</a>
             ))}
             <div className="mt-2 grid grid-cols-2 gap-2 border-t border-ink/10 pt-3">
-              <Link href="/login/admin" className="btn-secondary">Admin</Link>
-              <Link href="/login/student" className="btn-primary">Student login</Link>
+              <Link to="/login/admin" className="btn-secondary">Admin</Link>
+              <Link to="/login/student" className="btn-primary">Student login</Link>
             </div>
           </div>
         )}
@@ -120,7 +117,7 @@ export default function LandingPage() {
               CareerForge connects your skills, goals and progress into one intelligent career system—so every next move feels deliberate.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/login/student?mode=register" className="btn-accent px-6">
+              <Link to="/login/student?mode=register" className="btn-accent px-6">
                 Start forging your path <ArrowRight size={17} />
               </Link>
               <a href="#journey" className="btn-secondary px-5">
@@ -143,12 +140,9 @@ export default function LandingPage() {
               <span><b className="block text-sm">Readiness +12%</b><small className="text-muted">this month</small></span>
             </div>
             <div className="overflow-hidden rounded-[40px] border-[8px] border-white/45 shadow-lift">
-              <Image
+              <img
                 src="/careerforge-hero.png"
                 alt="Graduate exploring an AI-guided career path"
-                width={1696}
-                height={929}
-                priority
                 className="aspect-[1.55/1] w-full object-cover object-center lg:aspect-[1.45/1]"
               />
             </div>
@@ -232,7 +226,7 @@ export default function LandingPage() {
               <div className="eyebrow mb-5 !text-ink"><MessageCircle size={14} /> Powered by peers</div>
               <h2 className="section-title">Progress feels better <i>together.</i></h2>
               <p className="mt-5 leading-7 text-ink/65">Ask questions, share breakthroughs, find accountability and meet people building toward the same future.</p>
-              <Link href="/login/student?mode=register" className="btn-primary mt-7">Join the community <ArrowRight size={16} /></Link>
+              <Link to="/login/student?mode=register" className="btn-primary mt-7">Join the community <ArrowRight size={16} /></Link>
             </div>
             <div className="absolute -bottom-14 -right-12 h-64 w-64 rounded-full border-[45px] border-coral/70" />
             <div className="absolute bottom-12 right-16 hidden rotate-3 rounded-[22px] bg-white/85 p-4 shadow-lift backdrop-blur-md sm:block">
@@ -266,8 +260,8 @@ export default function LandingPage() {
             <span className="text-xs font-extrabold uppercase tracking-[0.18em] text-white/65">Your next chapter is waiting</span>
             <h2 className="mt-4 font-display text-5xl leading-[1] tracking-[-0.05em] sm:text-6xl">Stop planning around potential. <i>Build it.</i></h2>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/login/student?mode=register" className="btn-primary !bg-white !text-ink">Create free account <ArrowRight size={17} /></Link>
-              <Link href="/login/admin" className="btn-secondary !border-white/20 !bg-white/10 !text-white hover:!bg-white/20">Explore admin demo</Link>
+              <Link to="/login/student?mode=register" className="btn-primary !bg-white !text-ink">Create free account <ArrowRight size={17} /></Link>
+              <Link to="/login/admin" className="btn-secondary !border-white/20 !bg-white/10 !text-white hover:!bg-white/20">Explore admin demo</Link>
             </div>
           </div>
           <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full border-[70px] border-white/10" />
