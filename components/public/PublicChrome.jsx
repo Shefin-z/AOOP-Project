@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ArrowRight, Menu, X } from "lucide-react";
 import { Link } from "../../lib/router";
 import Brand from "../Brand";
@@ -32,39 +32,29 @@ function PublicNavLink({ item, current, mobile = false, onNavigate }) {
 export function PublicHeader({ current = "" }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  useEffect(() => {
-    if (!menuOpen) return undefined;
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") setMenuOpen(false);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [menuOpen]);
-
   return (
-    <header className="page-shell sticky top-0 z-50 pt-4">
+    <header className="page-shell relative z-50 pt-5">
       <nav className="glass flex h-[70px] items-center justify-between rounded-[22px] px-4 sm:px-5">
-        <Brand href="/" />
+        <Link to="/" aria-label="CareerForge home"><Brand /></Link>
         <div className="hidden items-center gap-1 lg:flex">
           {navigation.map((item) => (
             <PublicNavLink key={item.label} item={item} current={current} />
           ))}
         </div>
-        <div className="hidden items-center gap-2 lg:flex">
+        <div className="hidden items-center gap-2 sm:flex">
           <ThemeToggle />
           <Link to="/login/admin" className="btn-ghost">Admin</Link>
           <Link to="/login/student" className="btn-primary min-h-11 px-4">
             Student login <ArrowRight size={16} />
           </Link>
         </div>
-        <div className="flex items-center gap-2 lg:hidden">
+        <div className="flex items-center gap-2 sm:hidden">
           <ThemeToggle />
           <button
             onClick={() => setMenuOpen((open) => !open)}
             className="grid h-10 w-10 place-items-center rounded-xl bg-ink text-white"
             aria-label="Toggle navigation menu"
             aria-expanded={menuOpen}
-            aria-controls="careerforge-mobile-menu"
           >
             {menuOpen ? <X size={19} /> : <Menu size={19} />}
           </button>
@@ -72,7 +62,7 @@ export function PublicHeader({ current = "" }) {
       </nav>
 
       {menuOpen && (
-        <div id="careerforge-mobile-menu" className="glass-strong absolute left-5 right-5 top-24 z-50 animate-enter rounded-[22px] p-3 lg:hidden">
+        <div className="glass-strong absolute left-5 right-5 top-24 z-50 animate-enter rounded-[22px] p-3 sm:hidden">
           {navigation.map((item) => (
             <PublicNavLink
               key={item.label}
@@ -96,11 +86,11 @@ export function PublicFooter() {
   return (
     <footer className="border-t border-ink/[0.08] py-8">
       <div className="page-shell flex flex-col items-center justify-between gap-5 text-center sm:flex-row sm:text-left">
-        <Brand href="/" />
+        <Link to="/" aria-label="CareerForge home"><Brand /></Link>
         <p className="text-xs text-muted">© 2026 CareerForge. Built for the careers still becoming.</p>
         <div className="flex gap-1">
           {["Privacy", "Terms", "Support"].map((item) => (
-            <span key={item} className="px-3 py-2 text-xs font-semibold text-muted">{item}</span>
+            <button key={item} className="btn-ghost text-xs">{item}</button>
           ))}
         </div>
       </div>
