@@ -292,16 +292,24 @@ router.get("/jobs", async (_req, res, next) => {
        j.salary_min, j.salary_max, j.currency, j.status, j.expires_at,
        j.created_at, j.updated_at, c.name company_name, c.description company_description,
        c.website company_website, c.logo_url company_logo,
-       COUNT(a.id) application_count,
-       COALESCE(SUM(a.status='in_review'), 0) in_review_count,
-       COALESCE(SUM(a.status='assessment'), 0) assessment_count,
-       COALESCE(SUM(a.status='interview'), 0) interview_count,
-       COALESCE(SUM(a.status='offer'), 0) offer_count
+       COALESCE(application_totals.application_count, 0) application_count,
+       COALESCE(application_totals.in_review_count, 0) in_review_count,
+       COALESCE(application_totals.assessment_count, 0) assessment_count,
+       COALESCE(application_totals.interview_count, 0) interview_count,
+       COALESCE(application_totals.offer_count, 0) offer_count
        FROM jobs j
        JOIN companies c ON c.id=j.company_id
-       LEFT JOIN applications a ON a.job_id=j.id
+       LEFT JOIN (
+         SELECT job_id,
+          COUNT(*) application_count,
+          SUM(CASE WHEN status='in_review' THEN 1 ELSE 0 END) in_review_count,
+          SUM(CASE WHEN status='assessment' THEN 1 ELSE 0 END) assessment_count,
+          SUM(CASE WHEN status='interview' THEN 1 ELSE 0 END) interview_count,
+          SUM(CASE WHEN status='offer' THEN 1 ELSE 0 END) offer_count
+         FROM applications
+         GROUP BY job_id
+       ) application_totals ON application_totals.job_id=j.id
        WHERE j.created_by IS NOT NULL
-       GROUP BY j.id
        ORDER BY j.created_at DESC`,
     ));
   } catch (error) { next(error); }
