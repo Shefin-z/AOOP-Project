@@ -462,7 +462,7 @@ router.get("/users", async (req, res, next) => {
       `SELECT u.id, u.name, u.email, u.status, u.created_at, p.university, p.readiness_score
        FROM users u LEFT JOIN student_profiles p ON p.user_id=u.id
        WHERE u.role='student' AND (u.name LIKE ? OR u.email LIKE ? OR p.university LIKE ?)
-       ORDER BY u.created_at DESC LIMIT 200`,
+       ORDER BY u.created_at DESC`,
       [search, search, search],
     ));
   } catch (error) { next(error); }
@@ -471,7 +471,8 @@ router.get("/users", async (req, res, next) => {
 router.patch("/users/:id/status", async (req, res, next) => {
   try {
     if (!["active", "suspended"].includes(req.body.status)) return res.status(400).json({ error: "Invalid user status" });
-    await query("UPDATE users SET status=? WHERE id=? AND role='student'", [req.body.status, req.params.id]);
+    const result = await query("UPDATE users SET status=? WHERE id=? AND role='student'", [req.body.status, req.params.id]);
+    if (!result.affectedRows) return res.status(404).json({ error: "Student account not found" });
     res.json({ message: "User status updated" });
   } catch (error) { next(error); }
 });

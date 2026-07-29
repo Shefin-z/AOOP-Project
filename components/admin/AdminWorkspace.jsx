@@ -51,7 +51,7 @@ import { apiRequest } from "../../lib/api";
 
 const navItems = [
   { id: "overview", label: "Dashboard", icon: LayoutDashboard, group: "Command center" },
-  { id: "users", label: "User management", icon: Users, badge: "2,846" },
+  { id: "users", label: "User management", icon: Users },
   { id: "assessments", label: "Assessments", icon: FileCheck2, group: "Content" },
   { id: "questions", label: "Question bank", icon: FileQuestion },
   { id: "resources", label: "Resources", icon: BookOpen },
@@ -77,14 +77,6 @@ const meta = {
   settings: ["System settings", "Configure platform defaults, notifications and security."],
 };
 
-const usersSeed = [
-  { id: 1, name: "Nadia Ahmed", email: "nadia@northsouth.edu", university: "North South University", joined: "Jul 24, 2026", readiness: 78, status: "Active", initials: "NA", tone: "bg-cobalt" },
-  { id: 2, name: "Samiha Noor", email: "samiha@bracu.edu", university: "BRAC University", joined: "Jul 23, 2026", readiness: 84, status: "Active", initials: "SN", tone: "bg-coral" },
-  { id: 3, name: "Raihan Kabir", email: "raihan@aiub.edu", university: "AIUB", joined: "Jul 22, 2026", readiness: 71, status: "Active", initials: "RK", tone: "bg-jade" },
-  { id: 4, name: "Tasnia Islam", email: "tasnia@northsouth.edu", university: "North South University", joined: "Jul 19, 2026", readiness: 79, status: "Active", initials: "TI", tone: "bg-plum" },
-  { id: 5, name: "Fahim Chowdhury", email: "fahim@iub.edu", university: "Independent University", joined: "Jul 17, 2026", readiness: 62, status: "Suspended", initials: "FC", tone: "bg-ink" },
-];
-
 const moderationSeed = [
   { id: 1, author: "Anonymous Student", content: "This workshop organizer is a complete scam. Everyone should spam their page until they refund us.", reason: "Harassment", reports: 5, time: "12 min ago", type: "Post" },
   { id: 2, author: "CareerBoost BD", content: "Guaranteed job in 7 days! Pay the registration fee through this personal number.", reason: "Possible scam", reports: 12, time: "37 min ago", type: "Post" },
@@ -95,7 +87,9 @@ export default function AdminWorkspace() {
   const [active, setActive] = useState("overview");
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null);
-  const [users, setUsers] = useState(usersSeed);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersError, setUsersError] = useState("");
   const [moderation, setModeration] = useState(moderationSeed);
   const [assessmentRecords, setAssessmentRecords] = useState([]);
   const [questionRecords, setQuestionRecords] = useState([]);
@@ -108,6 +102,53 @@ export default function AdminWorkspace() {
   const notify = (message) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 3200);
+  };
+
+  const loadUsers = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setUsersLoading(true);
+      setUsersError("");
+    }
+    try {
+      setUsers(await apiRequest("/admin/users"));
+      setUsersError("");
+    } catch (error) {
+      if (!silent) setUsersError(error.message);
+    } finally {
+      if (!silent) setUsersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+    const refresh = () => loadUsers({ silent: true });
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const interval = window.setInterval(refresh, 20000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
+
+  const changeUserStatus = async (user) => {
+    const nextStatus = user.status === "active" ? "suspended" : "active";
+    const action = nextStatus === "suspended" ? "suspend" : "activate";
+    if (!window.confirm(`${action === "suspend" ? "Suspend" : "Activate"} ${user.name}'s student account?`)) return;
+    try {
+      await apiRequest(`/admin/users/${user.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      await loadUsers({ silent: true });
+      notify(`${user.name}'s account is now ${nextStatus}.`);
+    } catch (error) {
+      notify(error.message);
+    }
   };
 
   const loadAssessmentContent = async () => {
@@ -220,6 +261,7 @@ export default function AdminWorkspace() {
 
   const totalApplications = jobRecords.reduce((sum, job) => sum + Number(job.application_count || 0), 0);
   const dashboardNavItems = navItems.map((item) => {
+    if (item.id === "users") return { ...item, badge: users.length ? String(users.length) : undefined };
     if (item.id === "questions") return { ...item, badge: questionRecords.length ? String(questionRecords.length) : undefined };
     if (item.id === "jobs") return { ...item, badge: jobRecords.length ? String(jobRecords.length) : undefined };
     if (item.id === "applications") return { ...item, badge: totalApplications ? String(totalApplications) : undefined };
@@ -227,7 +269,6 @@ export default function AdminWorkspace() {
   });
 
   const addLabel = {
-    users: "Add user",
     assessments: "New assessment",
     questions: "Add question",
     resources: "Add resource",
@@ -246,8 +287,8 @@ export default function AdminWorkspace() {
         subtitle={meta[active][1]}
         actions={addLabel ? <button onClick={() => setModal({ type: "create", entity: active })} className="btn-primary !bg-plum hover:!bg-[#64465b]"><Plus size={16} /> {addLabel}</button> : active === "performance" ? <button onClick={() => notify("Analytics report exported.")} className="btn-secondary"><Download size={15} /> Export report</button> : null}
       >
-        {active === "overview" && <AdminOverview onNavigate={setActive} assessments={assessmentRecords} questions={questionRecords} jobs={jobRecords} />}
-        {active === "users" && <UsersPage users={users} setUsers={setUsers} notify={notify} />}
+        {active === "overview" && <AdminOverview onNavigate={setActive} assessments={assessmentRecords} questions={questionRecords} jobs={jobRecords} users={users} />}
+        {active === "users" && <UsersPage users={users} loading={usersLoading} error={usersError} onRetry={loadUsers} onStatus={changeUserStatus} />}
         {active === "assessments" && <AssessmentAdmin records={assessmentRecords} loading={contentLoading} error={contentError} onRetry={loadAssessmentContent} onEdit={(record) => setModal({ type: "edit", entity: "assessments", record })} onDelete={(record) => deleteAssessmentContent("assessments", record)} />}
         {active === "questions" && <QuestionsAdmin records={questionRecords} loading={contentLoading} error={contentError} onRetry={loadAssessmentContent} onEdit={(record) => setModal({ type: "edit", entity: "questions", record })} onDelete={(record) => deleteAssessmentContent("questions", record)} />}
         {active === "resources" && <ResourcesAdmin notify={notify} />}
@@ -273,7 +314,7 @@ export default function AdminWorkspace() {
   );
 }
 
-function AdminOverview({ onNavigate, assessments, questions, jobs }) {
+function AdminOverview({ onNavigate, assessments, questions, jobs, users }) {
   const publishedAssessments = assessments.filter((assessment) => assessment.status === "published");
   const reviewQuestions = questions.filter((question) => question.status === "needs_review");
   const latestAssessment = assessments[0];
@@ -298,7 +339,7 @@ function AdminOverview({ onNavigate, assessments, questions, jobs }) {
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <AdminMetric label="Total students" value="2,846" delta="+8.4%" note="vs last month" icon={Users} tone="bg-cobalt" />
+        <AdminMetric label="Total students" value={users.length} delta={`${users.filter((user) => user.status === "active").length} active`} note="registered student accounts" icon={Users} tone="bg-cobalt" />
         <AdminMetric label="Active assessments" value={publishedAssessments.length} delta={`${assessments.length} total`} note="published by administrators" icon={FileCheck2} tone="bg-jade" />
         <AdminMetric label="Live jobs" value={liveJobs.length} delta={`${jobs.length} total`} note="visible, unexpired listings" icon={BriefcaseBusiness} tone="bg-coral" />
         <AdminMetric label="Applications" value={totalApplications} delta="Actual" note="submitted to managed jobs" icon={FileText} tone="bg-plum" />
@@ -322,12 +363,82 @@ function AdminMetric({ label, value, delta, note, icon: Icon, tone }) {
   return <article className="metric-card"><div className="flex items-start justify-between"><span className={`grid h-11 w-11 place-items-center rounded-2xl text-white ${tone}`}><Icon size={19} /></span><span className="tag !border-0 !bg-jade/10 !text-jade"><TrendingUp size={11} />{delta}</span></div><b className="mt-5 block text-2xl tracking-[-0.04em]">{value}</b><p className="mt-0.5 text-xs font-bold">{label}</p><p className="mt-2 text-[10px] text-muted">{note}</p></article>;
 }
 
-function UsersPage({ users, setUsers, notify }) {
+function UsersPage({ users, loading, error, onRetry, onStatus }) {
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("All users");
-  const list = useMemo(() => users.filter((user) => `${user.name} ${user.email} ${user.university}`.toLowerCase().includes(search.toLowerCase()) && (status === "All users" || user.status === status)), [users, search, status]);
-  const toggleStatus = (id) => { setUsers((current) => current.map((user) => user.id === id ? { ...user, status: user.status === "Active" ? "Suspended" : "Active" } : user)); notify("User access status updated."); };
-  return <div className="space-y-5"><section className="glass flex flex-col gap-3 rounded-[24px] p-3 sm:flex-row"><label className="relative flex-1"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={16} /><input value={search} onChange={(e) => setSearch(e.target.value)} className="input pl-11" placeholder="Search name, email or university" /></label><select value={status} onChange={(e) => setStatus(e.target.value)} className="select sm:w-40"><option>All users</option><option>Active</option><option>Suspended</option></select><button className="btn-secondary"><Filter size={15} /> Filters</button><button onClick={() => notify("User list exported.")} className="btn-secondary"><ArrowDownToLine size={15} /> Export</button></section><section className="panel p-5"><div className="table-shell overflow-x-auto"><table className="w-full min-w-[850px] text-left"><thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.1em] text-muted"><tr>{["Student", "University", "Joined", "Readiness", "Status", "Actions"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr></thead><tbody className="divide-y divide-ink/[0.06]">{list.map((user) => <tr key={user.id} className="hover:bg-white/60"><td className="px-4 py-4"><div className="flex items-center gap-3"><span className={`grid h-9 w-9 place-items-center rounded-xl text-[10px] font-bold text-white ${user.tone}`}>{user.initials}</span><span><b className="block text-xs">{user.name}</b><small className="text-[10px] text-muted">{user.email}</small></span></div></td><td className="px-4 py-4 text-xs text-muted">{user.university}</td><td className="px-4 py-4 text-xs text-muted">{user.joined}</td><td className="px-4 py-4"><div className="flex items-center gap-2"><div className="h-1.5 w-16 rounded-full bg-ink/[0.07]"><div className="h-full rounded-full bg-cobalt" style={{ width: `${user.readiness}%` }} /></div><b className="text-[10px]">{user.readiness}%</b></div></td><td className="px-4 py-4"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${user.status === "Active" ? "bg-jade/10 text-jade" : "bg-coral/10 text-coral"}`}>{user.status}</span></td><td className="px-4 py-4"><div className="flex gap-1"><button onClick={() => notify(`Opened ${user.name}'s profile.`)} className="btn-ghost min-h-8"><Eye size={14} /></button><button onClick={() => toggleStatus(user.id)} className="btn-ghost min-h-8">{user.status === "Active" ? <LockKeyhole size={14} /> : <UserCheck size={14} />}</button><button className="btn-ghost min-h-8"><MoreHorizontal size={14} /></button></div></td></tr>)}</tbody></table></div><div className="mt-4 flex items-center justify-between text-xs text-muted"><span>Showing {list.length} of 2,846 students</span><div className="flex gap-1"><button className="btn-secondary min-h-8 px-3">Previous</button><button className="btn-secondary min-h-8 px-3">Next</button></div></div></section></div>;
+  const [status, setStatus] = useState("all");
+  const tones = ["bg-cobalt", "bg-coral", "bg-jade", "bg-plum", "bg-ink"];
+  const list = useMemo(() => users.filter((user) => {
+    const matchesSearch = `${user.name} ${user.email} ${user.university || ""}`.toLowerCase().includes(search.toLowerCase());
+    return matchesSearch && (status === "all" || user.status === status);
+  }), [users, search, status]);
+  const activeCount = users.filter((user) => user.status === "active").length;
+  const getInitials = (name) => String(name || "Student").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+  const formatJoinedDate = (value) => {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-BD", { day: "numeric", month: "short", year: "numeric" });
+  };
+  const exportUsers = () => {
+    const escape = (value) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`;
+    const rows = [
+      ["Name", "Email", "University", "Joined", "Readiness", "Status"],
+      ...list.map((user) => [
+        user.name,
+        user.email,
+        user.university || "Not provided",
+        formatJoinedDate(user.created_at),
+        `${Number(user.readiness_score || 0)}%`,
+        user.status,
+      ]),
+    ];
+    const blob = new Blob([rows.map((row) => row.map(escape).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "careerforge-students.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="space-y-5">
+      <section className="glass flex flex-col gap-3 rounded-[24px] p-3 sm:flex-row">
+        <label className="relative flex-1"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} className="input pl-11" placeholder="Search name, email or university" /></label>
+        <select value={status} onChange={(event) => setStatus(event.target.value)} className="select sm:w-44"><option value="all">All students</option><option value="active">Active</option><option value="suspended">Suspended</option></select>
+        <button onClick={onRetry} className="btn-secondary"><RefreshCw size={15} /> Refresh</button>
+        <button disabled={!list.length} onClick={exportUsers} className="btn-secondary disabled:opacity-50"><ArrowDownToLine size={15} /> Export</button>
+      </section>
+      <section className="panel p-5">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div><h2 className="text-lg font-extrabold">{users.length} registered students</h2><p className="text-xs text-muted">{activeCount} active · {users.length - activeCount} suspended · database-backed</p></div>
+          <span className="tag !bg-jade/10 !text-jade"><Database size={12} /> Live accounts</span>
+        </div>
+        <ContentState loading={loading} error={error} empty={!list.length} emptyTitle={users.length ? "No students match these filters" : "No registered students yet"} emptyCopy={users.length ? "Try another name, email, university or status." : "New student sign-ups will appear here automatically."} onRetry={onRetry}>
+          <div className="table-shell overflow-x-auto">
+            <table className="w-full min-w-[950px] text-left">
+              <thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.1em] text-muted"><tr>{["Student", "University", "Joined", "Readiness", "Status", "Account access"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr></thead>
+              <tbody className="divide-y divide-ink/[0.06]">
+                {list.map((user, index) => {
+                  const readiness = Math.min(100, Math.max(0, Number(user.readiness_score || 0)));
+                  const isActive = user.status === "active";
+                  return (
+                    <tr key={user.id} className="hover:bg-white/60">
+                      <td className="px-4 py-4"><div className="flex items-center gap-3"><span className={`grid h-10 w-10 place-items-center rounded-xl text-[10px] font-bold text-white ${tones[index % tones.length]}`}>{getInitials(user.name)}</span><span><b className="block text-xs">{user.name}</b><small className="text-[10px] text-muted">{user.email}</small></span></div></td>
+                      <td className="px-4 py-4 text-xs text-muted">{user.university || "Not provided"}</td>
+                      <td className="px-4 py-4 text-xs text-muted">{formatJoinedDate(user.created_at)}</td>
+                      <td className="px-4 py-4"><div className="flex items-center gap-2"><div className="h-1.5 w-16 rounded-full bg-ink/[0.07]"><div className="h-full rounded-full bg-cobalt" style={{ width: `${readiness}%` }} /></div><b className="text-[10px]">{readiness}%</b></div></td>
+                      <td className="px-4 py-4"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isActive ? "bg-jade/10 text-jade" : "bg-coral/10 text-coral"}`}>{isActive ? "Active" : "Suspended"}</span></td>
+                      <td className="px-4 py-4"><button onClick={() => onStatus(user)} className={`btn-ghost min-h-9 gap-1 ${isActive ? "text-coral" : "text-jade"}`}>{isActive ? <><LockKeyhole size={14} /> Suspend</> : <><UserCheck size={14} /> Activate</>}</button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </ContentState>
+        <p className="mt-4 text-xs text-muted">Showing {list.length} of {users.length} actual student accounts</p>
+      </section>
+    </div>
+  );
 }
 
 function AssessmentAdmin({ records, loading, error, onRetry, onEdit, onDelete }) {
