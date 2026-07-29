@@ -131,20 +131,35 @@ export default function AdminWorkspace() {
     loadAssessmentContent();
   }, []);
 
-  const loadJobs = async () => {
-    setJobsLoading(true);
-    setJobsError("");
+  const loadJobs = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setJobsLoading(true);
+      setJobsError("");
+    }
     try {
       setJobRecords(await apiRequest("/admin/jobs"));
+      setJobsError("");
     } catch (error) {
-      setJobsError(error.message);
+      if (!silent) setJobsError(error.message);
     } finally {
-      setJobsLoading(false);
+      if (!silent) setJobsLoading(false);
     }
   };
 
   useEffect(() => {
     loadJobs();
+    const refresh = () => loadJobs({ silent: true });
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const interval = window.setInterval(refresh, 10000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, []);
 
   const saveAssessmentContent = async (entity, values, record) => {
@@ -452,7 +467,7 @@ function JobsAdmin({ records, loading, error, onRetry, onEdit, onStatus, onDelet
                       <td className="px-4 py-4"><b className="text-cobalt">{Number(record.application_count || 0)}</b></td>
                       <td className={`px-4 py-4 ${expired ? "font-bold text-coral" : "text-muted"}`}>{Number.isNaN(expiry.getTime()) ? "—" : expiry.toLocaleDateString()}</td>
                       <td className="px-4 py-4"><ContentStatus value={expired && record.status === "live" ? "expired" : record.status} /></td>
-                      <td className="px-4 py-4"><div className="flex gap-1"><button onClick={() => onEdit(record)} className="btn-ghost min-h-8" aria-label="Edit job"><Pencil size={14} /></button><button onClick={() => onStatus(record, record.status === "live" ? "draft" : "live")} className={`btn-ghost min-h-8 ${record.status === "live" ? "text-coral" : "text-jade"}`} aria-label={record.status === "live" ? "Hide job" : "Publish job"}>{record.status === "live" ? <LockKeyhole size={14} /> : <Eye size={14} />}</button><button onClick={() => onDelete(record)} className="btn-ghost min-h-8 text-coral" aria-label="Delete job"><Trash2 size={14} /></button></div></td>
+                      <td className="px-4 py-4"><div className="flex gap-1"><button onClick={() => onEdit(record)} className="btn-ghost min-h-8" aria-label="Edit job"><Pencil size={14} /></button><button onClick={() => onStatus(record, record.status === "live" ? "draft" : "live")} className={`btn-ghost min-h-8 gap-1 ${record.status === "live" ? "text-coral" : "text-jade"}`} aria-label={record.status === "live" ? "Hide job" : "Publish job"}>{record.status === "live" ? <><LockKeyhole size={14} /> Hide</> : <><Eye size={14} /> Publish</>}</button><button onClick={() => onDelete(record)} className="btn-ghost min-h-8 text-coral" aria-label="Delete job"><Trash2 size={14} /></button></div></td>
                     </tr>
                   );
                 })}
@@ -516,7 +531,7 @@ function AssessmentEditorModal({ record, onClose, onSubmit }) {
     difficulty: record?.difficulty || "Beginner",
     timeLimitMinutes: record?.time_limit_minutes || 15,
     passingPercentage: record?.passing_percentage || 60,
-    status: record?.status || "draft",
+    status: record?.status || "live",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -691,7 +706,11 @@ function JobEditorModal({ record, onClose, onSubmit }) {
           <AdminEditorField label="Minimum salary"><input min="0" type="number" className="input" value={values.salaryMin} onChange={(event) => update("salaryMin", event.target.value)} placeholder="Optional" /></AdminEditorField>
           <AdminEditorField label="Maximum salary"><input min="0" type="number" className="input" value={values.salaryMax} onChange={(event) => update("salaryMax", event.target.value)} placeholder="Optional" /></AdminEditorField>
           <AdminEditorField label="Currency"><input required maxLength="3" className="input uppercase" value={values.currency} onChange={(event) => update("currency", event.target.value.toUpperCase())} /></AdminEditorField>
-          <AdminEditorField label="Status"><select className="select" value={values.status} onChange={(event) => update("status", event.target.value)}><option value="draft">Draft / hidden</option><option value="live">Live / visible</option><option value="pending">Pending review</option><option value="closed">Closed</option></select></AdminEditorField>
+          <AdminEditorField label="Student portal visibility"><select className="select" value={values.status} onChange={(event) => update("status", event.target.value)}><option value="live">Publish now · visible to students</option><option value="draft">Save as draft · hidden</option><option value="pending">Pending review · hidden</option><option value="closed">Closed · hidden</option></select></AdminEditorField>
+        </div>
+        <div className={`mt-4 rounded-2xl border p-4 text-xs leading-5 ${values.status === "live" ? "border-jade/20 bg-jade/10 text-jade" : "border-ink/10 bg-ink/[0.035] text-muted"}`}>
+          <b className="block">{values.status === "live" ? "This job will appear in Available jobs." : "This job will remain hidden from students."}</b>
+          {values.status === "live" ? "Students can open the listing and submit one authenticated application before the expiry date." : "You can publish it later from the Job management table."}
         </div>
         {error && <p className="mt-4 rounded-xl bg-coral/10 px-3 py-2 text-xs font-bold text-coral">{error}</p>}
         <div className="mt-7 flex justify-end gap-3"><button type="button" onClick={onClose} className="btn-secondary">Cancel</button><button disabled={saving} className="btn-primary !bg-plum disabled:opacity-50">{saving ? "Saving..." : record ? "Save job" : "Create job"} <ArrowRight size={15} /></button></div>

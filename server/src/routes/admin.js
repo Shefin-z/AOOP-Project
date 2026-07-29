@@ -98,7 +98,7 @@ function jobPayload(body) {
     salaryMin: optionalNumber(body.salaryMin),
     salaryMax: optionalNumber(body.salaryMax),
     currency: cleanText(body.currency, 3).toUpperCase() || "BDT",
-    status: jobStatuses.has(body.status) ? body.status : "draft",
+    status: jobStatuses.has(body.status) ? body.status : "live",
     expiresAt: expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null,
   };
 }

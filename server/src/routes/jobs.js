@@ -62,13 +62,24 @@ router.post("/:jobId/apply", authenticate, async (req, res, next) => {
       [req.params.jobId],
     );
     if (!job) return res.status(404).json({ error: "This job is no longer accepting applications" });
+    const [existingApplication] = await query(
+      "SELECT id FROM applications WHERE user_id=? AND job_id=? LIMIT 1",
+      [req.user.id, req.params.jobId],
+    );
+    if (existingApplication) return res.status(409).json({ error: "You have already applied for this job" });
     await query(
       `INSERT INTO applications (user_id, job_id, status, cover_letter, resume_url)
-       VALUES (?, ?, 'applied', ?, ?)
-       ON DUPLICATE KEY UPDATE cover_letter=VALUES(cover_letter), resume_url=VALUES(resume_url), updated_at=NOW()`,
+       VALUES (?, ?, 'applied', ?, ?)`,
       [req.user.id, req.params.jobId, coverLetter, resumeUrl],
     );
-    res.status(201).json({ message: "Application submitted" });
+    const [applicationStats] = await query(
+      "SELECT COUNT(*) application_count FROM applications WHERE job_id=?",
+      [req.params.jobId],
+    );
+    res.status(201).json({
+      message: "Application submitted",
+      applicationCount: Number(applicationStats.application_count || 0),
+    });
   } catch (error) { next(error); }
 });
 

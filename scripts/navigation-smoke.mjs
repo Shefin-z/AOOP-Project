@@ -199,7 +199,7 @@ if (scenario === "public") {
   await clickAndAssert("/", "/", "Career clarity, engineered", "Back home");
   await clickAndAssert("/login/student?mode=register", "/login/student", "Start your journey.");
 } else if (scenario === "student") {
-  await clickButtonAndAssert("Recommended jobs", "/student", "Your best-fit opportunities");
+  await clickButtonAndAssert("Available jobs", "/student", "Available jobs");
   await clickButtonAndAssert("Sign out", "/");
 } else if (scenario === "brand") {
   await clickAndAssert("/", "/");

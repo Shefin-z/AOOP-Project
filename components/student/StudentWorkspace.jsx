@@ -67,7 +67,7 @@ import { apiRequest } from "../../lib/api";
 
 const navItems = [
   { id: "overview", label: "Overview", icon: Gauge, group: "Workspace" },
-  { id: "jobs", label: "Recommended jobs", icon: BriefcaseBusiness },
+  { id: "jobs", label: "Available jobs", icon: BriefcaseBusiness },
   { id: "applications", label: "My applications", icon: FileCheck2 },
   { id: "vault", label: "Career Vault", icon: FileText },
   { id: "assessments", label: "Skill assessments", icon: ListChecks, group: "Growth" },
@@ -81,7 +81,7 @@ const navItems = [
 
 const pageMeta = {
   overview: ["Overview", "Here’s what is moving your career forward today."],
-  jobs: ["Your best-fit opportunities", "Live, unexpired jobs published by CareerForge administrators."],
+  jobs: ["Available jobs", "Real, unexpired opportunities published by CareerForge administrators."],
   applications: ["Application tracker", "Stay on top of every opportunity and follow-up."],
   vault: ["Career Vault", "Build, refine and export your professional story."],
   assessments: ["Skill assessments", "Measure what you know and make the next learning step obvious."],
@@ -241,9 +241,11 @@ export default function StudentWorkspace() {
     loadAssessments();
   }, []);
 
-  const loadJobData = async () => {
-    setJobsLoading(true);
-    setJobsError("");
+  const loadJobData = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setJobsLoading(true);
+      setJobsError("");
+    }
     try {
       const [nextJobs, nextApplications] = await Promise.all([
         apiRequest("/jobs"),
@@ -251,15 +253,28 @@ export default function StudentWorkspace() {
       ]);
       setJobRecords(nextJobs.map(normalizeJob));
       setApplications(nextApplications.map(normalizeApplication));
+      setJobsError("");
     } catch (error) {
-      setJobsError(error.message);
+      if (!silent) setJobsError(error.message);
     } finally {
-      setJobsLoading(false);
+      if (!silent) setJobsLoading(false);
     }
   };
 
   useEffect(() => {
     loadJobData();
+    const refresh = () => loadJobData({ silent: true });
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const interval = window.setInterval(refresh, 20000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, []);
 
   const notify = (message) => {
@@ -564,7 +579,10 @@ function JobsPage({ jobs: availableJobs, loading, error, onRetry, search, setSea
         <button onClick={onRetry} className="btn-secondary"><RefreshCw size={16} /> Refresh</button>
       </section>
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted"><b className="text-ink">{filtered.length} published openings</b> from CareerForge administrators</p>
+        <div>
+          <h2 className="text-lg font-extrabold">Administrator-published opportunities</h2>
+          <p className="mt-1 text-sm text-muted"><b className="text-ink">{filtered.length} available jobs</b> · only live, unexpired listings appear here</p>
+        </div>
       </div>
       {loading && <section className="panel grid min-h-64 place-items-center text-center"><div><RefreshCw className="mx-auto animate-spin text-cobalt" size={28} /><p className="mt-3 text-xs font-bold text-muted">Loading live jobs...</p></div></section>}
       {!loading && error && <section className="panel grid min-h-64 place-items-center p-6 text-center"><div><AlertTriangle className="mx-auto text-coral" size={30} /><h2 className="mt-3 text-lg font-extrabold">Jobs could not be loaded</h2><p className="mt-1 max-w-md text-xs text-muted">{error}</p><button onClick={onRetry} className="btn-secondary mt-5"><RefreshCw size={14} /> Try again</button></div></section>}
@@ -588,7 +606,7 @@ function JobsPage({ jobs: availableJobs, loading, error, onRetry, search, setSea
             <div className="mt-4 flex flex-wrap gap-1.5">{job.requirementsList.slice(0, 4).map((requirement) => <span className="tag" key={requirement}>{requirement}</span>)}</div>
             <div className="mt-5 flex items-center justify-between">
               <span><b className="block text-sm">{job.salary}</b><small className="text-[10px] text-muted">Apply by {new Date(job.expires_at).toLocaleDateString()}</small></span>
-              <button onClick={() => onOpen(job)} className={`min-h-10 px-4 ${job.already_applied ? "btn-secondary !text-jade" : "btn-primary"}`}>{job.already_applied ? "Application sent" : "View role"} <ArrowRight size={15} /></button>
+              <button onClick={() => onOpen(job)} className={`min-h-10 px-4 ${job.already_applied ? "btn-secondary !text-jade" : "btn-primary"}`}>{job.already_applied ? "Application sent" : "View & apply"} <ArrowRight size={15} /></button>
             </div>
           </article>
         ))}
