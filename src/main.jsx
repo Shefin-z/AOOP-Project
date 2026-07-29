@@ -5,6 +5,8 @@ import LandingPage from "../components/LandingPage";
 import AuthExperience from "../components/AuthExperience";
 import StudentWorkspace from "../components/student/StudentWorkspace";
 import AdminWorkspace from "../components/admin/AdminWorkspace";
+import CommunityLandingPage from "../components/public/CommunityLandingPage";
+import ResourcesLandingPage from "../components/public/ResourcesLandingPage";
 import { RouterProvider, useLocation } from "../lib/router";
 import { clearNavigationToken, navigateFresh } from "../lib/sessionNavigation";
 import { ThemeProvider } from "../lib/theme";
@@ -81,7 +83,9 @@ function RequireAuth({ role, children }) {
 function App() {
   const { pathname } = useLocation();
   let page = <LandingPage />;
-  if (pathname === "/login/student") page = <AuthExperience role="student" />;
+  if (pathname === "/community") page = <CommunityLandingPage />;
+  else if (pathname === "/resources") page = <ResourcesLandingPage />;
+  else if (pathname === "/login/student") page = <AuthExperience role="student" />;
   else if (pathname === "/login/admin") page = <AuthExperience role="admin" />;
   else if (pathname === "/student") page = <RequireAuth role="student"><StudentWorkspace /></RequireAuth>;
   else if (pathname === "/admin") page = <RequireAuth role="admin"><AdminWorkspace /></RequireAuth>;

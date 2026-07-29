@@ -21,17 +21,22 @@ export default function DashboardShell({
   title,
   subtitle,
   actions,
+  profileName,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [name, setName] = useState(() => getSessionName(role));
 
   useEffect(() => {
+    if (profileName) {
+      setName(profileName);
+      return;
+    }
     try {
       const session = JSON.parse(localStorage.getItem("careerforge_session"));
       if (session?.name) setName(session.name);
     } catch {}
-  }, []);
+  }, [profileName]);
 
   const navigate = (id) => {
     onNavigate(id);

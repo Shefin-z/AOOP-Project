@@ -267,6 +267,23 @@ textarea:focus-visible {
   background-image: none;
 }
 
+:root[data-theme="dark"] .resume-paper {
+  background-color: #ffffff !important;
+  color: #1e2430 !important;
+}
+
+:root[data-theme="dark"] .resume-paper .text-muted {
+  color: #687181 !important;
+}
+
+:root[data-theme="dark"] .resume-paper [class*="border-ink"] {
+  border-color: rgba(30, 36, 48, 0.18) !important;
+}
+
+:root[data-theme="dark"] .resume-paper .bg-canvas {
+  background-color: #f4f1ea !important;
+}
+
 :root[data-theme="dark"] .border-white\/45,
 :root[data-theme="dark"] .border-white\/60,
 :root[data-theme="dark"] .border-white\/70,
@@ -395,6 +412,110 @@ textarea:focus-visible {
   box-shadow:
     0 34px 110px rgba(0, 0, 0, 0.92),
     0 0 52px rgba(229, 151, 121, 0.1);
+}
+
+.university-viewport {
+  min-width: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+}
+
+.university-track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation: university-scroll 112s linear infinite;
+}
+
+.university-group {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: clamp(2.25rem, 4.5vw, 5.5rem);
+  padding-right: clamp(2.25rem, 4.5vw, 5.5rem);
+}
+
+.university-name {
+  display: inline-flex;
+  min-width: max-content;
+  align-items: center;
+  gap: 0.55rem;
+  color: rgba(99, 107, 122, 0.75);
+  transition: color 220ms ease, transform 220ms ease, background-color 220ms ease;
+}
+
+.university-name b {
+  font-size: 0.88rem;
+  letter-spacing: -0.025em;
+}
+
+.university-name small {
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: rgba(99, 107, 122, 0.58);
+}
+
+.university-name:hover {
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.university-name-featured {
+  border: 1px solid rgba(49, 85, 198, 0.16);
+  border-radius: 999px;
+  background: rgba(49, 85, 198, 0.08);
+  padding: 0.58rem 0.9rem;
+  color: var(--cobalt);
+}
+
+.university-name-featured small {
+  color: currentColor;
+  opacity: 0.72;
+}
+
+.university-strip:hover .university-track {
+  animation-play-state: paused;
+}
+
+@keyframes university-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+:root[data-theme="dark"] .university-name {
+  color: rgba(218, 222, 231, 0.66);
+}
+
+:root[data-theme="dark"] .university-name small {
+  color: rgba(218, 222, 231, 0.44);
+}
+
+:root[data-theme="dark"] .university-name:hover {
+  color: #fff;
+}
+
+:root[data-theme="dark"] .university-name-featured {
+  border-color: rgba(142, 166, 255, 0.26);
+  background: rgba(142, 166, 255, 0.12);
+  color: #a9baff;
+}
+
+.community-hero-board {
+  background:
+    radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.58), transparent 19rem),
+    #ded2be;
+}
+
+:root[data-theme="dark"] .community-hero-board {
+  background:
+    radial-gradient(circle at 20% 18%, rgba(226, 135, 100, 0.1), transparent 20rem),
+    #0d0d0e !important;
 }
 
 .auth-media-panel {
@@ -585,6 +706,16 @@ textarea:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .university-viewport {
+    overflow-x: auto;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+
+  .university-track {
+    animation: none;
+  }
+
   .hero-stage,
   .adaptive-hero-image,
   .adaptive-hero::after,
@@ -617,7 +748,12 @@ textarea:focus-visible {
     position: absolute;
     inset: 0;
     width: 100%;
+    background: #fff !important;
+    color: #1e2430 !important;
     box-shadow: none;
     border: 0;
+  }
+  #resume-print .cv-empty-state {
+    display: none;
   }
 }

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link } from "../lib/router";
 import {
   ArrowRight,
@@ -9,18 +8,16 @@ import {
   Check,
   ChevronRight,
   FileText,
-  Menu,
   MessageCircle,
   Play,
   Sparkles,
   Target,
   Users,
-  X,
   Zap,
 } from "lucide-react";
-import Brand from "./Brand";
-import ThemeToggle from "./ThemeToggle";
 import AdaptiveHeroImage from "./AdaptiveHeroImage";
+import { PublicFooter, PublicHeader } from "./public/PublicChrome";
+import UniversityMarquee from "./public/UniversityMarquee";
 
 const features = [
   {
@@ -60,51 +57,9 @@ const steps = [
 ];
 
 export default function LandingPage() {
-  const [menuOpen, setMenuOpen] = useState(false);
-
   return (
     <main className="noise min-h-screen overflow-hidden">
-      <header className="page-shell relative z-50 pt-5">
-        <nav className="glass flex h-[70px] items-center justify-between rounded-[22px] px-4 sm:px-5">
-          <Brand />
-          <div className="hidden items-center gap-1 lg:flex">
-            {[
-              ["Platform", "#platform"],
-              ["How it works", "#journey"],
-              ["Community", "#community"],
-              ["Resources", "#resources"],
-            ].map(([label, href]) => (
-              <a key={label} href={href} className="btn-ghost">{label}</a>
-            ))}
-          </div>
-          <div className="hidden items-center gap-2 sm:flex">
-            <ThemeToggle />
-            <Link to="/login/admin" className="btn-ghost">Admin</Link>
-            <Link to="/login/student" className="btn-primary min-h-11 px-4">
-              Student login <ArrowRight size={16} />
-            </Link>
-          </div>
-          <ThemeToggle className="sm:hidden" />
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="grid h-10 w-10 place-items-center rounded-xl bg-ink text-white sm:hidden"
-            aria-label="Toggle menu"
-          >
-            {menuOpen ? <X size={19} /> : <Menu size={19} />}
-          </button>
-        </nav>
-        {menuOpen && (
-          <div className="glass-strong absolute left-5 right-5 top-24 z-50 animate-enter rounded-[22px] p-3 sm:hidden">
-            {["Platform", "How it works", "Community", "Resources"].map((item) => (
-              <a key={item} href={`#${item.toLowerCase().replaceAll(" ", "-")}`} onClick={() => setMenuOpen(false)} className="dash-side-link">{item}</a>
-            ))}
-            <div className="mt-2 grid grid-cols-2 gap-2 border-t border-ink/10 pt-3">
-              <Link to="/login/admin" className="btn-secondary">Admin</Link>
-              <Link to="/login/student" className="btn-primary">Student login</Link>
-            </div>
-          </div>
-        )}
-      </header>
+      <PublicHeader />
 
       <section className="page-shell relative pb-16 pt-10 sm:pt-16 lg:pb-24 lg:pt-20">
         <div className="grid items-center gap-10 lg:grid-cols-[0.88fr_1.12fr] lg:gap-4">
@@ -163,14 +118,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="border-y border-ink/[0.07] bg-white/35 py-6">
-        <div className="page-shell marquee flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-sm font-bold text-muted/70 sm:justify-between">
-          <span className="text-xs uppercase tracking-[0.16em] text-muted">Built for ambitious students</span>
-          {["North South", "BRAC University", "AIUB", "East West", "IUB"].map((name) => (
-            <span key={name} className="tracking-[-0.02em]">{name}</span>
-          ))}
-        </div>
-      </section>
+      <UniversityMarquee />
 
       <section id="platform" className="page-shell py-20 sm:py-28">
         <div className="grid gap-8 lg:grid-cols-[.8fr_1.2fr] lg:items-end">
@@ -273,15 +221,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="border-t border-ink/[0.08] py-8">
-        <div className="page-shell flex flex-col items-center justify-between gap-5 text-center sm:flex-row sm:text-left">
-          <Brand />
-          <p className="text-xs text-muted">© 2026 CareerForge. Built for the careers still becoming.</p>
-          <div className="flex gap-1">
-            {["Privacy", "Terms", "Support"].map((item) => <button key={item} className="btn-ghost text-xs">{item}</button>)}
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </main>
   );
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowDownToLine,
@@ -79,7 +79,7 @@ const navItems = [
 ];
 
 const pageMeta = {
-  overview: ["Good afternoon, Nadia", "Here’s what is moving your career forward today."],
+  overview: ["Overview", "Here’s what is moving your career forward today."],
   jobs: ["Your best-fit opportunities", "Personalized from your skills, interests and assessment results."],
   applications: ["Application tracker", "Stay on top of every opportunity and follow-up."],
   vault: ["Career Vault", "Build, refine and export your professional story."],
@@ -91,6 +91,75 @@ const pageMeta = {
   achievements: ["Your milestones", "Proof that consistent effort is becoming real progress."],
   profile: ["Profile & preferences", "Keep your career signal accurate and your experience personal."],
 };
+
+const getInitials = (name) => String(name || "Student")
+  .split(/\s+/)
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((part) => part[0])
+  .join("")
+  .toUpperCase();
+
+function readStudentUser() {
+  try {
+    const session = JSON.parse(localStorage.getItem("careerforge_session"));
+    if (session?.role === "student") {
+      return {
+        ...session,
+        name: session.name || "Student",
+        email: session.email || "",
+      };
+    }
+  } catch {}
+  return { name: "Student", email: "", role: "student" };
+}
+
+const createCvData = (user) => ({
+  name: user.name || "Student",
+  title: "",
+  email: user.email || "",
+  phone: "",
+  location: "",
+  website: "",
+  summary: "",
+  skills: "",
+  education: [],
+  languages: [],
+  experiences: [],
+  projects: [],
+  certifications: [],
+});
+
+const getCvStorageKey = (user) => {
+  const owner = String(user.email || user.id || user.name || "student")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9@._-]+/g, "-");
+  return `careerforge_cv_${owner}`;
+};
+
+function readCvData(user) {
+  const empty = createCvData(user);
+  try {
+    const saved = JSON.parse(localStorage.getItem(getCvStorageKey(user)));
+    if (!saved || typeof saved !== "object") return empty;
+    return {
+      ...empty,
+      ...saved,
+      name: saved.name || empty.name,
+      email: saved.email || empty.email,
+      education: Array.isArray(saved.education) ? saved.education : [],
+      languages: Array.isArray(saved.languages) ? saved.languages : [],
+      experiences: Array.isArray(saved.experiences) ? saved.experiences : [],
+      projects: Array.isArray(saved.projects) ? saved.projects : [],
+      certifications: Array.isArray(saved.certifications) ? saved.certifications : [],
+    };
+  } catch {
+    return empty;
+  }
+}
+
+const createItemId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const applicationsSeed = [
   { company: "Pathao", role: "Product Analyst", applied: "Jul 25", status: "Interview", match: 94, tone: "bg-coral" },
@@ -118,11 +187,8 @@ const quizQuestions = [
 ];
 
 export default function StudentWorkspace() {
-  let sessionName = "Student";
-  try {
-    sessionName = JSON.parse(localStorage.getItem("careerforge_session"))?.name || sessionName;
-  } catch {}
-  const firstName = sessionName.split(/\s+/)[0];
+  const [currentUser, setCurrentUser] = useState(readStudentUser);
+  const firstName = currentUser.name.split(/\s+/)[0];
   const [active, setActive] = useState("overview");
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null);
@@ -133,10 +199,32 @@ export default function StudentWorkspace() {
   const [jobSearch, setJobSearch] = useState("");
   const [jobType, setJobType] = useState("All types");
   const [quiz, setQuiz] = useState({ index: 0, answers: {}, finished: false, score: 0 });
+  const [cvPhoto, setCvPhoto] = useState(null);
+  const [cvData, setCvData] = useState(() => readCvData(readStudentUser()));
+
+  useEffect(() => {
+    localStorage.setItem(getCvStorageKey(currentUser), JSON.stringify(cvData));
+  }, [cvData, currentUser]);
 
   const notify = (message) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 3200);
+  };
+
+  const saveProfile = (profile) => {
+    const nextUser = {
+      ...currentUser,
+      name: profile.name.trim() || currentUser.name,
+      email: profile.email.trim() || currentUser.email,
+    };
+    localStorage.setItem("careerforge_session", JSON.stringify(nextUser));
+    setCurrentUser(nextUser);
+    setCvData((current) => ({
+      ...current,
+      name: nextUser.name,
+      email: nextUser.email || current.email,
+    }));
+    notify("Profile changes saved.");
   };
 
   const pageActions = {
@@ -158,6 +246,7 @@ export default function StudentWorkspace() {
     <>
       <DashboardShell
         role="student"
+        profileName={currentUser.name}
         navItems={navItems}
         active={active}
         onNavigate={setActive}
@@ -178,14 +267,14 @@ export default function StudentWorkspace() {
           />
         )}
         {active === "applications" && <ApplicationsPage applications={applications} notify={notify} />}
-        {active === "vault" && <CareerVault notify={notify} />}
+        {active === "vault" && <CareerVault notify={notify} photo={cvPhoto} setPhoto={setCvPhoto} data={cvData} setData={setCvData} />}
         {active === "assessments" && <AssessmentsPage onStart={(assessment) => { setQuiz({ index: 0, answers: {}, finished: false, score: 0 }); setModal({ type: "quiz", assessment }); }} />}
         {active === "analytics" && <AnalyticsPage notify={notify} />}
         {active === "learning" && <LearningPage notify={notify} />}
-        {active === "community" && <CommunityPage posts={posts} setPosts={setPosts} notify={notify} onNewPost={() => setModal({ type: "post" })} />}
+        {active === "community" && <CommunityPage posts={posts} setPosts={setPosts} notify={notify} viewer={currentUser} onNewPost={() => setModal({ type: "post" })} />}
         {active === "events" && <EventsPage events={events} onRegister={(id) => { setEvents((current) => current.map((event) => event.id === id ? { ...event, registered: !event.registered } : event)); notify("Event registration updated."); }} />}
         {active === "achievements" && <AchievementsPage />}
-        {active === "profile" && <ProfilePage notify={notify} />}
+        {active === "profile" && <ProfilePage notify={notify} user={currentUser} onSave={saveProfile} />}
       </DashboardShell>
       <Toast message={toast} onClose={() => setToast("")} />
       {modal?.type === "job" && (
@@ -201,7 +290,7 @@ export default function StudentWorkspace() {
           }}
         />
       )}
-      {modal?.type === "apply" && <ApplyModal job={modal.job} onClose={() => setModal(null)} onSubmit={() => { setModal(null); notify(`Application sent to ${modal.job.company}.`); }} />}
+      {modal?.type === "apply" && <ApplyModal job={modal.job} user={currentUser} resumeName={cvData.name} onClose={() => setModal(null)} onSubmit={() => { setModal(null); notify(`Application sent to ${modal.job.company}.`); }} />}
       {modal?.type === "quiz" && (
         <QuizModal
           assessment={modal.assessment}
@@ -210,7 +299,7 @@ export default function StudentWorkspace() {
           onClose={() => setModal(null)}
         />
       )}
-      {modal?.type === "post" && <PostModal onClose={() => setModal(null)} onSubmit={(text) => { setPosts((current) => [{ id: Date.now(), author: "Nadia Ahmed", role: "CSE · North South University", time: "now", initials: "NA", tone: "bg-plum", text, tags: ["Career journey"], likes: 0, comments: 0, liked: false }, ...current]); setModal(null); notify("Your post is live."); }} />}
+      {modal?.type === "post" && <PostModal user={currentUser} onClose={() => setModal(null)} onSubmit={(text) => { setPosts((current) => [{ id: Date.now(), author: currentUser.name, role: "CareerForge student", time: "now", initials: getInitials(currentUser.name), tone: "bg-plum", text, tags: ["Career journey"], likes: 0, comments: 0, liked: false }, ...current]); setModal(null); notify("Your post is live."); }} />}
     </>
   );
 }
@@ -436,58 +525,288 @@ function Status({ value }) {
   return <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${styles[value] || "bg-ink/10 text-muted"}`}>{value}</span>;
 }
 
-function CareerVault({ notify }) {
-  const [data, setData] = useState({
-    name: "Nadia Ahmed",
-    title: "Aspiring Product & Data Analyst",
-    email: "nadia.ahmed@email.com",
-    phone: "+880 17 0000 0000",
-    summary: "Analytical CSE student with hands-on product research, SQL and frontend experience. Motivated by turning complex user needs into clear product decisions.",
-    skills: "SQL, JavaScript, React, Product Analytics, User Research",
-  });
+function CareerVault({ notify, photo, setPhoto, data, setData }) {
+  const [photoError, setPhotoError] = useState("");
   const update = (key, value) => setData((current) => ({ ...current, [key]: value }));
+  const initials = getInitials(data.name) || "CV";
+  const skills = data.skills.split(",").map((skill) => skill.trim()).filter(Boolean);
+  const contactItems = [data.email, data.phone, data.location, data.website].filter(Boolean);
+
+  const addItem = (section, values) => {
+    setData((current) => ({
+      ...current,
+      [section]: [...current[section], { id: createItemId(), ...values }],
+    }));
+  };
+
+  const updateItem = (section, id, key, value) => {
+    setData((current) => ({
+      ...current,
+      [section]: current[section].map((item) => item.id === id ? { ...item, [key]: value } : item),
+    }));
+  };
+
+  const removeItem = (section, id) => {
+    setData((current) => ({
+      ...current,
+      [section]: current[section].filter((item) => item.id !== id),
+    }));
+  };
+
+  const uploadPhoto = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setPhotoError("Please choose a JPG, PNG or WebP image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError("Photo must be smaller than 5 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPhoto({ src: String(reader.result), name: file.name });
+      setPhotoError("");
+      notify("CV photo added. Your preview has been updated.");
+    };
+    reader.onerror = () => setPhotoError("The photo could not be read. Please try another image.");
+    reader.readAsDataURL(file);
+  };
+
+  const removePhoto = () => {
+    setPhoto(null);
+    setPhotoError("");
+    notify("CV photo removed.");
+  };
+
   return (
     <div className="grid gap-5 xl:grid-cols-[.75fr_1.25fr]">
       <section className="panel h-fit p-5">
-        <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Resume details</h2><p className="text-xs text-muted">Changes update the preview instantly.</p></div><span className="tag text-jade"><Check size={12} /> Saved</span></div>
-        <div className="space-y-4">
-          {[["Full name", "name"], ["Professional title", "title"], ["Email", "email"], ["Phone", "phone"]].map(([label, key]) => (
-            <label key={key} className="block"><span className="mb-1.5 block text-xs font-bold">{label}</span><input className="input" value={data[key]} onChange={(e) => update(key, e.target.value)} /></label>
-          ))}
-          <label className="block"><span className="mb-1.5 block text-xs font-bold">Professional summary</span><textarea className="input min-h-28 resize-none py-3" value={data.summary} onChange={(e) => update("summary", e.target.value)} /></label>
-          <label className="block"><span className="mb-1.5 block text-xs font-bold">Core skills</span><textarea className="input min-h-20 resize-none py-3" value={data.skills} onChange={(e) => update("skills", e.target.value)} /></label>
+        <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Resume details</h2><p className="text-xs text-muted">Every section is manually editable and updates the preview instantly.</p></div><span className="tag text-jade"><Check size={12} /> Saved</span></div>
+        <div className="space-y-5">
+          <div className="rounded-[22px] border border-ink/[0.08] bg-white/45 p-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-[24px] border border-white/70 bg-cobalt text-white shadow-glass">
+                {photo ? (
+                  <img src={photo.src} alt="CV profile preview" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="grid h-full place-items-center text-2xl font-extrabold">{initials}</span>
+                )}
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-ink/55 py-1.5 text-center text-[9px] font-bold text-white backdrop-blur-sm">
+                  CV PHOTO
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <b className="block text-sm">Professional photo</b>
+                <p className="mt-1 text-[11px] leading-5 text-muted">
+                  Use a clear headshot. JPG, PNG or WebP · maximum 5 MB.
+                </p>
+                {photo?.name && <p className="mt-1 truncate text-[10px] font-bold text-jade">{photo.name}</p>}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <label className="btn-secondary min-h-9 cursor-pointer px-3 text-xs">
+                    <Camera size={14} /> {photo ? "Replace photo" : "Upload photo"}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={uploadPhoto} />
+                  </label>
+                  {photo && (
+                    <button type="button" onClick={removePhoto} className="btn-ghost min-h-9 px-3 text-xs text-coral">
+                      <X size={14} /> Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            {photoError && <p className="mt-3 rounded-xl bg-coral/10 px-3 py-2 text-[11px] font-bold text-coral">{photoError}</p>}
+          </div>
+
+          <CvEditorSection title="Personal & contact" description="The name and email start from your authenticated account.">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <CvField label="Full name" value={data.name} onChange={(value) => update("name", value)} placeholder="Your full name" />
+              <CvField label="Professional title" value={data.title} onChange={(value) => update("title", value)} placeholder="e.g. Junior Software Engineer" />
+              <CvField label="Email" type="email" value={data.email} onChange={(value) => update("email", value)} placeholder="you@example.com" />
+              <CvField label="Phone" value={data.phone} onChange={(value) => update("phone", value)} placeholder="+880..." />
+              <CvField label="Location" value={data.location} onChange={(value) => update("location", value)} placeholder="City, Country" />
+              <CvField label="Portfolio / LinkedIn" value={data.website} onChange={(value) => update("website", value)} placeholder="linkedin.com/in/yourname" />
+            </div>
+          </CvEditorSection>
+
+          <CvEditorSection title="Professional profile" description="Write this section completely in your own words.">
+            <CvField label="Professional summary" multiline rows="5" value={data.summary} onChange={(value) => update("summary", value)} placeholder="Introduce your strengths, experience and career direction..." />
+            <div className="mt-3">
+              <CvField label="Core skills" multiline rows="3" value={data.skills} onChange={(value) => update("skills", value)} placeholder="React, JavaScript, SQL, Communication..." help="Separate skills with commas." />
+            </div>
+          </CvEditorSection>
+
+          <CvEditorSection
+            title="Education"
+            description="Add as many degrees or qualifications as you need."
+            onAdd={() => addItem("education", { degree: "", institution: "", location: "", start: "", end: "" })}
+            addLabel="Add education"
+          >
+            {data.education.map((item, index) => (
+              <CvItemEditor key={item.id} label={`Education ${index + 1}`} onRemove={() => removeItem("education", item.id)}>
+                <CvField label="Degree / qualification" value={item.degree} onChange={(value) => updateItem("education", item.id, "degree", value)} placeholder="BSc in Computer Science" />
+                <CvField label="Institution" value={item.institution} onChange={(value) => updateItem("education", item.id, "institution", value)} placeholder="University name" />
+                <CvField label="Location" value={item.location} onChange={(value) => updateItem("education", item.id, "location", value)} placeholder="Dhaka, Bangladesh" />
+                <div className="grid grid-cols-2 gap-3">
+                  <CvField label="Start" value={item.start} onChange={(value) => updateItem("education", item.id, "start", value)} placeholder="2023" />
+                  <CvField label="End" value={item.end} onChange={(value) => updateItem("education", item.id, "end", value)} placeholder="2027 / Present" />
+                </div>
+              </CvItemEditor>
+            ))}
+            {!data.education.length && <CvEmpty copy="No education added yet." />}
+          </CvEditorSection>
+
+          <CvEditorSection
+            title="Work experience"
+            description="Use one line per achievement or responsibility."
+            onAdd={() => addItem("experiences", { title: "", company: "", location: "", start: "", end: "", details: "" })}
+            addLabel="Add experience"
+          >
+            {data.experiences.map((item, index) => (
+              <CvItemEditor key={item.id} label={`Experience ${index + 1}`} onRemove={() => removeItem("experiences", item.id)}>
+                <CvField label="Role / position" value={item.title} onChange={(value) => updateItem("experiences", item.id, "title", value)} placeholder="Software Engineering Intern" />
+                <CvField label="Company / organization" value={item.company} onChange={(value) => updateItem("experiences", item.id, "company", value)} placeholder="Organization name" />
+                <CvField label="Location" value={item.location} onChange={(value) => updateItem("experiences", item.id, "location", value)} placeholder="Dhaka / Remote" />
+                <div className="grid grid-cols-2 gap-3">
+                  <CvField label="Start" value={item.start} onChange={(value) => updateItem("experiences", item.id, "start", value)} placeholder="Jan 2026" />
+                  <CvField label="End" value={item.end} onChange={(value) => updateItem("experiences", item.id, "end", value)} placeholder="Present" />
+                </div>
+                <CvField label="Achievements" multiline rows="4" value={item.details} onChange={(value) => updateItem("experiences", item.id, "details", value)} placeholder={"Built...\nImproved...\nLed..."} help="Write each bullet on a new line." />
+              </CvItemEditor>
+            ))}
+            {!data.experiences.length && <CvEmpty copy="No work experience added yet." />}
+          </CvEditorSection>
+
+          <CvEditorSection
+            title="Projects"
+            description="Showcase academic, personal or team projects."
+            onAdd={() => addItem("projects", { title: "", context: "", link: "", date: "", details: "" })}
+            addLabel="Add project"
+          >
+            {data.projects.map((item, index) => (
+              <CvItemEditor key={item.id} label={`Project ${index + 1}`} onRemove={() => removeItem("projects", item.id)}>
+                <CvField label="Project title" value={item.title} onChange={(value) => updateItem("projects", item.id, "title", value)} placeholder="Project name" />
+                <CvField label="Context / role" value={item.context} onChange={(value) => updateItem("projects", item.id, "context", value)} placeholder="Personal project / Team lead" />
+                <CvField label="Project link" value={item.link} onChange={(value) => updateItem("projects", item.id, "link", value)} placeholder="github.com/..." />
+                <CvField label="Date" value={item.date} onChange={(value) => updateItem("projects", item.id, "date", value)} placeholder="2026" />
+                <CvField label="Highlights" multiline rows="4" value={item.details} onChange={(value) => updateItem("projects", item.id, "details", value)} placeholder={"Designed...\nDeveloped...\nMeasured..."} help="Write each bullet on a new line." />
+              </CvItemEditor>
+            ))}
+            {!data.projects.length && <CvEmpty copy="No projects added yet." />}
+          </CvEditorSection>
+
+          <CvEditorSection
+            title="Languages"
+            description="Add languages and your proficiency."
+            onAdd={() => addItem("languages", { name: "", proficiency: "" })}
+            addLabel="Add language"
+          >
+            {data.languages.map((item, index) => (
+              <CvItemEditor key={item.id} label={`Language ${index + 1}`} onRemove={() => removeItem("languages", item.id)}>
+                <div className="grid grid-cols-2 gap-3">
+                  <CvField label="Language" value={item.name} onChange={(value) => updateItem("languages", item.id, "name", value)} placeholder="Bangla" />
+                  <CvField label="Proficiency" value={item.proficiency} onChange={(value) => updateItem("languages", item.id, "proficiency", value)} placeholder="Native / Professional" />
+                </div>
+              </CvItemEditor>
+            ))}
+            {!data.languages.length && <CvEmpty copy="No languages added yet." />}
+          </CvEditorSection>
+
+          <CvEditorSection
+            title="Certifications"
+            description="Add courses, certificates, awards or credentials."
+            onAdd={() => addItem("certifications", { name: "", issuer: "", date: "", credential: "" })}
+            addLabel="Add certification"
+          >
+            {data.certifications.map((item, index) => (
+              <CvItemEditor key={item.id} label={`Certification ${index + 1}`} onRemove={() => removeItem("certifications", item.id)}>
+                <CvField label="Certification / award" value={item.name} onChange={(value) => updateItem("certifications", item.id, "name", value)} placeholder="Certificate name" />
+                <CvField label="Issuer" value={item.issuer} onChange={(value) => updateItem("certifications", item.id, "issuer", value)} placeholder="Issuing organization" />
+                <CvField label="Date" value={item.date} onChange={(value) => updateItem("certifications", item.id, "date", value)} placeholder="Jul 2026" />
+                <CvField label="Credential / link" value={item.credential} onChange={(value) => updateItem("certifications", item.id, "credential", value)} placeholder="Credential ID or URL" />
+              </CvItemEditor>
+            ))}
+            {!data.certifications.length && <CvEmpty copy="No certifications added yet." />}
+          </CvEditorSection>
+
           <button onClick={() => notify("AI strengthened your summary and added role keywords.")} className="btn-secondary w-full text-cobalt"><Sparkles size={16} /> Improve with AI</button>
         </div>
       </section>
       <section>
         <div className="mb-3 flex items-center justify-between"><span className="text-xs font-bold text-muted">LIVE PREVIEW · MODERN EDITORIAL</span><button onClick={() => notify("Resume version duplicated.")} className="btn-ghost"><Plus size={15} /> New version</button></div>
-        <article id="resume-print" className="min-h-[840px] overflow-hidden rounded-[8px] bg-white p-8 shadow-lift sm:p-12">
+        <article id="resume-print" className="resume-paper min-h-[840px] overflow-hidden rounded-[8px] bg-white p-8 shadow-lift sm:p-12">
           <header className="border-b-2 border-ink pb-7">
             <div className="flex items-start justify-between gap-5">
-              <div><h1 className="font-display text-4xl tracking-[-0.04em]">{data.name}</h1><p className="mt-2 text-sm font-bold uppercase tracking-[.12em] text-cobalt">{data.title}</p></div>
-              <span className="grid h-14 w-14 place-items-center rounded-full bg-coral text-sm font-extrabold text-white">NA</span>
+              <div><h1 className="font-display text-4xl tracking-[-0.04em]">{data.name || "Your name"}</h1>{data.title && <p className="mt-2 text-sm font-bold uppercase tracking-[.12em] text-cobalt">{data.title}</p>}</div>
+              {photo ? (
+                <img src={photo.src} alt={`${data.name} profile`} className="h-20 w-20 shrink-0 rounded-[22px] border-2 border-white object-cover shadow-md" />
+              ) : (
+                <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-coral text-sm font-extrabold text-white">{initials}</span>
+              )}
             </div>
-            <div className="mt-5 flex flex-wrap gap-4 text-[11px] font-semibold text-muted"><span>{data.email}</span><span>{data.phone}</span><span>Dhaka, Bangladesh</span></div>
+            {contactItems.length > 0 && <div className="mt-5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-semibold text-muted">{contactItems.map((item) => <span key={item}>{item}</span>)}</div>}
           </header>
           <div className="grid gap-8 pt-7 sm:grid-cols-[.35fr_.65fr]">
             <aside className="space-y-8">
-              <ResumeBlock title="Expertise"><div className="flex flex-wrap gap-2">{data.skills.split(",").map((skill) => <span className="rounded-md bg-canvas px-2 py-1 text-[10px] font-bold" key={skill}>{skill.trim()}</span>)}</div></ResumeBlock>
-              <ResumeBlock title="Education"><b className="text-xs">BSc in Computer Science</b><p className="mt-1 text-[11px] leading-5 text-muted">North South University<br />2023 — 2027</p></ResumeBlock>
-              <ResumeBlock title="Languages"><p className="text-[11px] leading-5"><b>Bangla</b> · Native<br /><b>English</b> · Professional</p></ResumeBlock>
+              {skills.length > 0 && <ResumeBlock title="Expertise"><div className="flex flex-wrap gap-2">{skills.map((skill) => <span className="rounded-md bg-canvas px-2 py-1 text-[10px] font-bold" key={skill}>{skill}</span>)}</div></ResumeBlock>}
+              {data.education.length > 0 && <ResumeBlock title="Education">{data.education.map((item) => <div className="mb-4 last:mb-0" key={item.id}><b className="text-xs">{item.degree || "Qualification"}</b>{item.institution && <p className="mt-1 text-[11px] leading-5 text-muted">{item.institution}</p>}<p className="text-[10px] leading-5 text-muted">{[item.location, [item.start, item.end].filter(Boolean).join(" — ")].filter(Boolean).join(" · ")}</p></div>)}</ResumeBlock>}
+              {data.languages.length > 0 && <ResumeBlock title="Languages"><div className="space-y-1.5">{data.languages.map((item) => <p className="text-[11px] leading-5" key={item.id}><b>{item.name || "Language"}</b>{item.proficiency && <span className="text-muted"> · {item.proficiency}</span>}</p>)}</div></ResumeBlock>}
+              {data.certifications.length > 0 && <ResumeBlock title="Certifications"><div className="space-y-3">{data.certifications.map((item) => <div key={item.id}><b className="block text-[11px]">{item.name || "Certification"}</b><p className="text-[10px] leading-4 text-muted">{[item.issuer, item.date].filter(Boolean).join(" · ")}</p>{item.credential && <p className="break-all text-[9px] leading-4 text-muted">{item.credential}</p>}</div>)}</div></ResumeBlock>}
             </aside>
             <div className="space-y-8">
-              <ResumeBlock title="Profile"><p className="text-[11px] leading-5 text-muted">{data.summary}</p></ResumeBlock>
-              <ResumeBlock title="Experience">
-                <ResumeEntry title="Product Research Intern" place="LaunchPad Labs · Dhaka" date="Jan — Jun 2026" points={["Analyzed 1,200+ feedback records to identify three high-impact onboarding improvements.", "Built a SQL reporting view that reduced weekly reporting time by 35%."]} />
-                <ResumeEntry title="Student Project Lead" place="Campus Connect" date="Aug — Dec 2025" points={["Led a four-person team to prototype and test a peer mentorship platform.", "Translated 18 user interviews into a prioritized product roadmap."]} />
-              </ResumeBlock>
-              <ResumeBlock title="Selected project"><ResumeEntry title="Career outcome dashboard" place="Personal project" date="2026" points={["Designed a React dashboard to surface graduate employment trends from 6,000+ records."]} /></ResumeBlock>
+              {data.summary && <ResumeBlock title="Profile"><p className="whitespace-pre-line text-[11px] leading-5 text-muted">{data.summary}</p></ResumeBlock>}
+              {data.experiences.length > 0 && <ResumeBlock title="Experience">{data.experiences.map((item) => <ResumeEntry key={item.id} title={item.title || "Position"} place={[item.company, item.location].filter(Boolean).join(" · ")} date={[item.start, item.end].filter(Boolean).join(" — ")} points={item.details.split("\n").map((point) => point.trim()).filter(Boolean)} />)}</ResumeBlock>}
+              {data.projects.length > 0 && <ResumeBlock title="Selected projects">{data.projects.map((item) => <ResumeEntry key={item.id} title={item.title || "Project"} place={[item.context, item.link].filter(Boolean).join(" · ")} date={item.date} points={item.details.split("\n").map((point) => point.trim()).filter(Boolean)} />)}</ResumeBlock>}
+              {!data.summary && !data.experiences.length && !data.projects.length && <div className="cv-empty-state rounded-[20px] border border-dashed border-ink/15 p-6 text-center"><FileText className="mx-auto text-muted" size={24} /><b className="mt-3 block text-sm">Your CV is ready to build</b><p className="mt-1 text-[11px] leading-5 text-muted">Use the editor to add your summary, experience and projects.</p></div>}
             </div>
           </div>
         </article>
       </section>
     </div>
   );
+}
+
+function CvEditorSection({ title, description, onAdd, addLabel, children }) {
+  return (
+    <section className="rounded-[22px] border border-ink/[0.08] bg-white/35 p-4">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div><h3 className="text-sm font-extrabold">{title}</h3>{description && <p className="mt-1 text-[10px] leading-4 text-muted">{description}</p>}</div>
+        {onAdd && <button type="button" onClick={onAdd} className="btn-ghost min-h-8 shrink-0 px-2 text-[10px] text-cobalt"><Plus size={13} /> {addLabel}</button>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function CvItemEditor({ label, onRemove, children }) {
+  return (
+    <div className="mb-3 rounded-[18px] border border-ink/[0.08] bg-white/55 p-3 last:mb-0">
+      <div className="mb-3 flex items-center justify-between"><b className="text-[10px] uppercase tracking-[0.12em] text-muted">{label}</b><button type="button" onClick={onRemove} className="grid h-7 w-7 place-items-center rounded-lg text-coral transition hover:bg-coral/10" aria-label={`Remove ${label}`}><X size={14} /></button></div>
+      <div className="space-y-3">{children}</div>
+    </div>
+  );
+}
+
+function CvField({ label, value, onChange, placeholder, type = "text", multiline = false, rows = "3", help }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[11px] font-bold">{label}</span>
+      {multiline ? (
+        <textarea rows={rows} className="input resize-y py-3" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+      ) : (
+        <input type={type} className="input" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+      )}
+      {help && <small className="mt-1 block text-[9px] leading-4 text-muted">{help}</small>}
+    </label>
+  );
+}
+
+function CvEmpty({ copy }) {
+  return <p className="rounded-[16px] border border-dashed border-ink/10 px-3 py-4 text-center text-[10px] font-semibold text-muted">{copy}</p>;
 }
 
 function ResumeBlock({ title, children }) {
@@ -595,12 +914,12 @@ function LearningPage({ notify }) {
   );
 }
 
-function CommunityPage({ posts, setPosts, notify, onNewPost }) {
+function CommunityPage({ posts, setPosts, notify, viewer, onNewPost }) {
   const toggleLike = (id) => setPosts((current) => current.map((post) => post.id === id ? { ...post, liked: !post.liked, likes: post.likes + (post.liked ? -1 : 1) } : post));
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_330px]">
       <section className="space-y-4">
-        <button onClick={onNewPost} className="panel flex w-full items-center gap-3 p-4 text-left"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-plum text-xs font-extrabold text-white">NA</span><span className="input flex min-h-10 items-center text-muted">Share a question, insight or win...</span><span className="btn-accent min-h-10 px-4"><Send size={15} /></span></button>
+        <button onClick={onNewPost} className="panel flex w-full items-center gap-3 p-4 text-left"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-plum text-xs font-extrabold text-white">{getInitials(viewer?.name)}</span><span className="input flex min-h-10 items-center text-muted">Share a question, insight or win...</span><span className="btn-accent min-h-10 px-4"><Send size={15} /></span></button>
         {posts.map((post) => (
           <article className="panel p-5" key={post.id}>
             <header className="flex items-start gap-3"><span className={`grid h-11 w-11 place-items-center rounded-2xl text-xs font-extrabold text-white ${post.tone}`}>{post.initials}</span><div className="flex-1"><b className="block text-sm">{post.author}</b><small className="text-[11px] text-muted">{post.role} · {post.time}</small></div><button className="btn-ghost min-h-8"><MoreHorizontal size={16} /></button></header>
@@ -655,20 +974,28 @@ function AchievementsPage() {
   );
 }
 
-function ProfilePage({ notify }) {
+function ProfilePage({ user, onSave }) {
   const [avatar, setAvatar] = useState(null);
-  const [form, setForm] = useState({ name: "Nadia Ahmed", university: "North South University", degree: "BSc in Computer Science", graduation: "2027", target: "Product Analyst", location: "Dhaka, Bangladesh" });
+  const [form, setForm] = useState({
+    name: user.name,
+    email: user.email || "",
+    university: "",
+    degree: "",
+    graduation: "",
+    target: "",
+    location: "",
+  });
   return (
     <div className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]">
       <aside className="space-y-5">
-        <div className="panel p-6 text-center"><label className="group relative mx-auto block h-28 w-28 cursor-pointer overflow-hidden rounded-[32px] bg-cobalt text-white shadow-lift">{avatar ? <img src={avatar} alt="Profile" className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-3xl font-extrabold">NA</span>}<span className="absolute inset-0 grid place-items-center bg-ink/50 opacity-0 transition group-hover:opacity-100"><Camera size={22} /></span><input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setAvatar(URL.createObjectURL(file)); }} /></label><h2 className="mt-4 text-xl font-extrabold">{form.name}</h2><p className="mt-1 text-xs text-muted">{form.degree}</p><span className="tag mt-4 !text-jade"><CheckCircle2 size={12} /> 92% profile complete</span></div>
+        <div className="panel p-6 text-center"><label className="group relative mx-auto block h-28 w-28 cursor-pointer overflow-hidden rounded-[32px] bg-cobalt text-white shadow-lift">{avatar ? <img src={avatar} alt="Profile" className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-3xl font-extrabold">{getInitials(form.name)}</span>}<span className="absolute inset-0 grid place-items-center bg-ink/50 opacity-0 transition group-hover:opacity-100"><Camera size={22} /></span><input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setAvatar(URL.createObjectURL(file)); }} /></label><h2 className="mt-4 text-xl font-extrabold">{form.name || "Student"}</h2><p className="mt-1 text-xs text-muted">{form.degree || form.email}</p><span className="tag mt-4 !text-jade"><CheckCircle2 size={12} /> Authenticated student</span></div>
         <div className="panel p-5"><h3 className="text-sm font-extrabold">Visibility</h3><div className="mt-4 space-y-3">{[["Open to opportunities", true], ["Show profile in community", true], ["Weekly progress email", false]].map(([label, enabled]) => <label key={label} className="flex items-center justify-between text-xs font-semibold"><span>{label}</span><input type="checkbox" defaultChecked={enabled} className="h-4 w-4 accent-cobalt" /></label>)}</div></div>
       </aside>
       <section className="panel p-6">
         <div className="mb-6 flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Personal & career details</h2><p className="text-xs text-muted">Used to personalize recommendations.</p></div><Pencil size={17} className="text-muted" /></div>
-        <div className="grid gap-4 sm:grid-cols-2">{[["Full name", "name"], ["University", "university"], ["Degree", "degree"], ["Graduation year", "graduation"], ["Target role", "target"], ["Location", "location"]].map(([label, key]) => <label key={key} className="block"><span className="mb-1.5 block text-xs font-bold">{label}</span><input value={form[key]} onChange={(e) => setForm((current) => ({ ...current, [key]: e.target.value }))} className="input" /></label>)}</div>
+        <div className="grid gap-4 sm:grid-cols-2">{[["Full name", "name"], ["Email address", "email"], ["University", "university"], ["Degree", "degree"], ["Graduation year", "graduation"], ["Target role", "target"], ["Location", "location"]].map(([label, key]) => <label key={key} className="block"><span className="mb-1.5 block text-xs font-bold">{label}</span><input type={key === "email" ? "email" : "text"} value={form[key]} onChange={(e) => setForm((current) => ({ ...current, [key]: e.target.value }))} className="input" /></label>)}</div>
         <div className="mt-6"><span className="mb-2 block text-xs font-bold">Career interests</span><div className="flex flex-wrap gap-2">{["Product", "Data & Analytics", "Technology", "Research"].map((item) => <span className="tag !bg-cobalt/10 !text-cobalt" key={item}>{item}<X size={11} /></span>)}<button className="tag"><Plus size={11} /> Add</button></div></div>
-        <div className="mt-8 flex justify-end"><button onClick={() => notify("Profile changes saved.")} className="btn-accent"><Check size={16} /> Save changes</button></div>
+        <div className="mt-8 flex justify-end"><button onClick={() => onSave(form)} className="btn-accent"><Check size={16} /> Save changes</button></div>
       </section>
     </div>
   );
@@ -680,15 +1007,20 @@ function JobModal({ job, applied, onClose, onApply }) {
   );
 }
 
-function ApplyModal({ job, onClose, onSubmit }) {
+function ApplyModal({ job, user, resumeName, onClose, onSubmit }) {
   const [coverLetter, setCoverLetter] = useState("");
+  const resumeOwner = (resumeName || user?.name || "Student").trim();
+  const resumeFileName = `${resumeOwner.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "Student"}_Resume.pdf`;
   const generate = () => setCoverLetter(`Dear ${job.company} Hiring Team,
 
-I am excited to apply for the ${job.title} role. My background in product analysis, SQL and user-centered problem solving aligns strongly with the opportunity. In my recent work, I translated over 1,200 feedback records into actionable product recommendations and built reporting workflows that reduced manual analysis time.
+I am excited to apply for the ${job.title} role. My skills, projects and learning experience align with this opportunity, and I would value the chance to contribute while continuing to grow.
 
-I would welcome the opportunity to bring this analytical, collaborative approach to ${job.company}.`);
+I would welcome the opportunity to discuss how I can contribute to ${job.company}.
+
+Sincerely,
+${user?.name || "Student"}`);
   return (
-    <div className="modal-backdrop" onClick={onClose}><div className="modal-card" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between"><div><span className="eyebrow"><Sparkles size={13} /> Smart application</span><h2 className="mt-2 text-xl font-extrabold">{job.title} · {job.company}</h2></div><button onClick={onClose} className="btn-ghost"><X size={18} /></button></div><div className="mt-6 space-y-4"><div className="rounded-2xl border border-ink/[0.08] bg-white/55 p-4"><div className="flex items-center justify-between"><span><b className="block text-sm">Nadia_Ahmed_Resume.pdf</b><small className="text-muted">Career Vault · Updated today</small></span><span className="tag !text-jade"><Check size={12} /> Selected</span></div></div><label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-ink/20 bg-white/35 p-5 text-xs font-bold text-muted hover:bg-white/60"><Upload size={17} /> Upload a different resume<input className="hidden" type="file" accept=".pdf,.doc,.docx" /></label><div><div className="mb-2 flex items-center justify-between"><b className="text-xs">Cover letter</b><button onClick={generate} className="text-xs font-bold text-cobalt"><Sparkles size={13} className="mr-1 inline" />Generate with AI</button></div><textarea className="input min-h-40 resize-none py-3" value={coverLetter} onChange={(event) => setCoverLetter(event.target.value)} placeholder="Write your note or generate a tailored draft..." /></div></div><div className="mt-6 flex justify-end gap-3"><button onClick={onClose} className="btn-secondary">Save draft</button><button onClick={onSubmit} className="btn-accent">Submit application <Send size={15} /></button></div></div></div>
+    <div className="modal-backdrop" onClick={onClose}><div className="modal-card" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between"><div><span className="eyebrow"><Sparkles size={13} /> Smart application</span><h2 className="mt-2 text-xl font-extrabold">{job.title} · {job.company}</h2></div><button onClick={onClose} className="btn-ghost"><X size={18} /></button></div><div className="mt-6 space-y-4"><div className="rounded-2xl border border-ink/[0.08] bg-white/55 p-4"><div className="flex items-center justify-between"><span><b className="block text-sm">{resumeFileName}</b><small className="text-muted">Career Vault · Updated today</small></span><span className="tag !text-jade"><Check size={12} /> Selected</span></div></div><label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-ink/20 bg-white/35 p-5 text-xs font-bold text-muted hover:bg-white/60"><Upload size={17} /> Upload a different resume<input className="hidden" type="file" accept=".pdf,.doc,.docx" /></label><div><div className="mb-2 flex items-center justify-between"><b className="text-xs">Cover letter</b><button onClick={generate} className="text-xs font-bold text-cobalt"><Sparkles size={13} className="mr-1 inline" />Generate with AI</button></div><textarea className="input min-h-40 resize-none py-3" value={coverLetter} onChange={(event) => setCoverLetter(event.target.value)} placeholder="Write your note or generate a tailored draft..." /></div></div><div className="mt-6 flex justify-end gap-3"><button onClick={onClose} className="btn-secondary">Save draft</button><button onClick={onSubmit} className="btn-accent">Submit application <Send size={15} /></button></div></div></div>
   );
 }
 
@@ -702,7 +1034,7 @@ function QuizModal({ assessment, quiz, setQuiz, onClose }) {
   return <div className="modal-backdrop"><div className="modal-card max-w-3xl">{quiz.finished ? <div className="py-6 text-center"><span className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-jade text-white shadow-lift"><Trophy size={32} /></span><span className="eyebrow mt-6">Assessment complete</span><h2 className="mt-2 font-display text-5xl">{quiz.score}%</h2><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted">Great work. Your result has been added to your skill profile and job recommendations have been refreshed.</p><div className="mx-auto mt-6 grid max-w-sm grid-cols-2 gap-3"><div className="rounded-2xl bg-jade/10 p-4"><b className="text-lg text-jade">{quizQuestions.filter((q, i) => quiz.answers[i] === q.correct).length}/{quizQuestions.length}</b><small className="block text-muted">Correct</small></div><div className="rounded-2xl bg-cobalt/10 p-4"><b className="text-lg text-cobalt">+2%</b><small className="block text-muted">Readiness</small></div></div><button onClick={onClose} className="btn-accent mt-7">Return to assessments</button></div> : <><div className="flex items-center justify-between"><div><span className="eyebrow">{assessment.category}</span><h2 className="mt-1 text-lg font-extrabold">{assessment.title}</h2></div><div className="flex items-center gap-2 rounded-xl bg-coral/10 px-3 py-2 text-xs font-bold text-coral"><Clock3 size={15} /> 14:32</div></div><div className="mt-6 flex gap-1.5">{quizQuestions.map((_, index) => <span key={index} className={`h-1.5 flex-1 rounded-full ${index <= quiz.index ? "bg-cobalt" : "bg-ink/[0.08]"}`} />)}</div><p className="mt-8 text-xs font-bold text-muted">QUESTION {quiz.index + 1} OF {quizQuestions.length}</p><h3 className="mt-3 text-xl font-extrabold leading-7">{question.text}</h3><div className="mt-6 grid gap-3">{question.answers.map((answer, index) => <button onClick={() => select(index)} key={answer} className={`flex items-center gap-3 rounded-2xl border p-4 text-left text-sm font-semibold transition ${quiz.answers[quiz.index] === index ? "border-cobalt bg-cobalt/10 text-cobalt" : "border-ink/[0.08] bg-white/55 hover:bg-white"}`}><span className={`grid h-7 w-7 place-items-center rounded-lg text-xs ${quiz.answers[quiz.index] === index ? "bg-cobalt text-white" : "bg-ink/[0.06] text-muted"}`}>{String.fromCharCode(65 + index)}</span>{answer}</button>)}</div><div className="mt-7 flex items-center justify-between"><button disabled={quiz.index === 0} onClick={() => setQuiz((current) => ({ ...current, index: current.index - 1 }))} className="btn-secondary disabled:opacity-40"><ChevronLeft size={15} /> Back</button>{quiz.index === quizQuestions.length - 1 ? <button disabled={quiz.answers[quiz.index] === undefined} onClick={finish} className="btn-accent disabled:opacity-40">Submit answers <Check size={15} /></button> : <button disabled={quiz.answers[quiz.index] === undefined} onClick={() => setQuiz((current) => ({ ...current, index: current.index + 1 }))} className="btn-primary disabled:opacity-40">Next question <ChevronRight size={15} /></button>}</div></>}</div></div>;
 }
 
-function PostModal({ onClose, onSubmit }) {
+function PostModal({ user, onClose, onSubmit }) {
   const [text, setText] = useState("");
-  return <div className="modal-backdrop" onClick={onClose}><div className="modal-card max-w-xl" onClick={(e) => e.stopPropagation()}><div className="flex justify-between"><div><span className="eyebrow"><Users size={13} /> Career community</span><h2 className="mt-2 text-xl font-extrabold">Share with the community</h2></div><button onClick={onClose} className="btn-ghost"><X size={18} /></button></div><div className="mt-6 flex gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-plum text-xs font-bold text-white">NA</span><textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} className="input min-h-40 resize-none py-3" placeholder="What are you learning, building or wondering?" /></div><div className="mt-4 flex flex-wrap gap-2"><button className="tag"><Link2 size={12} /> Add link</button><button className="tag"><Target size={12} /> Add topic</button><button className="tag"><Upload size={12} /> Add image</button></div><div className="mt-6 flex justify-end gap-3"><button onClick={onClose} className="btn-secondary">Cancel</button><button disabled={!text.trim()} onClick={() => onSubmit(text)} className="btn-accent disabled:opacity-40">Publish post <Send size={15} /></button></div></div></div>;
+  return <div className="modal-backdrop" onClick={onClose}><div className="modal-card max-w-xl" onClick={(e) => e.stopPropagation()}><div className="flex justify-between"><div><span className="eyebrow"><Users size={13} /> Career community</span><h2 className="mt-2 text-xl font-extrabold">Share with the community</h2></div><button onClick={onClose} className="btn-ghost"><X size={18} /></button></div><div className="mt-6 flex gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-plum text-xs font-bold text-white">{getInitials(user?.name)}</span><textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} className="input min-h-40 resize-none py-3" placeholder="What are you learning, building or wondering?" /></div><div className="mt-4 flex flex-wrap gap-2"><button className="tag"><Link2 size={12} /> Add link</button><button className="tag"><Target size={12} /> Add topic</button><button className="tag"><Upload size={12} /> Add image</button></div><div className="mt-6 flex justify-end gap-3"><button onClick={onClose} className="btn-secondary">Cancel</button><button disabled={!text.trim()} onClick={() => onSubmit(text)} className="btn-accent disabled:opacity-40">Publish post <Send size={15} /></button></div></div></div>;
 }
