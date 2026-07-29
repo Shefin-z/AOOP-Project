@@ -202,7 +202,7 @@ if (scenario === "public") {
   await clickButtonAndAssert("Available jobs", "/student", "Available jobs");
   await clickButtonAndAssert("Sign out", "/");
 } else if (scenario === "brand") {
-  await clickAndAssert("/", "/");
+  await clickAndAssert("/student", "/student", "My CareerForge");
 } else if (scenario === "login-student") {
   await submitLoginAndAssert("/student");
 } else if (scenario === "login-admin") {

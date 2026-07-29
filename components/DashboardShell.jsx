@@ -52,7 +52,7 @@ export default function DashboardShell({
   const sidebar = (
     <>
       <div className="flex h-[78px] items-center justify-between px-5">
-        <Brand />
+        <Brand href={role === "admin" ? "/admin" : "/student"} />
         <button onClick={() => setMobileOpen(false)} className="btn-ghost md:hidden"><X size={18} /></button>
       </div>
       <div className="mx-4 mb-4 rounded-2xl border border-ink/[0.07] bg-white/60 p-3">
