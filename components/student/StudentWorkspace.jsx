@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
+  AlertTriangle,
   ArrowDownToLine,
   ArrowRight,
   Award,
@@ -37,6 +38,7 @@ import {
   Pencil,
   Play,
   Plus,
+  RefreshCw,
   Search,
   Send,
   Settings,
@@ -56,18 +58,17 @@ import DashboardShell from "../DashboardShell";
 import Toast from "../Toast";
 import {
   achievements as seedAchievements,
-  assessments,
   communityPosts as seedPosts,
   events as seedEvents,
-  jobs,
   performanceSeries,
   resources,
 } from "../../lib/mockData";
+import { apiRequest } from "../../lib/api";
 
 const navItems = [
   { id: "overview", label: "Overview", icon: Gauge, group: "Workspace" },
-  { id: "jobs", label: "Recommended jobs", icon: BriefcaseBusiness, badge: "12" },
-  { id: "applications", label: "My applications", icon: FileCheck2, badge: "4" },
+  { id: "jobs", label: "Recommended jobs", icon: BriefcaseBusiness },
+  { id: "applications", label: "My applications", icon: FileCheck2 },
   { id: "vault", label: "Career Vault", icon: FileText },
   { id: "assessments", label: "Skill assessments", icon: ListChecks, group: "Growth" },
   { id: "analytics", label: "Performance", icon: BarChart3 },
@@ -80,7 +81,7 @@ const navItems = [
 
 const pageMeta = {
   overview: ["Overview", "Here’s what is moving your career forward today."],
-  jobs: ["Your best-fit opportunities", "Personalized from your skills, interests and assessment results."],
+  jobs: ["Your best-fit opportunities", "Live, unexpired jobs published by CareerForge administrators."],
   applications: ["Application tracker", "Stay on top of every opportunity and follow-up."],
   vault: ["Career Vault", "Build, refine and export your professional story."],
   assessments: ["Skill assessments", "Measure what you know and make the next learning step obvious."],
@@ -161,30 +162,42 @@ function readCvData(user) {
 
 const createItemId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-const applicationsSeed = [
-  { company: "Pathao", role: "Product Analyst", applied: "Jul 25", status: "Interview", match: 94, tone: "bg-coral" },
-  { company: "Brain Station 23", role: "Junior Frontend Engineer", applied: "Jul 22", status: "In review", match: 89, tone: "bg-cobalt" },
-  { company: "bKash", role: "Data Science Intern", applied: "Jul 18", status: "Assessment", match: 86, tone: "bg-plum" },
-  { company: "ShopUp", role: "UX Research Associate", applied: "Jul 12", status: "Applied", match: 81, tone: "bg-jade" },
-];
+const jobTones = ["bg-coral", "bg-cobalt", "bg-plum", "bg-jade", "bg-ink"];
 
-const quizQuestions = [
-  {
-    text: "Which JavaScript method creates a new array containing elements that pass a test?",
-    answers: ["map()", "filter()", "reduce()", "forEach()"],
-    correct: 1,
-  },
-  {
-    text: "What is the most useful first step when a metric suddenly changes?",
-    answers: ["Publish the result", "Validate the data", "Change the target", "Ignore the outlier"],
-    correct: 1,
-  },
-  {
-    text: "Which structure is best for a behavioral interview answer?",
-    answers: ["SWOT", "STAR", "AIDA", "RACE"],
-    correct: 1,
-  },
-];
+const formatJobSalary = (job) => {
+  const minimum = job.salary_min == null ? null : Number(job.salary_min);
+  const maximum = job.salary_max == null ? null : Number(job.salary_max);
+  if (minimum == null && maximum == null) return "Salary not disclosed";
+  const formatter = new Intl.NumberFormat("en-BD", { maximumFractionDigits: 0 });
+  if (minimum != null && maximum != null) return `${job.currency || "BDT"} ${formatter.format(minimum)}–${formatter.format(maximum)}`;
+  return `${job.currency || "BDT"} ${formatter.format(minimum ?? maximum)}`;
+};
+
+const splitJobDetails = (value) => String(value || "")
+  .split(/\r?\n|[,;]+/)
+  .map((item) => item.trim().replace(/^[-•]\s*/, ""))
+  .filter(Boolean);
+
+const normalizeJob = (job, index = 0) => ({
+  ...job,
+  company: job.company || job.company_name || "Company",
+  type: job.employment_type,
+  displayLocation: [job.location, job.workplace_type].filter(Boolean).join(" · "),
+  salary: formatJobSalary(job),
+  logo: String(job.company || job.company_name || "C").trim().charAt(0).toUpperCase(),
+  tone: jobTones[index % jobTones.length],
+  requirementsList: splitJobDetails(job.requirements),
+  responsibilitiesList: splitJobDetails(job.responsibilities),
+  already_applied: Number(job.already_applied) === 1 || job.already_applied === true,
+});
+
+const normalizeApplication = (application, index = 0) => ({
+  ...application,
+  role: application.title,
+  applied: application.applied_at ? new Date(application.applied_at).toLocaleDateString() : "Submitted",
+  displayStatus: String(application.status || "applied").replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
+  tone: jobTones[index % jobTones.length],
+});
 
 export default function StudentWorkspace() {
   const [currentUser, setCurrentUser] = useState(readStudentUser);
@@ -192,19 +205,62 @@ export default function StudentWorkspace() {
   const [active, setActive] = useState("overview");
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null);
-  const [applications, setApplications] = useState(applicationsSeed);
-  const [savedJobs, setSavedJobs] = useState([2]);
+  const [applications, setApplications] = useState([]);
+  const [jobRecords, setJobRecords] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsError, setJobsError] = useState("");
+  const [savedJobs, setSavedJobs] = useState([]);
   const [events, setEvents] = useState(seedEvents);
   const [posts, setPosts] = useState(seedPosts);
   const [jobSearch, setJobSearch] = useState("");
   const [jobType, setJobType] = useState("All types");
-  const [quiz, setQuiz] = useState({ index: 0, answers: {}, finished: false, score: 0 });
+  const [quiz, setQuiz] = useState({ index: 0, answers: {}, finished: false, score: 0, submitting: false, result: null, startedAt: null });
+  const [assessmentRecords, setAssessmentRecords] = useState([]);
+  const [assessmentLoading, setAssessmentLoading] = useState(true);
+  const [assessmentError, setAssessmentError] = useState("");
   const [cvPhoto, setCvPhoto] = useState(null);
   const [cvData, setCvData] = useState(() => readCvData(readStudentUser()));
 
   useEffect(() => {
     localStorage.setItem(getCvStorageKey(currentUser), JSON.stringify(cvData));
   }, [cvData, currentUser]);
+
+  const loadAssessments = async () => {
+    setAssessmentLoading(true);
+    setAssessmentError("");
+    try {
+      setAssessmentRecords(await apiRequest("/assessments"));
+    } catch (error) {
+      setAssessmentError(error.message);
+    } finally {
+      setAssessmentLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAssessments();
+  }, []);
+
+  const loadJobData = async () => {
+    setJobsLoading(true);
+    setJobsError("");
+    try {
+      const [nextJobs, nextApplications] = await Promise.all([
+        apiRequest("/jobs"),
+        apiRequest("/jobs/applications/mine"),
+      ]);
+      setJobRecords(nextJobs.map(normalizeJob));
+      setApplications(nextApplications.map(normalizeApplication));
+    } catch (error) {
+      setJobsError(error.message);
+    } finally {
+      setJobsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadJobData();
+  }, []);
 
   const notify = (message) => {
     setToast(message);
@@ -227,6 +283,56 @@ export default function StudentWorkspace() {
     notify("Profile changes saved.");
   };
 
+  const startAssessment = async (assessment) => {
+    setQuiz({ index: 0, answers: {}, finished: false, score: 0, submitting: false, result: null, startedAt: new Date().toISOString() });
+    setModal({ type: "quiz-loading", assessment });
+    try {
+      const questions = await apiRequest(`/assessments/${assessment.id}/questions`);
+      if (!questions.length) {
+        setModal(null);
+        notify("This assessment does not have any published questions yet.");
+        return;
+      }
+      setModal({ type: "quiz", assessment, questions });
+    } catch (error) {
+      setModal(null);
+      notify(error.message);
+    }
+  };
+
+  const submitAssessment = async (assessment, questions) => {
+    setQuiz((current) => ({ ...current, submitting: true }));
+    try {
+      const answers = questions.map((question, index) => ({
+        questionId: question.id,
+        optionId: quiz.answers[index],
+      }));
+      const result = await apiRequest(`/assessments/${assessment.id}/submit`, {
+        method: "POST",
+        body: JSON.stringify({ answers, startedAt: quiz.startedAt }),
+      });
+      setQuiz((current) => ({ ...current, submitting: false, finished: true, score: result.percentage, result }));
+      await loadAssessments();
+    } catch (error) {
+      setQuiz((current) => ({ ...current, submitting: false }));
+      notify(error.message);
+    }
+  };
+
+  const submitJobApplication = async (job, coverLetter) => {
+    try {
+      await apiRequest(`/jobs/${job.id}/apply`, {
+        method: "POST",
+        body: JSON.stringify({ coverLetter, resumeUrl: null }),
+      });
+      setModal(null);
+      await loadJobData();
+      notify(`Application sent to ${job.company}.`);
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
   const pageActions = {
     jobs: (
       <button className="btn-secondary"><BellRing size={16} /> Create job alert</button>
@@ -242,21 +348,31 @@ export default function StudentWorkspace() {
     ),
   };
 
+  const studentNavItems = navItems.map((item) => {
+    if (item.id === "jobs") return { ...item, badge: jobRecords.length ? String(jobRecords.length) : undefined };
+    if (item.id === "applications") return { ...item, badge: applications.length ? String(applications.length) : undefined };
+    return item;
+  });
+
   return (
     <>
       <DashboardShell
         role="student"
         profileName={currentUser.name}
-        navItems={navItems}
+        navItems={studentNavItems}
         active={active}
         onNavigate={setActive}
         title={active === "overview" ? `Good afternoon, ${firstName}` : pageMeta[active][0]}
         subtitle={pageMeta[active][1]}
         actions={pageActions[active]}
       >
-        {active === "overview" && <Overview onNavigate={setActive} onOpenJob={(job) => setModal({ type: "job", job })} />}
+        {active === "overview" && <Overview onNavigate={setActive} onOpenJob={(job) => setModal({ type: "job", job })} assessments={assessmentRecords} jobs={jobRecords} applications={applications} />}
         {active === "jobs" && (
           <JobsPage
+            jobs={jobRecords}
+            loading={jobsLoading}
+            error={jobsError}
+            onRetry={loadJobData}
             search={jobSearch}
             setSearch={setJobSearch}
             type={jobType}
@@ -266,9 +382,9 @@ export default function StudentWorkspace() {
             onOpen={(job) => setModal({ type: "job", job })}
           />
         )}
-        {active === "applications" && <ApplicationsPage applications={applications} notify={notify} />}
+        {active === "applications" && <ApplicationsPage applications={applications} loading={jobsLoading} error={jobsError} onRetry={loadJobData} notify={notify} />}
         {active === "vault" && <CareerVault notify={notify} photo={cvPhoto} setPhoto={setCvPhoto} data={cvData} setData={setCvData} />}
-        {active === "assessments" && <AssessmentsPage onStart={(assessment) => { setQuiz({ index: 0, answers: {}, finished: false, score: 0 }); setModal({ type: "quiz", assessment }); }} />}
+        {active === "assessments" && <AssessmentsPage assessments={assessmentRecords} loading={assessmentLoading} error={assessmentError} onRetry={loadAssessments} onStart={startAssessment} />}
         {active === "analytics" && <AnalyticsPage notify={notify} />}
         {active === "learning" && <LearningPage notify={notify} />}
         {active === "community" && <CommunityPage posts={posts} setPosts={setPosts} notify={notify} viewer={currentUser} onNewPost={() => setModal({ type: "post" })} />}
@@ -280,37 +396,45 @@ export default function StudentWorkspace() {
       {modal?.type === "job" && (
         <JobModal
           job={modal.job}
-          applied={applications.some((item) => item.role === modal.job.title)}
+          applied={modal.job.already_applied || applications.some((item) => Number(item.job_id) === Number(modal.job.id))}
           onClose={() => setModal(null)}
-          onApply={() => {
-            if (!applications.some((item) => item.role === modal.job.title)) {
-              setApplications((current) => [{ company: modal.job.company, role: modal.job.title, applied: "Today", status: "Applied", match: modal.job.match, tone: modal.job.tone }, ...current]);
-            }
-            setModal({ type: "apply", job: modal.job });
-          }}
+          onApply={() => setModal({ type: "apply", job: modal.job })}
         />
       )}
-      {modal?.type === "apply" && <ApplyModal job={modal.job} user={currentUser} resumeName={cvData.name} onClose={() => setModal(null)} onSubmit={() => { setModal(null); notify(`Application sent to ${modal.job.company}.`); }} />}
+      {modal?.type === "apply" && <ApplyModal job={modal.job} user={currentUser} resumeName={cvData.name} onClose={() => setModal(null)} onSubmit={(coverLetter) => submitJobApplication(modal.job, coverLetter)} />}
       {modal?.type === "quiz" && (
         <QuizModal
           assessment={modal.assessment}
+          questions={modal.questions}
           quiz={quiz}
           setQuiz={setQuiz}
+          onSubmit={() => submitAssessment(modal.assessment, modal.questions)}
           onClose={() => setModal(null)}
         />
       )}
+      {modal?.type === "quiz-loading" && <QuizLoadingModal assessment={modal.assessment} onClose={() => setModal(null)} />}
       {modal?.type === "post" && <PostModal user={currentUser} onClose={() => setModal(null)} onSubmit={(text) => { setPosts((current) => [{ id: Date.now(), author: currentUser.name, role: "CareerForge student", time: "now", initials: getInitials(currentUser.name), tone: "bg-plum", text, tags: ["Career journey"], likes: 0, comments: 0, liked: false }, ...current]); setModal(null); notify("Your post is live."); }} />}
     </>
   );
 }
 
-function Overview({ onNavigate, onOpenJob }) {
+function Overview({ onNavigate, onOpenJob, assessments, jobs: availableJobs, applications }) {
+  const completedAssessments = assessments.filter((assessment) => assessment.best_score != null);
+  const nextAssessment = assessments.find((assessment) => assessment.best_score == null) || assessments[0];
+  const careerActions = [
+    nextAssessment
+      ? [`Complete ${nextAssessment.title}`, `${nextAssessment.question_count} questions`, "bg-coral", nextAssessment.best_score == null ? "Start" : "Retry"]
+      : ["No published assessment yet", "Your administrator can publish one", "bg-coral", "Pending"],
+    ["Add one quantified project result", "Profile", "bg-cobalt", "+2%"],
+    ["Finish SQL learning module", "45 min left", "bg-jade", "+3%"],
+  ];
+
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric icon={Target} label="Readiness score" value="78%" delta="+6% this month" tone="bg-cobalt" />
-        <Metric icon={ListChecks} label="Assessments" value="8" delta="3 completed recently" tone="bg-jade" />
-        <Metric icon={BriefcaseBusiness} label="Applications" value="4" delta="1 interview scheduled" tone="bg-coral" />
+        <Metric icon={ListChecks} label="Assessments" value={assessments.length} delta={`${completedAssessments.length} completed`} tone="bg-jade" />
+        <Metric icon={BriefcaseBusiness} label="Applications" value={applications.length} delta={`${availableJobs.length} available jobs`} tone="bg-coral" />
         <Metric icon={Flame} label="Learning streak" value="6 days" delta="Personal best: 11 days" tone="bg-plum" />
       </section>
 
@@ -331,11 +455,7 @@ function Overview({ onNavigate, onOpenJob }) {
               </div>
             </div>
             <div className="space-y-3">
-              {[
-                ["Complete Data Analysis assessment", "High impact", "bg-coral", "+4%"],
-                ["Add one quantified project result", "Profile", "bg-cobalt", "+2%"],
-                ["Finish SQL learning module", "45 min left", "bg-jade", "+3%"],
-              ].map(([title, label, tone, impact]) => (
+              {careerActions.map(([title, label, tone, impact]) => (
                 <div key={title} className="flex items-center gap-3 rounded-2xl border border-ink/[0.07] bg-white/55 p-3">
                   <span className={`h-9 w-1 rounded-full ${tone}`} />
                   <span className="flex-1"><b className="block text-sm">{title}</b><small className="text-muted">{label}</small></span>
@@ -379,7 +499,8 @@ function Overview({ onNavigate, onOpenJob }) {
             <button onClick={() => onNavigate("jobs")} className="btn-ghost">View all <ArrowRight size={15} /></button>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
-            {jobs.slice(0, 2).map((job) => <CompactJob key={job.id} job={job} onClick={() => onOpenJob(job)} />)}
+            {availableJobs.slice(0, 2).map((job) => <CompactJob key={job.id} job={job} onClick={() => onOpenJob(job)} />)}
+            {!availableJobs.length && <div className="rounded-2xl border border-dashed border-ink/15 p-5 text-center text-xs text-muted">No administrator-published jobs are available yet.</div>}
           </div>
         </div>
         <div className="panel p-6">
@@ -414,18 +535,18 @@ function CompactJob({ job, onClick }) {
   return (
     <button onClick={onClick} className="group flex items-center gap-3 rounded-2xl border border-ink/[0.07] bg-white/55 p-3 text-left transition hover:border-cobalt/20 hover:bg-white">
       <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-sm font-extrabold text-white ${job.tone}`}>{job.logo}</span>
-      <span className="min-w-0 flex-1"><b className="block truncate text-sm">{job.title}</b><small className="text-muted">{job.company} · {job.location.split(" · ")[0]}</small></span>
-      <span className="rounded-full bg-jade/10 px-2 py-1 text-[10px] font-extrabold text-jade">{job.match}%</span>
+      <span className="min-w-0 flex-1"><b className="block truncate text-sm">{job.title}</b><small className="text-muted">{job.company} · {job.displayLocation}</small></span>
+      <span className={`rounded-full px-2 py-1 text-[10px] font-extrabold ${job.already_applied ? "bg-jade/10 text-jade" : "bg-cobalt/10 text-cobalt"}`}>{job.already_applied ? "Applied" : job.type}</span>
     </button>
   );
 }
 
-function JobsPage({ search, setSearch, type, setType, saved, onSave, onOpen }) {
-  const filtered = useMemo(() => jobs.filter((job) => {
-    const matchesSearch = `${job.title} ${job.company} ${job.skills.join(" ")}`.toLowerCase().includes(search.toLowerCase());
+function JobsPage({ jobs: availableJobs, loading, error, onRetry, search, setSearch, type, setType, saved, onSave, onOpen }) {
+  const filtered = useMemo(() => availableJobs.filter((job) => {
+    const matchesSearch = `${job.title} ${job.company} ${job.requirements}`.toLowerCase().includes(search.toLowerCase());
     const matchesType = type === "All types" || job.type === type;
     return matchesSearch && matchesType;
-  }), [search, type]);
+  }), [availableJobs, search, type]);
 
   return (
     <div className="space-y-5">
@@ -436,16 +557,19 @@ function JobsPage({ search, setSearch, type, setType, saved, onSave, onOpen }) {
         </label>
         <label className="relative sm:w-44">
           <select value={type} onChange={(e) => setType(e.target.value)} className="select bg-white/60">
-            {["All types", "Full-time", "Internship", "Contract"].map((item) => <option key={item}>{item}</option>)}
+            {["All types", "Full-time", "Part-time", "Internship", "Contract"].map((item) => <option key={item}>{item}</option>)}
           </select>
           <ChevronRight className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-muted" size={15} />
         </label>
-        <button className="btn-secondary"><Filter size={16} /> More filters</button>
+        <button onClick={onRetry} className="btn-secondary"><RefreshCw size={16} /> Refresh</button>
       </section>
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted"><b className="text-ink">{filtered.length} strong matches</b> based on your profile</p>
-        <button className="btn-ghost">Best match <ChevronRight size={14} className="rotate-90" /></button>
+        <p className="text-sm text-muted"><b className="text-ink">{filtered.length} published openings</b> from CareerForge administrators</p>
       </div>
+      {loading && <section className="panel grid min-h-64 place-items-center text-center"><div><RefreshCw className="mx-auto animate-spin text-cobalt" size={28} /><p className="mt-3 text-xs font-bold text-muted">Loading live jobs...</p></div></section>}
+      {!loading && error && <section className="panel grid min-h-64 place-items-center p-6 text-center"><div><AlertTriangle className="mx-auto text-coral" size={30} /><h2 className="mt-3 text-lg font-extrabold">Jobs could not be loaded</h2><p className="mt-1 max-w-md text-xs text-muted">{error}</p><button onClick={onRetry} className="btn-secondary mt-5"><RefreshCw size={14} /> Try again</button></div></section>}
+      {!loading && !error && !filtered.length && <section className="panel grid min-h-64 place-items-center p-6 text-center"><div><BriefcaseBusiness className="mx-auto text-muted" size={32} /><h2 className="mt-3 text-lg font-extrabold">No jobs available</h2><p className="mt-1 max-w-md text-xs leading-5 text-muted">Only live, unexpired jobs created by an administrator appear here. Adjust your filters or check again later.</p></div></section>}
+      {!loading && !error && filtered.length > 0 && (
       <section className="grid gap-4 lg:grid-cols-2">
         {filtered.map((job) => (
           <article key={job.id} className="panel group p-5 transition hover:-translate-y-0.5 hover:shadow-glass">
@@ -456,60 +580,67 @@ function JobsPage({ search, setSearch, type, setType, saved, onSave, onOpen }) {
                   <div><h3 className="truncate text-base font-extrabold">{job.title}</h3><p className="mt-0.5 text-xs font-semibold text-muted">{job.company}</p></div>
                   <button onClick={() => onSave(job.id)} className={`grid h-9 w-9 place-items-center rounded-xl border border-ink/[0.08] ${saved.includes(job.id) ? "bg-cobalt text-white" : "bg-white/60 text-muted"}`}><Bookmark size={16} fill={saved.includes(job.id) ? "currentColor" : "none"} /></button>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted"><span><MapPin className="mr-1 inline" size={12} />{job.location}</span><span><Clock3 className="mr-1 inline" size={12} />{job.type}</span></div>
+                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted"><span><MapPin className="mr-1 inline" size={12} />{job.displayLocation}</span><span><Clock3 className="mr-1 inline" size={12} />{job.type}</span></div>
               </div>
             </div>
             <div className="my-5 border-t border-ink/[0.07]" />
-            <div className="flex items-center gap-3">
-              <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-ink/[0.07]"><div className="h-full rounded-full bg-jade" style={{ width: `${job.match}%` }} /></div>
-              <b className="text-xs text-jade">{job.match}% match</b>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-1.5">{job.skills.map((skill) => <span className="tag" key={skill}>{skill}</span>)}</div>
+            <p className="line-clamp-2 text-xs leading-5 text-muted">{job.description}</p>
+            <div className="mt-4 flex flex-wrap gap-1.5">{job.requirementsList.slice(0, 4).map((requirement) => <span className="tag" key={requirement}>{requirement}</span>)}</div>
             <div className="mt-5 flex items-center justify-between">
-              <span><b className="block text-sm">{job.salary}</b><small className="text-[10px] text-muted">per month · {job.posted}</small></span>
-              <button onClick={() => onOpen(job)} className="btn-primary min-h-10 px-4">View role <ArrowRight size={15} /></button>
+              <span><b className="block text-sm">{job.salary}</b><small className="text-[10px] text-muted">Apply by {new Date(job.expires_at).toLocaleDateString()}</small></span>
+              <button onClick={() => onOpen(job)} className={`min-h-10 px-4 ${job.already_applied ? "btn-secondary !text-jade" : "btn-primary"}`}>{job.already_applied ? "Application sent" : "View role"} <ArrowRight size={15} /></button>
             </div>
           </article>
         ))}
       </section>
+      )}
     </div>
   );
 }
 
-function ApplicationsPage({ applications, notify }) {
-  const [filter, setFilter] = useState("All");
-  const rows = filter === "All" ? applications : applications.filter((item) => item.status === filter);
+function ApplicationsPage({ applications, loading, error, onRetry, notify }) {
+  const [filter, setFilter] = useState("all");
+  const rows = filter === "all" ? applications : applications.filter((item) => item.status === filter);
+  const inReview = applications.filter((item) => item.status === "in_review").length;
+  const nextStage = applications.filter((item) => ["assessment", "interview", "offer"].includes(item.status)).length;
+  const interviews = applications.filter((item) => item.status === "interview").length;
+  const interviewRate = applications.length ? `${Math.round((interviews / applications.length) * 100)}%` : "0%";
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[["Total applications", applications.length, BriefcaseBusiness, "bg-cobalt"], ["In review", 1, Eye, "bg-plum"], ["Next stage", 2, ListChecks, "bg-coral"], ["Interview rate", "25%", Target, "bg-jade"]].map(([label, value, Icon, tone]) => <Metric key={label} icon={Icon} label={label} value={value} delta="Updated today" tone={tone} />)}
+        {[["Total applications", applications.length, BriefcaseBusiness, "bg-cobalt"], ["In review", inReview, Eye, "bg-plum"], ["Next stage", nextStage, ListChecks, "bg-coral"], ["Interview rate", interviewRate, Target, "bg-jade"]].map(([label, value, Icon, tone]) => <Metric key={label} icon={Icon} label={label} value={value} delta="Live application data" tone={tone} />)}
       </section>
       <section className="panel p-5">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
-            {["All", "Applied", "In review", "Assessment", "Interview"].map((item) => <button key={item} onClick={() => setFilter(item)} className={`min-h-9 rounded-xl px-3 text-xs font-bold ${filter === item ? "bg-ink text-white" : "bg-white/60 text-muted"}`}>{item}</button>)}
+            {[["all", "All"], ["applied", "Applied"], ["in_review", "In review"], ["assessment", "Assessment"], ["interview", "Interview"]].map(([value, label]) => <button key={value} onClick={() => setFilter(value)} className={`min-h-9 rounded-xl px-3 text-xs font-bold ${filter === value ? "bg-ink text-white" : "bg-white/60 text-muted"}`}>{label}</button>)}
           </div>
-          <button onClick={() => notify("Application report downloaded.")} className="btn-secondary min-h-10"><ArrowDownToLine size={15} /> Export</button>
+          <button onClick={onRetry} className="btn-secondary min-h-10"><RefreshCw size={15} /> Refresh</button>
         </div>
+        {loading && <div className="grid min-h-56 place-items-center text-center"><RefreshCw className="animate-spin text-cobalt" size={27} /><p className="mt-3 text-xs font-bold text-muted">Loading applications...</p></div>}
+        {!loading && error && <div className="grid min-h-56 place-items-center text-center"><div><AlertTriangle className="mx-auto text-coral" size={28} /><h3 className="mt-3 font-extrabold">Applications could not be loaded</h3><p className="mt-1 text-xs text-muted">{error}</p><button onClick={onRetry} className="btn-secondary mt-5">Try again</button></div></div>}
+        {!loading && !error && !rows.length && <div className="grid min-h-56 place-items-center text-center"><div><FileCheck2 className="mx-auto text-muted" size={30} /><h3 className="mt-3 font-extrabold">No applications yet</h3><p className="mt-1 text-xs text-muted">Applications submitted to administrator-published jobs will appear here.</p></div></div>}
+        {!loading && !error && rows.length > 0 && (
         <div className="table-shell overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.1em] text-muted">
-              <tr>{["Company & role", "Applied", "Match", "Status", "Next action", ""].map((item) => <th key={item} className="px-4 py-3 font-extrabold">{item}</th>)}</tr>
+              <tr>{["Company & role", "Applied", "Location", "Status", "Next action", ""].map((item) => <th key={item} className="px-4 py-3 font-extrabold">{item}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-ink/[0.06]">
               {rows.map((item) => (
-                <tr key={item.role} className="hover:bg-white/60">
+                <tr key={item.id} className="hover:bg-white/60">
                   <td className="px-4 py-4"><div className="flex items-center gap-3"><span className={`grid h-9 w-9 place-items-center rounded-xl text-xs font-bold text-white ${item.tone}`}>{item.company[0]}</span><span><b className="block text-xs">{item.role}</b><small className="text-muted">{item.company}</small></span></div></td>
                   <td className="px-4 py-4 text-xs text-muted">{item.applied}</td>
-                  <td className="px-4 py-4"><b className="text-xs text-jade">{item.match}%</b></td>
-                  <td className="px-4 py-4"><Status value={item.status} /></td>
-                  <td className="px-4 py-4 text-xs font-semibold">{item.status === "Interview" ? "Aug 2 · 11:00 AM" : item.status === "Assessment" ? "Due in 2 days" : "Monitor response"}</td>
+                  <td className="px-4 py-4 text-xs text-muted">{item.location} · {item.workplace_type}</td>
+                  <td className="px-4 py-4"><Status value={item.displayStatus} /></td>
+                  <td className="px-4 py-4 text-xs font-semibold">{item.status === "interview" ? "Prepare for interview" : item.status === "assessment" ? "Complete employer assessment" : item.status === "offer" ? "Review offer" : "Monitor response"}</td>
                   <td className="px-4 py-4"><button className="btn-ghost min-h-8"><MoreHorizontal size={16} /></button></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        )}
       </section>
     </div>
   );
@@ -817,32 +948,49 @@ function ResumeEntry({ title, place, date, points }) {
   return <div className="mb-5 last:mb-0"><div className="flex justify-between gap-4"><div><b className="block text-xs">{title}</b><small className="text-[10px] text-muted">{place}</small></div><small className="shrink-0 text-[9px] font-bold text-muted">{date}</small></div><ul className="mt-2 space-y-1.5">{points.map((point) => <li className="flex gap-2 text-[10px] leading-4 text-muted" key={point}><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-cobalt" />{point}</li>)}</ul></div>;
 }
 
-function AssessmentsPage({ onStart }) {
+function AssessmentsPage({ assessments, loading, error, onRetry, onStart }) {
   const [category, setCategory] = useState("All");
   const list = category === "All" ? assessments : assessments.filter((item) => item.category === category);
+  const categories = ["All", ...new Set(assessments.map((item) => item.category))];
+  const completed = assessments.filter((item) => item.best_score != null);
+  const averageScore = completed.length
+    ? Math.round(completed.reduce((sum, item) => sum + Number(item.best_score), 0) / completed.length)
+    : null;
+  const recommended = assessments[0];
+  const colors = ["bg-cobalt", "bg-jade", "bg-coral", "bg-plum", "bg-ink", "bg-[#A57945]"];
+
+  if (loading) {
+    return <section className="panel grid min-h-72 place-items-center text-center"><div><RefreshCw className="mx-auto animate-spin text-cobalt" size={28} /><p className="mt-3 text-xs font-bold text-muted">Loading published assessments...</p></div></section>;
+  }
+  if (error) {
+    return <section className="panel grid min-h-72 place-items-center p-6 text-center"><div><AlertTriangle className="mx-auto text-coral" size={30} /><h2 className="mt-3 text-lg font-extrabold">Assessments could not be loaded</h2><p className="mt-1 max-w-md text-xs text-muted">{error}</p><button onClick={onRetry} className="btn-secondary mt-5"><RefreshCw size={14} /> Try again</button></div></section>;
+  }
+  if (!assessments.length) {
+    return <section className="panel grid min-h-80 place-items-center p-6 text-center"><div><ListChecks className="mx-auto text-muted" size={34} /><h2 className="mt-4 text-xl font-extrabold">No assessments are published yet</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">Your administrator has not published any real assessment questions. New assessments will appear here automatically.</p></div></section>;
+  }
+
   return (
     <div className="space-y-5">
       <section className="grid gap-4 md:grid-cols-3">
         <div className="panel col-span-2 overflow-hidden bg-ink p-6 text-white md:col-span-2">
           <div className="flex items-start justify-between gap-5">
-            <div><span className="eyebrow !text-[#AFC0FF]"><Sparkles size={13} /> Recommended next</span><h2 className="mt-3 text-2xl font-extrabold tracking-[-0.04em]">Data Analysis Essentials</h2><p className="mt-2 max-w-md text-sm leading-6 text-white/60">This assessment unlocks more analyst roles and can add up to 4% to your readiness score.</p><button onClick={() => onStart(assessments[1])} className="btn-accent mt-5 !bg-white !text-ink">Start 15-minute assessment <ArrowRight size={16} /></button></div>
-            <span className="hidden h-28 w-28 shrink-0 place-items-center rounded-full border-[18px] border-jade text-center sm:grid"><b className="text-2xl">+4%</b></span>
+            <div><span className="eyebrow !text-[#AFC0FF]"><Sparkles size={13} /> Recommended next</span><h2 className="mt-3 text-2xl font-extrabold tracking-[-0.04em]">{recommended.title}</h2><p className="mt-2 max-w-md text-sm leading-6 text-white/60">{recommended.description || `Measure your ${recommended.category.toLowerCase()} knowledge with administrator-published questions.`}</p><button onClick={() => onStart(recommended)} className="btn-accent mt-5 !bg-white !text-ink">Start {recommended.time_limit_minutes}-minute assessment <ArrowRight size={16} /></button></div>
+            <span className="hidden h-28 w-28 shrink-0 place-items-center rounded-full border-[18px] border-jade text-center sm:grid"><span><b className="block text-2xl">{recommended.question_count}</b><small className="text-[9px] uppercase tracking-wider text-white/60">questions</small></span></span>
           </div>
         </div>
-        <div className="panel p-6"><span className="icon-tile !bg-coral"><Award size={20} /></span><b className="mt-5 block text-3xl tracking-[-0.05em]">83%</b><p className="text-xs font-bold">Average score</p><p className="mt-3 text-[11px] text-muted">Top 22% of your peer group</p></div>
+        <div className="panel p-6"><span className="icon-tile !bg-coral"><Award size={20} /></span><b className="mt-5 block text-3xl tracking-[-0.05em]">{averageScore == null ? "—" : `${averageScore}%`}</b><p className="text-xs font-bold">Your average best score</p><p className="mt-3 text-[11px] text-muted">{completed.length ? `${completed.length} assessment${completed.length === 1 ? "" : "s"} completed` : "Complete an assessment to see your score."}</p></div>
       </section>
       <div className="flex flex-wrap gap-2">
-        {["All", "Development", "Analytics", "Soft Skills", "Business", "Design"].map((item) => <button key={item} onClick={() => setCategory(item)} className={`min-h-9 rounded-xl px-3 text-xs font-bold transition ${category === item ? "bg-ink text-white" : "border border-ink/[0.07] bg-white/60 text-muted"}`}>{item}</button>)}
+        {categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`min-h-9 rounded-xl px-3 text-xs font-bold transition ${category === item ? "bg-ink text-white" : "border border-ink/[0.07] bg-white/60 text-muted"}`}>{item}</button>)}
       </div>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {list.map((assessment) => {
-          const colors = { cobalt: "bg-cobalt", jade: "bg-jade", coral: "bg-coral", plum: "bg-plum", ink: "bg-ink", sand: "bg-[#A57945]" };
+        {list.map((assessment, index) => {
           return (
             <article key={assessment.id} className="panel p-5">
-              <div className="flex items-start justify-between"><span className={`grid h-11 w-11 place-items-center rounded-2xl text-white ${colors[assessment.color]}`}><Code2 size={19} /></span>{assessment.score ? <span className="tag !text-jade"><CheckCircle2 size={12} /> {assessment.score}%</span> : <span className="tag">{assessment.level}</span>}</div>
+              <div className="flex items-start justify-between"><span className={`grid h-11 w-11 place-items-center rounded-2xl text-white ${colors[index % colors.length]}`}><Code2 size={19} /></span>{assessment.best_score != null ? <span className="tag !text-jade"><CheckCircle2 size={12} /> {Math.round(Number(assessment.best_score))}% best</span> : <span className="tag">{assessment.difficulty}</span>}</div>
               <h3 className="mt-6 text-base font-extrabold">{assessment.title}</h3><p className="mt-1 text-xs text-muted">{assessment.category}</p>
-              <div className="mt-4 flex gap-4 text-[11px] text-muted"><span><CircleHelp className="mr-1 inline" size={12} />{assessment.questions} questions</span><span><Clock3 className="mr-1 inline" size={12} />{assessment.minutes} min</span></div>
-              <button onClick={() => onStart(assessment)} className={`mt-5 w-full ${assessment.score ? "btn-secondary" : "btn-primary"}`}>{assessment.score ? "Retake assessment" : "Start assessment"} <ArrowRight size={15} /></button>
+              <div className="mt-4 flex gap-4 text-[11px] text-muted"><span><CircleHelp className="mr-1 inline" size={12} />{assessment.question_count} questions</span><span><Clock3 className="mr-1 inline" size={12} />{assessment.time_limit_minutes} min</span></div>
+              <button onClick={() => onStart(assessment)} className={`mt-5 w-full ${assessment.best_score != null ? "btn-secondary" : "btn-primary"}`}>{assessment.best_score != null ? "Retake assessment" : "Start assessment"} <ArrowRight size={15} /></button>
             </article>
           );
         })}
@@ -1003,12 +1151,26 @@ function ProfilePage({ user, onSave }) {
 
 function JobModal({ job, applied, onClose, onApply }) {
   return (
-    <div className="modal-backdrop" onClick={onClose}><div className="modal-card" onClick={(e) => e.stopPropagation()}><div className="flex items-start gap-4"><span className={`grid h-14 w-14 shrink-0 place-items-center rounded-[20px] text-lg font-extrabold text-white ${job.tone}`}>{job.logo}</span><div className="flex-1"><h2 className="text-xl font-extrabold">{job.title}</h2><p className="mt-1 text-sm text-muted">{job.company} · {job.location}</p></div><button onClick={onClose} className="btn-ghost min-h-9"><X size={18} /></button></div><div className="mt-6 flex flex-wrap gap-2"><span className="tag !bg-jade/10 !text-jade"><Sparkles size={12} /> {job.match}% match</span><span className="tag">{job.type}</span><span className="tag">{job.salary}</span><span className="tag"><Star size={11} fill="currentColor" className="text-coral" /> {job.review} employee rating</span></div><div className="my-6 h-px bg-ink/[0.08]" /><h3 className="text-sm font-extrabold">About the opportunity</h3><p className="mt-2 text-sm leading-7 text-muted">{job.description}</p><h3 className="mt-6 text-sm font-extrabold">Why you match</h3><div className="mt-3 grid gap-2 sm:grid-cols-3">{job.skills.map((skill) => <div className="rounded-2xl bg-jade/10 p-3 text-xs font-bold text-jade" key={skill}><Check size={14} className="mb-2" />{skill}</div>)}</div><div className="mt-7 flex flex-wrap justify-end gap-3"><button className="btn-secondary"><Bookmark size={16} /> Save role</button><button onClick={onApply} className="btn-accent">{applied ? "Application sent" : "Apply with CareerForge"} <ArrowRight size={16} /></button></div></div></div>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card max-h-[92vh] max-w-3xl overflow-y-auto" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start gap-4"><span className={`grid h-14 w-14 shrink-0 place-items-center rounded-[20px] text-lg font-extrabold text-white ${job.tone}`}>{job.logo}</span><div className="flex-1"><h2 className="text-xl font-extrabold">{job.title}</h2><p className="mt-1 text-sm text-muted">{job.company} · {job.displayLocation}</p></div><button onClick={onClose} className="btn-ghost min-h-9"><X size={18} /></button></div>
+        <div className="mt-6 flex flex-wrap gap-2"><span className="tag">{job.type}</span><span className="tag">{job.category}</span><span className="tag">{job.salary}</span><span className="tag !bg-coral/10 !text-coral"><Clock3 size={12} /> Apply by {new Date(job.expires_at).toLocaleDateString()}</span>{applied && <span className="tag !bg-jade/10 !text-jade"><CheckCircle2 size={12} /> Already applied</span>}</div>
+        <div className="my-6 h-px bg-ink/[0.08]" />
+        <h3 className="text-sm font-extrabold">About the opportunity</h3>
+        <p className="mt-2 whitespace-pre-line text-sm leading-7 text-muted">{job.description}</p>
+        {!!job.responsibilitiesList.length && <><h3 className="mt-6 text-sm font-extrabold">Responsibilities</h3><ul className="mt-3 space-y-2">{job.responsibilitiesList.map((item) => <li className="flex gap-2 text-sm leading-6 text-muted" key={item}><Check size={15} className="mt-1 shrink-0 text-cobalt" />{item}</li>)}</ul></>}
+        <h3 className="mt-6 text-sm font-extrabold">Candidate requirements</h3>
+        <ul className="mt-3 space-y-2">{job.requirementsList.map((item) => <li className="flex gap-2 text-sm leading-6 text-muted" key={item}><Check size={15} className="mt-1 shrink-0 text-jade" />{item}</li>)}</ul>
+        {job.company_description && <div className="mt-6 rounded-2xl bg-ink/[0.035] p-4"><h3 className="text-sm font-extrabold">About {job.company}</h3><p className="mt-2 text-xs leading-5 text-muted">{job.company_description}</p>{job.company_website && <a href={job.company_website} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-cobalt">Company website <ExternalLink size={13} /></a>}</div>}
+        <div className="mt-7 flex flex-wrap justify-end gap-3"><button className="btn-secondary"><Bookmark size={16} /> Save role</button><button disabled={applied} onClick={onApply} className="btn-accent disabled:cursor-not-allowed disabled:opacity-50">{applied ? "Application sent" : "Apply with CareerForge"} <ArrowRight size={16} /></button></div>
+      </div>
+    </div>
   );
 }
 
 function ApplyModal({ job, user, resumeName, onClose, onSubmit }) {
   const [coverLetter, setCoverLetter] = useState("");
+  const [saving, setSaving] = useState(false);
   const resumeOwner = (resumeName || user?.name || "Student").trim();
   const resumeFileName = `${resumeOwner.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "Student"}_Resume.pdf`;
   const generate = () => setCoverLetter(`Dear ${job.company} Hiring Team,
@@ -1018,20 +1180,81 @@ I am excited to apply for the ${job.title} role. My skills, projects and learnin
 I would welcome the opportunity to discuss how I can contribute to ${job.company}.
 
 Sincerely,
-${user?.name || "Student"}`);
+  ${user?.name || "Student"}`);
+  const submit = async () => {
+    setSaving(true);
+    await onSubmit(coverLetter);
+    setSaving(false);
+  };
   return (
-    <div className="modal-backdrop" onClick={onClose}><div className="modal-card" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between"><div><span className="eyebrow"><Sparkles size={13} /> Smart application</span><h2 className="mt-2 text-xl font-extrabold">{job.title} · {job.company}</h2></div><button onClick={onClose} className="btn-ghost"><X size={18} /></button></div><div className="mt-6 space-y-4"><div className="rounded-2xl border border-ink/[0.08] bg-white/55 p-4"><div className="flex items-center justify-between"><span><b className="block text-sm">{resumeFileName}</b><small className="text-muted">Career Vault · Updated today</small></span><span className="tag !text-jade"><Check size={12} /> Selected</span></div></div><label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-ink/20 bg-white/35 p-5 text-xs font-bold text-muted hover:bg-white/60"><Upload size={17} /> Upload a different resume<input className="hidden" type="file" accept=".pdf,.doc,.docx" /></label><div><div className="mb-2 flex items-center justify-between"><b className="text-xs">Cover letter</b><button onClick={generate} className="text-xs font-bold text-cobalt"><Sparkles size={13} className="mr-1 inline" />Generate with AI</button></div><textarea className="input min-h-40 resize-none py-3" value={coverLetter} onChange={(event) => setCoverLetter(event.target.value)} placeholder="Write your note or generate a tailored draft..." /></div></div><div className="mt-6 flex justify-end gap-3"><button onClick={onClose} className="btn-secondary">Save draft</button><button onClick={onSubmit} className="btn-accent">Submit application <Send size={15} /></button></div></div></div>
+    <div className="modal-backdrop" onClick={onClose}><div className="modal-card" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between"><div><span className="eyebrow"><Sparkles size={13} /> Smart application</span><h2 className="mt-2 text-xl font-extrabold">{job.title} · {job.company}</h2></div><button onClick={onClose} className="btn-ghost"><X size={18} /></button></div><div className="mt-6 space-y-4"><div className="rounded-2xl border border-ink/[0.08] bg-white/55 p-4"><div className="flex items-center justify-between"><span><b className="block text-sm">{resumeFileName}</b><small className="text-muted">Career Vault · Updated today</small></span><span className="tag !text-jade"><Check size={12} /> Selected</span></div></div><label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-ink/20 bg-white/35 p-5 text-xs font-bold text-muted hover:bg-white/60"><Upload size={17} /> Upload a different resume<input className="hidden" type="file" accept=".pdf,.doc,.docx" /></label><div><div className="mb-2 flex items-center justify-between"><b className="text-xs">Cover letter</b><button onClick={generate} className="text-xs font-bold text-cobalt"><Sparkles size={13} className="mr-1 inline" />Generate with AI</button></div><textarea className="input min-h-40 resize-none py-3" value={coverLetter} onChange={(event) => setCoverLetter(event.target.value)} placeholder="Write your note or generate a tailored draft..." /></div></div><div className="mt-6 flex justify-end gap-3"><button onClick={onClose} className="btn-secondary">Save draft</button><button disabled={saving} onClick={submit} className="btn-accent disabled:opacity-50">{saving ? "Submitting..." : "Submit application"} <Send size={15} /></button></div></div></div>
   );
 }
 
-function QuizModal({ assessment, quiz, setQuiz, onClose }) {
-  const question = quizQuestions[quiz.index];
-  const select = (answer) => setQuiz((current) => ({ ...current, answers: { ...current.answers, [current.index]: answer } }));
-  const finish = () => {
-    const correct = quizQuestions.filter((q, index) => quiz.answers[index] === q.correct).length;
-    setQuiz((current) => ({ ...current, finished: true, score: Math.round(correct / quizQuestions.length * 100) }));
-  };
-  return <div className="modal-backdrop"><div className="modal-card max-w-3xl">{quiz.finished ? <div className="py-6 text-center"><span className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-jade text-white shadow-lift"><Trophy size={32} /></span><span className="eyebrow mt-6">Assessment complete</span><h2 className="mt-2 font-display text-5xl">{quiz.score}%</h2><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted">Great work. Your result has been added to your skill profile and job recommendations have been refreshed.</p><div className="mx-auto mt-6 grid max-w-sm grid-cols-2 gap-3"><div className="rounded-2xl bg-jade/10 p-4"><b className="text-lg text-jade">{quizQuestions.filter((q, i) => quiz.answers[i] === q.correct).length}/{quizQuestions.length}</b><small className="block text-muted">Correct</small></div><div className="rounded-2xl bg-cobalt/10 p-4"><b className="text-lg text-cobalt">+2%</b><small className="block text-muted">Readiness</small></div></div><button onClick={onClose} className="btn-accent mt-7">Return to assessments</button></div> : <><div className="flex items-center justify-between"><div><span className="eyebrow">{assessment.category}</span><h2 className="mt-1 text-lg font-extrabold">{assessment.title}</h2></div><div className="flex items-center gap-2 rounded-xl bg-coral/10 px-3 py-2 text-xs font-bold text-coral"><Clock3 size={15} /> 14:32</div></div><div className="mt-6 flex gap-1.5">{quizQuestions.map((_, index) => <span key={index} className={`h-1.5 flex-1 rounded-full ${index <= quiz.index ? "bg-cobalt" : "bg-ink/[0.08]"}`} />)}</div><p className="mt-8 text-xs font-bold text-muted">QUESTION {quiz.index + 1} OF {quizQuestions.length}</p><h3 className="mt-3 text-xl font-extrabold leading-7">{question.text}</h3><div className="mt-6 grid gap-3">{question.answers.map((answer, index) => <button onClick={() => select(index)} key={answer} className={`flex items-center gap-3 rounded-2xl border p-4 text-left text-sm font-semibold transition ${quiz.answers[quiz.index] === index ? "border-cobalt bg-cobalt/10 text-cobalt" : "border-ink/[0.08] bg-white/55 hover:bg-white"}`}><span className={`grid h-7 w-7 place-items-center rounded-lg text-xs ${quiz.answers[quiz.index] === index ? "bg-cobalt text-white" : "bg-ink/[0.06] text-muted"}`}>{String.fromCharCode(65 + index)}</span>{answer}</button>)}</div><div className="mt-7 flex items-center justify-between"><button disabled={quiz.index === 0} onClick={() => setQuiz((current) => ({ ...current, index: current.index - 1 }))} className="btn-secondary disabled:opacity-40"><ChevronLeft size={15} /> Back</button>{quiz.index === quizQuestions.length - 1 ? <button disabled={quiz.answers[quiz.index] === undefined} onClick={finish} className="btn-accent disabled:opacity-40">Submit answers <Check size={15} /></button> : <button disabled={quiz.answers[quiz.index] === undefined} onClick={() => setQuiz((current) => ({ ...current, index: current.index + 1 }))} className="btn-primary disabled:opacity-40">Next question <ChevronRight size={15} /></button>}</div></>}</div></div>;
+function QuizLoadingModal({ assessment, onClose }) {
+  return <div className="modal-backdrop"><div className="modal-card max-w-lg text-center"><RefreshCw className="mx-auto animate-spin text-cobalt" size={30} /><h2 className="mt-4 text-lg font-extrabold">Preparing {assessment.title}</h2><p className="mt-1 text-xs text-muted">Loading the latest published questions...</p><button onClick={onClose} className="btn-secondary mt-6">Cancel</button></div></div>;
+}
+
+function QuizModal({ assessment, questions, quiz, setQuiz, onSubmit, onClose }) {
+  const question = questions[quiz.index];
+  const [secondsLeft, setSecondsLeft] = useState(Number(assessment.time_limit_minutes || 15) * 60);
+  const select = (optionId) => setQuiz((current) => ({ ...current, answers: { ...current.answers, [current.index]: optionId } }));
+
+  useEffect(() => {
+    if (quiz.finished || quiz.submitting) return undefined;
+    const timer = window.setInterval(() => {
+      setSecondsLeft((current) => {
+        if (current <= 1) {
+          window.clearInterval(timer);
+          onSubmit();
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [quiz.finished, quiz.submitting, onSubmit]);
+
+  const minutes = Math.floor(secondsLeft / 60);
+  const seconds = String(secondsLeft % 60).padStart(2, "0");
+  const answeredCount = Object.keys(quiz.answers).length;
+
+  if (quiz.finished) {
+    const passed = quiz.score >= Number(assessment.passing_percentage || 60);
+    return (
+      <div className="modal-backdrop">
+        <div className="modal-card max-w-3xl">
+          <div className="py-6 text-center">
+            <span className={`mx-auto grid h-20 w-20 place-items-center rounded-full text-white shadow-lift ${passed ? "bg-jade" : "bg-coral"}`}><Trophy size={32} /></span>
+            <span className="eyebrow mt-6">Assessment complete</span>
+            <h2 className="mt-2 font-display text-5xl">{quiz.score}%</h2>
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted">{passed ? "You reached the passing score. Your result is saved to your assessment history." : `Your result is saved. The passing score for this assessment is ${assessment.passing_percentage}%.`}</p>
+            <div className="mx-auto mt-6 grid max-w-sm grid-cols-2 gap-3"><div className="rounded-2xl bg-jade/10 p-4"><b className="text-lg text-jade">{quiz.result?.correctAnswers ?? 0}/{quiz.result?.questionCount ?? questions.length}</b><small className="block text-muted">Correct</small></div><div className="rounded-2xl bg-cobalt/10 p-4"><b className="text-lg text-cobalt">{quiz.result?.score ?? 0}/{quiz.result?.total ?? 0}</b><small className="block text-muted">Points</small></div></div>
+            <button onClick={onClose} className="btn-accent mt-7">Return to assessments</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-card max-w-3xl">
+        <div className="flex items-center justify-between gap-4"><div><span className="eyebrow">{assessment.category}</span><h2 className="mt-1 text-lg font-extrabold">{assessment.title}</h2></div><div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold ${secondsLeft < 60 ? "bg-coral text-white" : "bg-coral/10 text-coral"}`}><Clock3 size={15} /> {minutes}:{seconds}</div></div>
+        <div className="mt-6 flex gap-1.5">{questions.map((item, index) => <span key={item.id} className={`h-1.5 flex-1 rounded-full ${index <= quiz.index ? "bg-cobalt" : "bg-ink/[0.08]"}`} />)}</div>
+        <div className="mt-8 flex items-center justify-between"><p className="text-xs font-bold text-muted">QUESTION {quiz.index + 1} OF {questions.length}</p><p className="text-[10px] font-bold text-muted">{answeredCount}/{questions.length} answered</p></div>
+        <h3 className="mt-3 text-xl font-extrabold leading-7">{question.prompt}</h3>
+        <div className="mt-6 grid gap-3">
+          {question.options.map((option, index) => (
+            <button onClick={() => select(option.id)} key={option.id} className={`flex items-center gap-3 rounded-2xl border p-4 text-left text-sm font-semibold transition ${quiz.answers[quiz.index] === option.id ? "border-cobalt bg-cobalt/10 text-cobalt" : "border-ink/[0.08] bg-white/55 hover:bg-white"}`}>
+              <span className={`grid h-7 w-7 place-items-center rounded-lg text-xs ${quiz.answers[quiz.index] === option.id ? "bg-cobalt text-white" : "bg-ink/[0.06] text-muted"}`}>{String.fromCharCode(65 + index)}</span>{option.option_text}
+            </button>
+          ))}
+        </div>
+        <div className="mt-7 flex items-center justify-between"><button disabled={quiz.index === 0 || quiz.submitting} onClick={() => setQuiz((current) => ({ ...current, index: current.index - 1 }))} className="btn-secondary disabled:opacity-40"><ChevronLeft size={15} /> Back</button>{quiz.index === questions.length - 1 ? <button disabled={answeredCount !== questions.length || quiz.submitting} onClick={onSubmit} className="btn-accent disabled:opacity-40">{quiz.submitting ? "Submitting..." : "Submit answers"} <Check size={15} /></button> : <button disabled={quiz.answers[quiz.index] === undefined || quiz.submitting} onClick={() => setQuiz((current) => ({ ...current, index: current.index + 1 }))} className="btn-primary disabled:opacity-40">Next question <ChevronRight size={15} /></button>}</div>
+      </div>
+    </div>
+  );
 }
 
 function PostModal({ user, onClose, onSubmit }) {

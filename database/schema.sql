@@ -90,11 +90,15 @@ CREATE TABLE IF NOT EXISTS jobs (
   currency CHAR(3) NOT NULL DEFAULT 'BDT',
   status ENUM('draft', 'pending', 'live', 'closed') NOT NULL DEFAULT 'draft',
   expires_at DATETIME NULL,
+  created_by BIGINT UNSIGNED NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_jobs_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
   INDEX idx_jobs_status_category (status, category)
 );
+
+ALTER TABLE jobs
+  ADD COLUMN IF NOT EXISTS created_by BIGINT UNSIGNED NULL AFTER expires_at;
 
 CREATE TABLE IF NOT EXISTS job_skills (
   job_id BIGINT UNSIGNED NOT NULL,

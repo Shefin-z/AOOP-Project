@@ -15,70 +15,11 @@ INSERT INTO skills (name, category) VALUES
   ('Figma', 'Design')
 ON DUPLICATE KEY UPDATE category=VALUES(category);
 
-INSERT INTO companies (name, description, website, employee_rating, review_count) VALUES
-  ('Pathao', 'A leading digital services platform in Bangladesh.', 'https://pathao.com', 4.7, 248),
-  ('Brain Station 23', 'A global software engineering company headquartered in Dhaka.', 'https://brainstation-23.com', 4.5, 186),
-  ('bKash', 'Bangladesh''s largest mobile financial services provider.', 'https://bkash.com', 4.8, 412),
-  ('ShopUp', 'A full-stack B2B commerce platform for small businesses.', 'https://shopup.org', 4.3, 134)
-ON DUPLICATE KEY UPDATE employee_rating=VALUES(employee_rating), review_count=VALUES(review_count);
+-- Companies and jobs are intentionally not seeded. Administrators create and
+-- publish real opportunities from the control center.
 
-INSERT INTO jobs (company_id, title, slug, description, requirements, category, employment_type, location, workplace_type, salary_min, salary_max, status, expires_at)
-SELECT id, 'Product Analyst', 'product-analyst-pathao', 'Turn customer and product data into clear decisions for a fast-moving digital platform.', 'SQL, product thinking, analytics, and communication.', 'Product & Analytics', 'Full-time', 'Dhaka', 'Hybrid', 55000, 75000, 'live', DATE_ADD(NOW(), INTERVAL 30 DAY) FROM companies WHERE name='Pathao'
-ON DUPLICATE KEY UPDATE status='live', expires_at=VALUES(expires_at);
-INSERT INTO jobs (company_id, title, slug, description, requirements, category, employment_type, location, workplace_type, salary_min, salary_max, status, expires_at)
-SELECT id, 'Junior Frontend Engineer', 'junior-frontend-engineer-bs23', 'Build polished, accessible web products with an experienced engineering team.', 'React, JavaScript, CSS, accessibility.', 'Engineering', 'Full-time', 'Dhaka', 'On-site', 45000, 65000, 'live', DATE_ADD(NOW(), INTERVAL 24 DAY) FROM companies WHERE name='Brain Station 23'
-ON DUPLICATE KEY UPDATE status='live', expires_at=VALUES(expires_at);
-INSERT INTO jobs (company_id, title, slug, description, requirements, category, employment_type, location, workplace_type, salary_min, salary_max, status, expires_at)
-SELECT id, 'Data Science Intern', 'data-science-intern-bkash', 'Support customer intelligence initiatives with predictive analysis.', 'Python, statistics, machine learning.', 'Data Science', 'Internship', 'Dhaka', 'Hybrid', 25000, 35000, 'live', DATE_ADD(NOW(), INTERVAL 21 DAY) FROM companies WHERE name='bKash'
-ON DUPLICATE KEY UPDATE status='live', expires_at=VALUES(expires_at);
-INSERT INTO jobs (company_id, title, slug, description, requirements, category, employment_type, location, workplace_type, salary_min, salary_max, status, expires_at)
-SELECT id, 'UX Research Associate', 'ux-research-associate-shopup', 'Find the human insight behind product opportunities for small businesses.', 'User research, Figma, interviews.', 'Design', 'Contract', 'Remote', 'Remote', 40000, 58000, 'live', DATE_ADD(NOW(), INTERVAL 18 DAY) FROM companies WHERE name='ShopUp'
-ON DUPLICATE KEY UPDATE status='live', expires_at=VALUES(expires_at);
-
-INSERT INTO assessments (title, description, category, difficulty, time_limit_minutes, status) VALUES
-  ('JavaScript Foundations', 'Measure practical JavaScript knowledge.', 'Development', 'Intermediate', 18, 'published'),
-  ('Data Analysis Essentials', 'Test core analysis and data reasoning.', 'Analytics', 'Intermediate', 15, 'published'),
-  ('Professional Communication', 'Evaluate workplace communication decisions.', 'Soft Skills', 'Beginner', 12, 'published'),
-  ('Product Thinking', 'Explore product judgment and prioritization.', 'Business', 'Advanced', 20, 'published'),
-  ('SQL & Databases', 'Assess SQL querying and relational concepts.', 'Analytics', 'Intermediate', 18, 'published'),
-  ('UX Research Basics', 'Test foundational research methods.', 'Design', 'Beginner', 14, 'published');
-
-INSERT INTO questions (assessment_id, prompt, question_type, difficulty, explanation, points, status)
-SELECT id, 'Which JavaScript method creates a new array containing only elements that pass a test?', 'multiple_choice', 'Intermediate', 'filter() evaluates every element and retains elements for which the callback returns true.', 1, 'published'
-FROM assessments WHERE title='JavaScript Foundations' LIMIT 1;
-INSERT INTO questions (assessment_id, prompt, question_type, difficulty, explanation, points, status)
-SELECT id, 'What is the most useful first step when a metric changes unexpectedly?', 'multiple_choice', 'Intermediate', 'Validate the data and instrumentation before interpreting or acting on the change.', 1, 'published'
-FROM assessments WHERE title='Data Analysis Essentials' LIMIT 1;
-INSERT INTO questions (assessment_id, prompt, question_type, difficulty, explanation, points, status)
-SELECT id, 'Which structure is most useful for a behavioral interview response?', 'multiple_choice', 'Beginner', 'STAR structures the situation, task, action and result.', 1, 'published'
-FROM assessments WHERE title='Professional Communication' LIMIT 1;
-
-INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-SELECT id, 'map()', FALSE, 1 FROM questions WHERE prompt LIKE 'Which JavaScript method%' LIMIT 1;
-INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-SELECT id, 'filter()', TRUE, 2 FROM questions WHERE prompt LIKE 'Which JavaScript method%' LIMIT 1;
-INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-SELECT id, 'reduce()', FALSE, 3 FROM questions WHERE prompt LIKE 'Which JavaScript method%' LIMIT 1;
-INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-SELECT id, 'forEach()', FALSE, 4 FROM questions WHERE prompt LIKE 'Which JavaScript method%' LIMIT 1;
-
-INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-SELECT id, 'Publish the result', FALSE, 1 FROM questions WHERE prompt LIKE 'What is the most useful first%' LIMIT 1;
-INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-SELECT id, 'Validate the data', TRUE, 2 FROM questions WHERE prompt LIKE 'What is the most useful first%' LIMIT 1;
-INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-SELECT id, 'Change the target', FALSE, 3 FROM questions WHERE prompt LIKE 'What is the most useful first%' LIMIT 1;
-INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-SELECT id, 'Ignore the outlier', FALSE, 4 FROM questions WHERE prompt LIKE 'What is the most useful first%' LIMIT 1;
-
-INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-SELECT id, 'SWOT', FALSE, 1 FROM questions WHERE prompt LIKE 'Which structure is most useful%' LIMIT 1;
-INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-SELECT id, 'STAR', TRUE, 2 FROM questions WHERE prompt LIKE 'Which structure is most useful%' LIMIT 1;
-INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-SELECT id, 'AIDA', FALSE, 3 FROM questions WHERE prompt LIKE 'Which structure is most useful%' LIMIT 1;
-INSERT INTO question_options (question_id, option_text, is_correct, sort_order)
-SELECT id, 'RACE', FALSE, 4 FROM questions WHERE prompt LIKE 'Which structure is most useful%' LIMIT 1;
+-- Assessments and questions are intentionally not seeded. Administrators create
+-- the real assessment catalogue and question bank from the control center.
 
 INSERT INTO learning_resources (title, description, category, difficulty, resource_type, resource_url, estimated_minutes, featured, status) VALUES
   ('SQL for Product Decisions', 'Use SQL to answer practical product questions.', 'Data & Analytics', 'Intermediate', 'course', '/resources/sql-product', 160, TRUE, 'published'),

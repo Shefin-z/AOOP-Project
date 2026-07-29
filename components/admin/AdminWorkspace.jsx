@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -46,13 +46,14 @@ import {
 } from "lucide-react";
 import DashboardShell from "../DashboardShell";
 import Toast from "../Toast";
-import { assessments, events as seedEvents, jobs as seedJobs, resources as seedResources } from "../../lib/mockData";
+import { events as seedEvents, resources as seedResources } from "../../lib/mockData";
+import { apiRequest } from "../../lib/api";
 
 const navItems = [
   { id: "overview", label: "Dashboard", icon: LayoutDashboard, group: "Command center" },
   { id: "users", label: "User management", icon: Users, badge: "2,846" },
   { id: "assessments", label: "Assessments", icon: FileCheck2, group: "Content" },
-  { id: "questions", label: "Question bank", icon: FileQuestion, badge: "384" },
+  { id: "questions", label: "Question bank", icon: FileQuestion },
   { id: "resources", label: "Resources", icon: BookOpen },
   { id: "events", label: "Events", icon: CalendarDays },
   { id: "jobs", label: "Jobs", icon: BriefcaseBusiness, group: "Operations" },
@@ -90,24 +91,125 @@ const moderationSeed = [
   { id: 3, author: "Jubayer Hasan", content: "You clearly have no idea what you're talking about. Stop giving advice.", reason: "Incivility", reports: 2, time: "1 hr ago", type: "Comment" },
 ];
 
-const applicationRows = [
-  { job: "Product Analyst", company: "Pathao", total: 126, screening: 58, interview: 18, offers: 4, rate: "14.3%" },
-  { job: "Junior Frontend Engineer", company: "Brain Station 23", total: 98, screening: 42, interview: 14, offers: 3, rate: "14.2%" },
-  { job: "Data Science Intern", company: "bKash", total: 154, screening: 66, interview: 21, offers: 6, rate: "13.6%" },
-  { job: "UX Research Associate", company: "ShopUp", total: 73, screening: 28, interview: 8, offers: 2, rate: "10.9%" },
-];
-
 export default function AdminWorkspace() {
   const [active, setActive] = useState("overview");
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null);
   const [users, setUsers] = useState(usersSeed);
   const [moderation, setModeration] = useState(moderationSeed);
+  const [assessmentRecords, setAssessmentRecords] = useState([]);
+  const [questionRecords, setQuestionRecords] = useState([]);
+  const [contentLoading, setContentLoading] = useState(true);
+  const [contentError, setContentError] = useState("");
+  const [jobRecords, setJobRecords] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsError, setJobsError] = useState("");
 
   const notify = (message) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 3200);
   };
+
+  const loadAssessmentContent = async () => {
+    setContentLoading(true);
+    setContentError("");
+    try {
+      const [nextAssessments, nextQuestions] = await Promise.all([
+        apiRequest("/admin/assessments"),
+        apiRequest("/admin/questions"),
+      ]);
+      setAssessmentRecords(nextAssessments);
+      setQuestionRecords(nextQuestions);
+    } catch (error) {
+      setContentError(error.message);
+    } finally {
+      setContentLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAssessmentContent();
+  }, []);
+
+  const loadJobs = async () => {
+    setJobsLoading(true);
+    setJobsError("");
+    try {
+      setJobRecords(await apiRequest("/admin/jobs"));
+    } catch (error) {
+      setJobsError(error.message);
+    } finally {
+      setJobsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadJobs();
+  }, []);
+
+  const saveAssessmentContent = async (entity, values, record) => {
+    const path = `/admin/${entity}${record?.id ? `/${record.id}` : ""}`;
+    await apiRequest(path, {
+      method: record?.id ? "PATCH" : "POST",
+      body: JSON.stringify(values),
+    });
+    setModal(null);
+    await loadAssessmentContent();
+    notify(`${entity === "questions" ? "Question" : "Assessment"} ${record?.id ? "updated" : "created"} successfully.`);
+  };
+
+  const deleteAssessmentContent = async (entity, record) => {
+    if (!window.confirm(`Delete this ${entity === "questions" ? "question" : "assessment"}? This cannot be undone.`)) return;
+    try {
+      await apiRequest(`/admin/${entity}/${record.id}`, { method: "DELETE" });
+      await loadAssessmentContent();
+      notify(`${entity === "questions" ? "Question" : "Assessment"} deleted.`);
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
+  const saveJob = async (values, record) => {
+    await apiRequest(`/admin/jobs${record?.id ? `/${record.id}` : ""}`, {
+      method: record?.id ? "PATCH" : "POST",
+      body: JSON.stringify(values),
+    });
+    setModal(null);
+    await loadJobs();
+    notify(`Job ${record?.id ? "updated" : "created"} successfully.`);
+  };
+
+  const changeJobStatus = async (record, status) => {
+    try {
+      await apiRequest(`/admin/jobs/${record.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      await loadJobs();
+      notify(status === "live" ? "Job is now visible to students." : "Job hidden from the student portal.");
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
+  const deleteJob = async (record) => {
+    if (!window.confirm(`Delete “${record.title}”? Its applications will also be removed.`)) return;
+    try {
+      await apiRequest(`/admin/jobs/${record.id}`, { method: "DELETE" });
+      await loadJobs();
+      notify("Job deleted.");
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
+  const totalApplications = jobRecords.reduce((sum, job) => sum + Number(job.application_count || 0), 0);
+  const dashboardNavItems = navItems.map((item) => {
+    if (item.id === "questions") return { ...item, badge: questionRecords.length ? String(questionRecords.length) : undefined };
+    if (item.id === "jobs") return { ...item, badge: jobRecords.length ? String(jobRecords.length) : undefined };
+    if (item.id === "applications") return { ...item, badge: totalApplications ? String(totalApplications) : undefined };
+    return item;
+  });
 
   const addLabel = {
     users: "Add user",
@@ -122,39 +224,69 @@ export default function AdminWorkspace() {
     <>
       <DashboardShell
         role="admin"
-        navItems={navItems}
+        navItems={dashboardNavItems}
         active={active}
         onNavigate={setActive}
         title={meta[active][0]}
         subtitle={meta[active][1]}
         actions={addLabel ? <button onClick={() => setModal({ type: "create", entity: active })} className="btn-primary !bg-plum hover:!bg-[#64465b]"><Plus size={16} /> {addLabel}</button> : active === "performance" ? <button onClick={() => notify("Analytics report exported.")} className="btn-secondary"><Download size={15} /> Export report</button> : null}
       >
-        {active === "overview" && <AdminOverview onNavigate={setActive} />}
+        {active === "overview" && <AdminOverview onNavigate={setActive} assessments={assessmentRecords} questions={questionRecords} jobs={jobRecords} />}
         {active === "users" && <UsersPage users={users} setUsers={setUsers} notify={notify} />}
-        {active === "assessments" && <AssessmentAdmin notify={notify} />}
-        {active === "questions" && <QuestionsAdmin notify={notify} />}
+        {active === "assessments" && <AssessmentAdmin records={assessmentRecords} loading={contentLoading} error={contentError} onRetry={loadAssessmentContent} onEdit={(record) => setModal({ type: "edit", entity: "assessments", record })} onDelete={(record) => deleteAssessmentContent("assessments", record)} />}
+        {active === "questions" && <QuestionsAdmin records={questionRecords} loading={contentLoading} error={contentError} onRetry={loadAssessmentContent} onEdit={(record) => setModal({ type: "edit", entity: "questions", record })} onDelete={(record) => deleteAssessmentContent("questions", record)} />}
         {active === "resources" && <ResourcesAdmin notify={notify} />}
         {active === "events" && <EventsAdmin notify={notify} />}
-        {active === "jobs" && <JobsAdmin notify={notify} />}
+        {active === "jobs" && <JobsAdmin records={jobRecords} loading={jobsLoading} error={jobsError} onRetry={loadJobs} onEdit={(record) => setModal({ type: "edit", entity: "jobs", record })} onStatus={changeJobStatus} onDelete={deleteJob} />}
         {active === "community" && <ModerationPage items={moderation} setItems={setModeration} notify={notify} />}
-        {active === "applications" && <ApplicationsAdmin />}
+        {active === "applications" && <ApplicationsAdmin records={jobRecords} loading={jobsLoading} error={jobsError} onRetry={loadJobs} />}
         {active === "performance" && <PerformanceAdmin />}
         {active === "settings" && <SettingsAdmin notify={notify} />}
       </DashboardShell>
       <Toast message={toast} onClose={() => setToast("")} />
-      {modal?.type === "create" && <CreateEntityModal entity={modal.entity} onClose={() => setModal(null)} onSubmit={() => { setModal(null); notify(`New ${modal.entity.replace(/s$/, "")} created successfully.`); }} />}
+      {(modal?.type === "create" || modal?.type === "edit") && modal.entity === "assessments" && (
+        <AssessmentEditorModal record={modal.record} onClose={() => setModal(null)} onSubmit={(values) => saveAssessmentContent("assessments", values, modal.record)} />
+      )}
+      {(modal?.type === "create" || modal?.type === "edit") && modal.entity === "questions" && (
+        <QuestionEditorModal assessments={assessmentRecords} record={modal.record} onClose={() => setModal(null)} onSubmit={(values) => saveAssessmentContent("questions", values, modal.record)} />
+      )}
+      {(modal?.type === "create" || modal?.type === "edit") && modal.entity === "jobs" && (
+        <JobEditorModal record={modal.record} onClose={() => setModal(null)} onSubmit={(values) => saveJob(values, modal.record)} />
+      )}
+      {modal?.type === "create" && !["assessments", "questions", "jobs"].includes(modal.entity) && <CreateEntityModal entity={modal.entity} onClose={() => setModal(null)} onSubmit={() => { setModal(null); notify(`New ${modal.entity.replace(/s$/, "")} created successfully.`); }} />}
     </>
   );
 }
 
-function AdminOverview({ onNavigate }) {
+function AdminOverview({ onNavigate, assessments, questions, jobs }) {
+  const publishedAssessments = assessments.filter((assessment) => assessment.status === "published");
+  const reviewQuestions = questions.filter((question) => question.status === "needs_review");
+  const latestAssessment = assessments[0];
+  const liveJobs = jobs.filter((job) => job.status === "live" && new Date(job.expires_at).getTime() > Date.now());
+  const totalApplications = jobs.reduce((sum, job) => sum + Number(job.application_count || 0), 0);
+  const expiringJobs = liveJobs.filter((job) => {
+    const days = (new Date(job.expires_at).getTime() - Date.now()) / 86400000;
+    return days <= 7;
+  });
+  const latestJob = jobs[0];
+  const attentionItems = [
+    [Flag, "8 reported community items", "Review now", "community", "text-coral bg-coral/10"],
+    [BriefcaseBusiness, `${expiringJobs.length} job listings expire soon`, "Manage", "jobs", "text-cobalt bg-cobalt/10"],
+    [FileQuestion, `${reviewQuestions.length} questions need review`, "Open bank", "questions", "text-plum bg-plum/10"],
+  ];
+  const recentActivity = [
+    ...(latestAssessment ? [["Assessment updated", `${latestAssessment.title} · ${latestAssessment.status}`, "Latest", FileCheck2, "bg-jade"]] : []),
+    ...(latestJob ? [["Job listing updated", `${latestJob.title} · ${latestJob.company_name}`, "Latest", BriefcaseBusiness, "bg-cobalt"]] : []),
+    ["Community post removed", "Harassment policy violation", "32 min", ShieldCheck, "bg-coral"],
+    ["Resource downloaded 100 times", "Product Analytics Field Guide", "1 hr", BookOpen, "bg-plum"],
+  ];
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AdminMetric label="Total students" value="2,846" delta="+8.4%" note="vs last month" icon={Users} tone="bg-cobalt" />
-        <AdminMetric label="Active assessments" value="24" delta="+3" note="published this month" icon={FileCheck2} tone="bg-jade" />
-        <AdminMetric label="Live jobs" value="186" delta="+18" note="new this week" icon={BriefcaseBusiness} tone="bg-coral" />
-        <AdminMetric label="Applications" value="4,392" delta="+12.1%" note="vs last month" icon={FileText} tone="bg-plum" />
+        <AdminMetric label="Active assessments" value={publishedAssessments.length} delta={`${assessments.length} total`} note="published by administrators" icon={FileCheck2} tone="bg-jade" />
+        <AdminMetric label="Live jobs" value={liveJobs.length} delta={`${jobs.length} total`} note="visible, unexpired listings" icon={BriefcaseBusiness} tone="bg-coral" />
+        <AdminMetric label="Applications" value={totalApplications} delta="Actual" note="submitted to managed jobs" icon={FileText} tone="bg-plum" />
       </section>
       <section className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
         <div className="panel p-6">
@@ -164,8 +296,8 @@ function AdminOverview({ onNavigate }) {
         <div className="panel p-6"><div className="flex items-center justify-between"><div><h2 className="text-lg font-extrabold">System health</h2><p className="text-xs text-muted">All services operational</p></div><span className="h-3 w-3 rounded-full bg-jade shadow-[0_0_0_6px_rgba(78,120,100,.12)]" /></div><div className="mt-6 space-y-4">{[["Web application", "99.99%", "Healthy"], ["Express API", "184ms", "Healthy"], ["MySQL database", "37%", "Healthy"], ["Python AI service", "212ms", "Healthy"]].map(([label, value, status]) => <div className="flex items-center justify-between border-b border-ink/[0.07] pb-3 last:border-0" key={label}><span><b className="block text-xs">{label}</b><small className="text-[10px] text-jade">{status}</small></span><b className="text-xs text-muted">{value}</b></div>)}</div></div>
       </section>
       <section className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
-        <div className="panel p-6"><div className="flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Needs attention</h2><p className="text-xs text-muted">Prioritized operational queue</p></div><span className="tag !bg-coral/10 !text-coral">8 items</span></div><div className="mt-5 space-y-3">{[[Flag, "8 reported community items", "Review now", "community", "text-coral bg-coral/10"], [BriefcaseBusiness, "12 job listings expire soon", "Manage", "jobs", "text-cobalt bg-cobalt/10"], [FileQuestion, "16 questions need review", "Open bank", "questions", "text-plum bg-plum/10"]].map(([Icon, text, action, page, tone]) => <button onClick={() => onNavigate(page)} key={text} className="flex w-full items-center gap-3 rounded-2xl border border-ink/[0.07] bg-white/55 p-3 text-left hover:bg-white"><span className={`grid h-9 w-9 place-items-center rounded-xl ${tone}`}><Icon size={16} /></span><b className="flex-1 text-xs">{text}</b><span className="text-[10px] font-bold text-muted">{action}</span><ChevronRight size={14} className="text-muted" /></button>)}</div></div>
-        <div className="panel p-6"><div className="flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Recent platform activity</h2><p className="text-xs text-muted">Live operational feed</p></div><button className="btn-ghost"><RefreshCw size={15} /></button></div><div className="mt-5 space-y-4">{[["New assessment published", "Product Thinking · Advanced", "6 min", FileCheck2, "bg-jade"], ["Job listing approved", "Associate UX Researcher · ShopUp", "18 min", BriefcaseBusiness, "bg-cobalt"], ["Community post removed", "Harassment policy violation", "32 min", ShieldCheck, "bg-coral"], ["Resource downloaded 100 times", "Product Analytics Field Guide", "1 hr", BookOpen, "bg-plum"]].map(([title, detail, time, Icon, tone]) => <div className="flex items-start gap-3" key={title}><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white ${tone}`}><Icon size={15} /></span><span className="flex-1"><b className="block text-xs">{title}</b><small className="text-[10px] text-muted">{detail}</small></span><small className="text-[9px] font-bold text-muted">{time}</small></div>)}</div></div>
+        <div className="panel p-6"><div className="flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Needs attention</h2><p className="text-xs text-muted">Prioritized operational queue</p></div><span className="tag !bg-coral/10 !text-coral">{reviewQuestions.length} question reviews</span></div><div className="mt-5 space-y-3">{attentionItems.map(([Icon, text, action, page, tone]) => <button onClick={() => onNavigate(page)} key={text} className="flex w-full items-center gap-3 rounded-2xl border border-ink/[0.07] bg-white/55 p-3 text-left hover:bg-white"><span className={`grid h-9 w-9 place-items-center rounded-xl ${tone}`}><Icon size={16} /></span><b className="flex-1 text-xs">{text}</b><span className="text-[10px] font-bold text-muted">{action}</span><ChevronRight size={14} className="text-muted" /></button>)}</div></div>
+        <div className="panel p-6"><div className="flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Recent platform activity</h2><p className="text-xs text-muted">Live assessment activity with platform updates</p></div><button className="btn-ghost"><RefreshCw size={15} /></button></div><div className="mt-5 space-y-4">{recentActivity.map(([title, detail, time, Icon, tone]) => <div className="flex items-start gap-3" key={`${title}-${detail}`}><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white ${tone}`}><Icon size={15} /></span><span className="flex-1"><b className="block text-xs">{title}</b><small className="text-[10px] text-muted">{detail}</small></span><small className="text-[9px] font-bold text-muted">{time}</small></div>)}</div></div>
       </section>
     </div>
   );
@@ -183,19 +315,97 @@ function UsersPage({ users, setUsers, notify }) {
   return <div className="space-y-5"><section className="glass flex flex-col gap-3 rounded-[24px] p-3 sm:flex-row"><label className="relative flex-1"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={16} /><input value={search} onChange={(e) => setSearch(e.target.value)} className="input pl-11" placeholder="Search name, email or university" /></label><select value={status} onChange={(e) => setStatus(e.target.value)} className="select sm:w-40"><option>All users</option><option>Active</option><option>Suspended</option></select><button className="btn-secondary"><Filter size={15} /> Filters</button><button onClick={() => notify("User list exported.")} className="btn-secondary"><ArrowDownToLine size={15} /> Export</button></section><section className="panel p-5"><div className="table-shell overflow-x-auto"><table className="w-full min-w-[850px] text-left"><thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.1em] text-muted"><tr>{["Student", "University", "Joined", "Readiness", "Status", "Actions"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr></thead><tbody className="divide-y divide-ink/[0.06]">{list.map((user) => <tr key={user.id} className="hover:bg-white/60"><td className="px-4 py-4"><div className="flex items-center gap-3"><span className={`grid h-9 w-9 place-items-center rounded-xl text-[10px] font-bold text-white ${user.tone}`}>{user.initials}</span><span><b className="block text-xs">{user.name}</b><small className="text-[10px] text-muted">{user.email}</small></span></div></td><td className="px-4 py-4 text-xs text-muted">{user.university}</td><td className="px-4 py-4 text-xs text-muted">{user.joined}</td><td className="px-4 py-4"><div className="flex items-center gap-2"><div className="h-1.5 w-16 rounded-full bg-ink/[0.07]"><div className="h-full rounded-full bg-cobalt" style={{ width: `${user.readiness}%` }} /></div><b className="text-[10px]">{user.readiness}%</b></div></td><td className="px-4 py-4"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${user.status === "Active" ? "bg-jade/10 text-jade" : "bg-coral/10 text-coral"}`}>{user.status}</span></td><td className="px-4 py-4"><div className="flex gap-1"><button onClick={() => notify(`Opened ${user.name}'s profile.`)} className="btn-ghost min-h-8"><Eye size={14} /></button><button onClick={() => toggleStatus(user.id)} className="btn-ghost min-h-8">{user.status === "Active" ? <LockKeyhole size={14} /> : <UserCheck size={14} />}</button><button className="btn-ghost min-h-8"><MoreHorizontal size={14} /></button></div></td></tr>)}</tbody></table></div><div className="mt-4 flex items-center justify-between text-xs text-muted"><span>Showing {list.length} of 2,846 students</span><div className="flex gap-1"><button className="btn-secondary min-h-8 px-3">Previous</button><button className="btn-secondary min-h-8 px-3">Next</button></div></div></section></div>;
 }
 
-function AssessmentAdmin({ notify }) {
-  return <DataGrid title="24 assessments" subtitle="18 published · 4 draft · 2 archived" columns={["Assessment", "Category", "Difficulty", "Questions", "Attempts", "Avg. score", "Status", ""]} rows={assessments.map((item) => [item.title, item.category, item.level, item.questions, Math.floor(420 + item.id * 117), `${item.score || 74 + item.id}%`, item.id % 4 === 0 ? "Draft" : "Published"])} notify={notify} />;
+function AssessmentAdmin({ records, loading, error, onRetry, onEdit, onDelete }) {
+  const [search, setSearch] = useState("");
+  const filtered = records.filter((record) => `${record.title} ${record.category} ${record.difficulty} ${record.status}`.toLowerCase().includes(search.toLowerCase()));
+  return (
+    <div className="space-y-5">
+      <section className="glass flex flex-col gap-3 rounded-[24px] p-3 sm:flex-row">
+        <label className="relative flex-1"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} className="input pl-11" placeholder="Search assessments..." /></label>
+        <button onClick={onRetry} className="btn-secondary"><RefreshCw size={15} /> Refresh</button>
+      </section>
+      <section className="panel p-5">
+        <div className="mb-5"><h2 className="text-lg font-extrabold">{records.length} assessments</h2><p className="text-xs text-muted">Only administrator-created records are shown.</p></div>
+        <ContentState loading={loading} error={error} empty={!filtered.length} emptyTitle="No assessments yet" emptyCopy="Create your first assessment, then add and publish questions inside it." onRetry={onRetry}>
+          <div className="table-shell overflow-x-auto">
+            <table className="w-full min-w-[960px] text-left text-xs">
+              <thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.09em] text-muted"><tr>{["Assessment", "Category", "Difficulty", "Time", "Questions", "Attempts", "Avg. score", "Status", "Actions"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr></thead>
+              <tbody className="divide-y divide-ink/[0.06]">
+                {filtered.map((record) => (
+                  <tr key={record.id} className="hover:bg-white/60">
+                    <td className="max-w-[300px] px-4 py-4"><b className="block">{record.title}</b><small className="line-clamp-1 text-muted">{record.description || "No description"}</small></td>
+                    <td className="px-4 py-4 text-muted">{record.category}</td>
+                    <td className="px-4 py-4 text-muted">{record.difficulty}</td>
+                    <td className="px-4 py-4 text-muted">{record.time_limit_minutes} min</td>
+                    <td className="px-4 py-4 font-bold">{record.question_count}</td>
+                    <td className="px-4 py-4 text-muted">{record.attempt_count}</td>
+                    <td className="px-4 py-4 text-muted">{record.average_score == null ? "—" : `${record.average_score}%`}</td>
+                    <td className="px-4 py-4"><ContentStatus value={record.status} /></td>
+                    <td className="px-4 py-4"><div className="flex gap-1"><button onClick={() => onEdit(record)} className="btn-ghost min-h-8" aria-label="Edit assessment"><Pencil size={14} /></button><button onClick={() => onDelete(record)} className="btn-ghost min-h-8 text-coral" aria-label="Delete assessment"><Trash2 size={14} /></button></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ContentState>
+      </section>
+    </div>
+  );
 }
 
-function QuestionsAdmin({ notify }) {
-  const rows = [
-    ["Which method creates a filtered array?", "JavaScript Foundations", "Intermediate", "Multiple choice", "82%", "Published"],
-    ["What is the first step in metric diagnosis?", "Data Analysis Essentials", "Intermediate", "Multiple choice", "71%", "Published"],
-    ["Choose the clearest STAR response.", "Professional Communication", "Beginner", "Scenario", "88%", "Published"],
-    ["Calculate customer retention rate.", "Product Thinking", "Advanced", "Numeric", "54%", "Needs review"],
-    ["Write a query using a window function.", "SQL & Databases", "Advanced", "Code", "61%", "Draft"],
-  ];
-  return <DataGrid title="384 questions" subtitle="Organized across 24 assessments" columns={["Question", "Assessment", "Difficulty", "Type", "Success rate", "Status", ""]} rows={rows} notify={notify} />;
+function QuestionsAdmin({ records, loading, error, onRetry, onEdit, onDelete }) {
+  const [search, setSearch] = useState("");
+  const filtered = records.filter((record) => `${record.prompt} ${record.assessment_title} ${record.difficulty} ${record.status}`.toLowerCase().includes(search.toLowerCase()));
+  return (
+    <div className="space-y-5">
+      <section className="glass flex flex-col gap-3 rounded-[24px] p-3 sm:flex-row">
+        <label className="relative flex-1"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} className="input pl-11" placeholder="Search question bank..." /></label>
+        <button onClick={onRetry} className="btn-secondary"><RefreshCw size={15} /> Refresh</button>
+      </section>
+      <section className="panel p-5">
+        <div className="mb-5"><h2 className="text-lg font-extrabold">{records.length} questions</h2><p className="text-xs text-muted">Published questions become available in the student portal immediately.</p></div>
+        <ContentState loading={loading} error={error} empty={!filtered.length} emptyTitle="Question bank is empty" emptyCopy="Use “Add question” to create the first real question. No demo records are displayed." onRetry={onRetry}>
+          <div className="table-shell overflow-x-auto">
+            <table className="w-full min-w-[980px] text-left text-xs">
+              <thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.09em] text-muted"><tr>{["Question", "Assessment", "Difficulty", "Type", "Points", "Status", "Actions"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr></thead>
+              <tbody className="divide-y divide-ink/[0.06]">
+                {filtered.map((record) => (
+                  <tr key={record.id} className="hover:bg-white/60">
+                    <td className="max-w-[360px] px-4 py-4 font-bold">{record.prompt}</td>
+                    <td className="px-4 py-4 text-muted">{record.assessment_title}</td>
+                    <td className="px-4 py-4 text-muted">{record.difficulty}</td>
+                    <td className="px-4 py-4 text-muted">{record.question_type === "true_false" ? "True / false" : "Multiple choice"}</td>
+                    <td className="px-4 py-4 text-muted">{Number(record.points)}</td>
+                    <td className="px-4 py-4"><ContentStatus value={record.status} /></td>
+                    <td className="px-4 py-4"><div className="flex gap-1"><button onClick={() => onEdit(record)} className="btn-ghost min-h-8" aria-label="Edit question"><Pencil size={14} /></button><button onClick={() => onDelete(record)} className="btn-ghost min-h-8 text-coral" aria-label="Delete question"><Trash2 size={14} /></button></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ContentState>
+      </section>
+    </div>
+  );
+}
+
+function ContentState({ loading, error, empty, emptyTitle, emptyCopy, onRetry, children }) {
+  if (loading) return <div className="grid min-h-56 place-items-center text-center"><RefreshCw className="animate-spin text-plum" size={26} /><p className="mt-3 text-xs font-bold text-muted">Loading live content...</p></div>;
+  if (error) return <div className="grid min-h-56 place-items-center text-center"><div><AlertTriangle className="mx-auto text-coral" size={28} /><h3 className="mt-3 font-extrabold">Could not load content</h3><p className="mt-1 max-w-md text-xs text-muted">{error}</p><button onClick={onRetry} className="btn-secondary mt-5"><RefreshCw size={14} /> Try again</button></div></div>;
+  if (empty) return <div className="grid min-h-56 place-items-center text-center"><div><FileQuestion className="mx-auto text-muted" size={30} /><h3 className="mt-3 font-extrabold">{emptyTitle}</h3><p className="mt-1 max-w-md text-xs leading-5 text-muted">{emptyCopy}</p></div></div>;
+  return children;
+}
+
+function ContentStatus({ value }) {
+  const label = String(value || "").replace("_", " ");
+  const tone = ["published", "live"].includes(value)
+    ? "bg-jade/10 text-jade"
+    : value === "draft"
+      ? "bg-ink/10 text-muted"
+      : value === "pending" || value === "needs_review"
+        ? "bg-plum/10 text-plum"
+        : "bg-coral/10 text-coral";
+  return <span className={`rounded-full px-2 py-1 text-[10px] font-bold capitalize ${tone}`}>{label}</span>;
 }
 
 function ResourcesAdmin({ notify }) {
@@ -206,8 +416,53 @@ function EventsAdmin({ notify }) {
   return <DataGrid title="12 upcoming events" subtitle="1,846 total registrations" columns={["Event", "Type", "Date", "Time", "Host", "Registrations", "Status", ""]} rows={seedEvents.map((item, index) => [item.title, item.type, `${item.day} ${item.month}`, item.time, item.host, 84 + index * 43, index === 3 ? "Draft" : "Published"])} notify={notify} />;
 }
 
-function JobsAdmin({ notify }) {
-  return <DataGrid title="186 live job listings" subtitle="28 companies · 12 pending review" columns={["Role", "Company", "Location", "Type", "Applications", "Expires", "Status", ""]} rows={seedJobs.map((item, index) => [item.title, item.company, item.location, item.type, 73 + index * 27, `${8 + index * 3} days`, index === 3 ? "Pending" : "Live"])} notify={notify} />;
+function JobsAdmin({ records, loading, error, onRetry, onEdit, onStatus, onDelete }) {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const filtered = records.filter((record) => {
+    const matchesSearch = `${record.title} ${record.company_name} ${record.location} ${record.requirements}`.toLowerCase().includes(search.toLowerCase());
+    return matchesSearch && (status === "all" || record.status === status);
+  });
+  const liveCount = records.filter((record) => record.status === "live" && new Date(record.expires_at).getTime() > Date.now()).length;
+  const applicationCount = records.reduce((sum, record) => sum + Number(record.application_count || 0), 0);
+
+  return (
+    <div className="space-y-5">
+      <section className="glass flex flex-col gap-3 rounded-[24px] p-3 sm:flex-row">
+        <label className="relative flex-1"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} className="input pl-11" placeholder="Search role, company, location or requirement..." /></label>
+        <select value={status} onChange={(event) => setStatus(event.target.value)} className="select sm:w-40"><option value="all">All statuses</option><option value="live">Live</option><option value="draft">Hidden / draft</option><option value="pending">Pending</option><option value="closed">Closed</option></select>
+        <button onClick={onRetry} className="btn-secondary"><RefreshCw size={15} /> Refresh</button>
+      </section>
+      <section className="panel p-5">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-lg font-extrabold">{records.length} managed jobs</h2><p className="text-xs text-muted">{liveCount} visible to students · {applicationCount} actual applications</p></div><span className="tag !bg-jade/10 !text-jade">Database-backed</span></div>
+        <ContentState loading={loading} error={error} empty={!filtered.length} emptyTitle="No managed jobs yet" emptyCopy="Use “Add job” to create the first real opportunity. Demo listings are not displayed." onRetry={onRetry}>
+          <div className="table-shell overflow-x-auto">
+            <table className="w-full min-w-[1100px] text-left text-xs">
+              <thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.09em] text-muted"><tr>{["Role", "Company", "Location", "Type", "Applications", "Expires", "Status", "Actions"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr></thead>
+              <tbody className="divide-y divide-ink/[0.06]">
+                {filtered.map((record) => {
+                  const expiry = new Date(record.expires_at);
+                  const expired = expiry.getTime() <= Date.now();
+                  return (
+                    <tr key={record.id} className="hover:bg-white/60">
+                      <td className="max-w-[280px] px-4 py-4"><b className="block">{record.title}</b><small className="line-clamp-1 text-muted">{record.requirements}</small></td>
+                      <td className="px-4 py-4 text-muted">{record.company_name}</td>
+                      <td className="px-4 py-4 text-muted">{record.location} · {record.workplace_type}</td>
+                      <td className="px-4 py-4 text-muted">{record.employment_type}</td>
+                      <td className="px-4 py-4"><b className="text-cobalt">{Number(record.application_count || 0)}</b></td>
+                      <td className={`px-4 py-4 ${expired ? "font-bold text-coral" : "text-muted"}`}>{Number.isNaN(expiry.getTime()) ? "—" : expiry.toLocaleDateString()}</td>
+                      <td className="px-4 py-4"><ContentStatus value={expired && record.status === "live" ? "expired" : record.status} /></td>
+                      <td className="px-4 py-4"><div className="flex gap-1"><button onClick={() => onEdit(record)} className="btn-ghost min-h-8" aria-label="Edit job"><Pencil size={14} /></button><button onClick={() => onStatus(record, record.status === "live" ? "draft" : "live")} className={`btn-ghost min-h-8 ${record.status === "live" ? "text-coral" : "text-jade"}`} aria-label={record.status === "live" ? "Hide job" : "Publish job"}>{record.status === "live" ? <LockKeyhole size={14} /> : <Eye size={14} />}</button><button onClick={() => onDelete(record)} className="btn-ghost min-h-8 text-coral" aria-label="Delete job"><Trash2 size={14} /></button></div></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </ContentState>
+      </section>
+    </div>
+  );
 }
 
 function DataGrid({ title, subtitle, columns, rows, notify }) {
@@ -221,8 +476,28 @@ function ModerationPage({ items, setItems, notify }) {
   return <div className="space-y-5"><section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><AdminMetric label="Open reports" value={items.length + 5} delta="-14%" note="vs last week" icon={Flag} tone="bg-coral" /><AdminMetric label="Posts today" value="286" delta="+9%" note="healthy activity" icon={MessageCircle} tone="bg-cobalt" /><AdminMetric label="Comments today" value="842" delta="+11%" note="healthy activity" icon={Users} tone="bg-jade" /><AdminMetric label="Resolution time" value="18m" delta="-4m" note="weekly average" icon={Clock3} tone="bg-plum" /></section><section className="panel p-5"><div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Reported content queue</h2><p className="text-xs text-muted">Review context before taking action.</p></div><span className="tag !bg-coral/10 !text-coral"><AlertTriangle size={12} /> {items.length} high priority</span></div><div className="space-y-3">{items.map((item) => <article className="rounded-[22px] border border-ink/[0.08] bg-white/55 p-4" key={item.id}><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><b className="text-sm">{item.author}</b><span className="tag">{item.type}</span><span className="tag !bg-coral/10 !text-coral">{item.reason}</span></div><p className="mt-3 max-w-3xl text-sm leading-6 text-ink/75">{item.content}</p><p className="mt-3 text-[10px] font-bold text-muted">{item.reports} reports · {item.time}</p></div><div className="flex shrink-0 gap-2"><button onClick={() => resolve(item.id, "dismiss")} className="btn-secondary min-h-10">Dismiss</button><button onClick={() => resolve(item.id, "remove")} className="btn-primary min-h-10 !bg-coral"><Trash2 size={14} /> Remove</button></div></div></article>)}</div>{!items.length && <div className="py-16 text-center"><CheckCircle2 className="mx-auto text-jade" size={34} /><h3 className="mt-3 font-extrabold">Queue cleared</h3><p className="mt-1 text-xs text-muted">No reported content needs review.</p></div>}</section></div>;
 }
 
-function ApplicationsAdmin() {
-  return <div className="space-y-5"><section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><AdminMetric label="Applications" value="4,392" delta="+12%" note="this month" icon={FileText} tone="bg-cobalt" /><AdminMetric label="Screening rate" value="43%" delta="+3.2%" note="monthly rate" icon={Eye} tone="bg-plum" /><AdminMetric label="Interview rate" value="13.8%" delta="+1.1%" note="of screened" icon={Users} tone="bg-coral" /><AdminMetric label="Offer rate" value="3.4%" delta="+0.6%" note="of applicants" icon={CheckCircle2} tone="bg-jade" /></section><section className="panel p-5"><div className="mb-5"><h2 className="text-lg font-extrabold">Application funnel by role</h2><p className="text-xs text-muted">Current live opportunities</p></div><div className="table-shell overflow-x-auto"><table className="w-full min-w-[800px] text-left text-xs"><thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.1em] text-muted"><tr>{["Role", "Total", "Screening", "Interview", "Offers", "Conversion"].map((x) => <th className="px-4 py-3" key={x}>{x}</th>)}</tr></thead><tbody className="divide-y divide-ink/[0.06]">{applicationRows.map((row) => <tr key={row.job}><td className="px-4 py-4"><b className="block">{row.job}</b><small className="text-muted">{row.company}</small></td><td className="px-4 py-4 font-bold">{row.total}</td><td className="px-4 py-4 text-muted">{row.screening}</td><td className="px-4 py-4 text-muted">{row.interview}</td><td className="px-4 py-4 text-muted">{row.offers}</td><td className="px-4 py-4 font-bold text-jade">{row.rate}</td></tr>)}</tbody></table></div></section></div>;
+function ApplicationsAdmin({ records, loading, error, onRetry }) {
+  const total = records.reduce((sum, record) => sum + Number(record.application_count || 0), 0);
+  const inReview = records.reduce((sum, record) => sum + Number(record.in_review_count || 0), 0);
+  const interviews = records.reduce((sum, record) => sum + Number(record.interview_count || 0), 0);
+  const offers = records.reduce((sum, record) => sum + Number(record.offer_count || 0), 0);
+  const rate = total ? `${((offers / total) * 100).toFixed(1)}%` : "0%";
+  return (
+    <div className="space-y-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminMetric label="Applications" value={total} delta="Actual" note="all managed jobs" icon={FileText} tone="bg-cobalt" />
+        <AdminMetric label="In review" value={inReview} delta="Live" note="current review queue" icon={Eye} tone="bg-plum" />
+        <AdminMetric label="Interviews" value={interviews} delta="Live" note="students at interview stage" icon={Users} tone="bg-coral" />
+        <AdminMetric label="Offer rate" value={rate} delta={`${offers} offers`} note="of submitted applications" icon={CheckCircle2} tone="bg-jade" />
+      </section>
+      <section className="panel p-5">
+        <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Application funnel by job</h2><p className="text-xs text-muted">Counts update from real student submissions.</p></div><button onClick={onRetry} className="btn-secondary"><RefreshCw size={14} /> Refresh</button></div>
+        <ContentState loading={loading} error={error} empty={!records.length} emptyTitle="No application data yet" emptyCopy="Applications will appear after an administrator publishes a job and students apply." onRetry={onRetry}>
+          <div className="table-shell overflow-x-auto"><table className="w-full min-w-[850px] text-left text-xs"><thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.1em] text-muted"><tr>{["Role", "Total", "In review", "Assessment", "Interview", "Offers"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr></thead><tbody className="divide-y divide-ink/[0.06]">{records.map((record) => <tr key={record.id}><td className="px-4 py-4"><b className="block">{record.title}</b><small className="text-muted">{record.company_name}</small></td><td className="px-4 py-4 font-bold">{Number(record.application_count || 0)}</td><td className="px-4 py-4 text-muted">{Number(record.in_review_count || 0)}</td><td className="px-4 py-4 text-muted">{Number(record.assessment_count || 0)}</td><td className="px-4 py-4 text-muted">{Number(record.interview_count || 0)}</td><td className="px-4 py-4 font-bold text-jade">{Number(record.offer_count || 0)}</td></tr>)}</tbody></table></div>
+        </ContentState>
+      </section>
+    </div>
+  );
 }
 
 function PerformanceAdmin() {
@@ -231,6 +506,202 @@ function PerformanceAdmin() {
 
 function SettingsAdmin({ notify }) {
   return <div className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]"><aside className="panel h-fit p-4">{[["General", Settings], ["Security", ShieldCheck], ["Email templates", Mail], ["Integrations", Database], ["AI configuration", Sparkles]].map(([label, Icon], index) => <button className={`dash-side-link ${index === 0 ? "dash-side-link-active" : ""}`} key={label}><Icon size={16} />{label}</button>)}</aside><section className="panel p-6"><div><h2 className="text-lg font-extrabold">General platform settings</h2><p className="text-xs text-muted">Core presentation and operational defaults.</p></div><div className="mt-6 grid gap-4 sm:grid-cols-2">{[["Platform name", "CareerForge"], ["Support email", "support@careerforge.com"], ["Default timezone", "Asia/Dhaka"], ["Student locale", "English (Bangladesh)"]].map(([label, value]) => <label key={label}><span className="mb-1.5 block text-xs font-bold">{label}</span><input className="input" defaultValue={value} /></label>)}</div><div className="my-7 h-px bg-ink/[0.08]" /><h3 className="text-sm font-extrabold">Feature controls</h3><div className="mt-4 space-y-4">{[["Allow new student registration", "Students can create accounts from the public landing page.", true], ["AI cover letter generator", "Generate tailored drafts inside job applications.", true], ["Community posting", "Allow students to create public community posts.", true], ["Maintenance mode", "Temporarily restrict student access.", false]].map(([title, copy, checked]) => <label className="flex items-start justify-between gap-5" key={title}><span><b className="block text-xs">{title}</b><small className="text-[10px] leading-4 text-muted">{copy}</small></span><input type="checkbox" defaultChecked={checked} className="mt-1 h-4 w-4 accent-plum" /></label>)}</div><div className="mt-8 flex justify-end"><button onClick={() => notify("System settings saved.")} className="btn-primary !bg-plum"><Check size={15} /> Save settings</button></div></section></div>;
+}
+
+function AssessmentEditorModal({ record, onClose, onSubmit }) {
+  const [values, setValues] = useState({
+    title: record?.title || "",
+    description: record?.description || "",
+    category: record?.category || "",
+    difficulty: record?.difficulty || "Beginner",
+    timeLimitMinutes: record?.time_limit_minutes || 15,
+    passingPercentage: record?.passing_percentage || 60,
+    status: record?.status || "draft",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const update = (key, value) => setValues((current) => ({ ...current, [key]: value }));
+  const submit = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      await onSubmit(values);
+    } catch (requestError) {
+      setError(requestError.message);
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <form onSubmit={submit} className="modal-card max-w-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between"><div><span className="eyebrow">Assessment catalogue</span><h2 className="mt-2 text-xl font-extrabold">{record ? "Edit assessment" : "Create assessment"}</h2><p className="mt-1 text-xs text-muted">Published assessments appear to students after at least one question is published.</p></div><button type="button" onClick={onClose} className="btn-ghost"><X size={18} /></button></div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <AdminEditorField label="Assessment title" className="sm:col-span-2"><input required className="input" value={values.title} onChange={(event) => update("title", event.target.value)} placeholder="e.g. Data Visualization Essentials" /></AdminEditorField>
+          <AdminEditorField label="Description" className="sm:col-span-2"><textarea className="input min-h-24 resize-y py-3" value={values.description} onChange={(event) => update("description", event.target.value)} placeholder="What knowledge or skill will this assessment measure?" /></AdminEditorField>
+          <AdminEditorField label="Category"><input required className="input" value={values.category} onChange={(event) => update("category", event.target.value)} placeholder="e.g. Analytics" /></AdminEditorField>
+          <AdminEditorField label="Difficulty"><select className="select" value={values.difficulty} onChange={(event) => update("difficulty", event.target.value)}>{["Beginner", "Intermediate", "Advanced"].map((item) => <option key={item}>{item}</option>)}</select></AdminEditorField>
+          <AdminEditorField label="Time limit (minutes)"><input required min="1" max="180" type="number" className="input" value={values.timeLimitMinutes} onChange={(event) => update("timeLimitMinutes", event.target.value)} /></AdminEditorField>
+          <AdminEditorField label="Passing score (%)"><input required min="0" max="100" type="number" className="input" value={values.passingPercentage} onChange={(event) => update("passingPercentage", event.target.value)} /></AdminEditorField>
+          <AdminEditorField label="Status" className="sm:col-span-2"><select className="select" value={values.status} onChange={(event) => update("status", event.target.value)}><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select></AdminEditorField>
+        </div>
+        {error && <p className="mt-4 rounded-xl bg-coral/10 px-3 py-2 text-xs font-bold text-coral">{error}</p>}
+        <div className="mt-7 flex justify-end gap-3"><button type="button" onClick={onClose} className="btn-secondary">Cancel</button><button disabled={saving} className="btn-primary !bg-plum disabled:opacity-50">{saving ? "Saving..." : record ? "Save assessment" : "Create assessment"} <ArrowRight size={15} /></button></div>
+      </form>
+    </div>
+  );
+}
+
+function QuestionEditorModal({ assessments: assessmentRecords, record, onClose, onSubmit }) {
+  const existingOptions = record?.options?.length
+    ? record.options.map((option) => ({ text: option.option_text, isCorrect: Boolean(option.is_correct) }))
+    : [{ text: "", isCorrect: false }, { text: "", isCorrect: false }, { text: "", isCorrect: false }, { text: "", isCorrect: false }];
+  const [values, setValues] = useState({
+    assessmentId: record?.assessment_id || assessmentRecords[0]?.id || "",
+    prompt: record?.prompt || "",
+    questionType: record?.question_type || "multiple_choice",
+    difficulty: record?.difficulty || "Beginner",
+    explanation: record?.explanation || "",
+    points: record?.points || 1,
+    status: record?.status || "draft",
+    options: existingOptions,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const update = (key, value) => setValues((current) => ({ ...current, [key]: value }));
+  const updateOption = (index, key, value) => setValues((current) => ({
+    ...current,
+    options: current.options.map((option, optionIndex) => {
+      if (key === "isCorrect") return { ...option, isCorrect: optionIndex === index };
+      return optionIndex === index ? { ...option, [key]: value } : option;
+    }),
+  }));
+  const setQuestionType = (questionType) => setValues((current) => ({
+    ...current,
+    questionType,
+    options: questionType === "true_false"
+      ? [{ text: "True", isCorrect: false }, { text: "False", isCorrect: false }]
+      : current.questionType === "true_false"
+        ? [{ text: "", isCorrect: false }, { text: "", isCorrect: false }, { text: "", isCorrect: false }, { text: "", isCorrect: false }]
+        : current.options,
+  }));
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!values.options.some((option) => option.isCorrect)) {
+      setError("Select the correct answer.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onSubmit(values);
+    } catch (requestError) {
+      setError(requestError.message);
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <form onSubmit={submit} className="modal-card max-w-3xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between"><div><span className="eyebrow">Question bank</span><h2 className="mt-2 text-xl font-extrabold">{record ? "Edit question" : "Add question"}</h2><p className="mt-1 text-xs text-muted">Only published questions inside published assessments are shown to students.</p></div><button type="button" onClick={onClose} className="btn-ghost"><X size={18} /></button></div>
+        {!assessmentRecords.length ? (
+          <div className="mt-6 rounded-[22px] border border-dashed border-ink/15 p-8 text-center"><FileCheck2 className="mx-auto text-muted" size={28} /><h3 className="mt-3 font-extrabold">Create an assessment first</h3><p className="mt-1 text-xs text-muted">A question must belong to an administrator-created assessment.</p></div>
+        ) : (
+          <>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <AdminEditorField label="Assessment"><select required className="select" value={values.assessmentId} onChange={(event) => update("assessmentId", event.target.value)}>{assessmentRecords.map((assessment) => <option value={assessment.id} key={assessment.id}>{assessment.title} · {assessment.status}</option>)}</select></AdminEditorField>
+              <AdminEditorField label="Question type"><select className="select" value={values.questionType} onChange={(event) => setQuestionType(event.target.value)}><option value="multiple_choice">Multiple choice</option><option value="true_false">True / false</option></select></AdminEditorField>
+              <AdminEditorField label="Question text" className="sm:col-span-2"><textarea required className="input min-h-28 resize-y py-3" value={values.prompt} onChange={(event) => update("prompt", event.target.value)} placeholder="Write a clear, unambiguous question." /></AdminEditorField>
+              <AdminEditorField label="Difficulty"><select className="select" value={values.difficulty} onChange={(event) => update("difficulty", event.target.value)}>{["Beginner", "Intermediate", "Advanced"].map((item) => <option key={item}>{item}</option>)}</select></AdminEditorField>
+              <AdminEditorField label="Points"><input required min="0.25" max="100" step="0.25" type="number" className="input" value={values.points} onChange={(event) => update("points", event.target.value)} /></AdminEditorField>
+            </div>
+            <div className="mt-5 rounded-[22px] border border-ink/[0.08] bg-white/35 p-4">
+              <div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-extrabold">Answer options</h3><p className="text-[10px] text-muted">Select exactly one correct answer.</p></div>{values.questionType === "multiple_choice" && values.options.length < 6 && <button type="button" onClick={() => update("options", [...values.options, { text: "", isCorrect: false }])} className="btn-ghost min-h-8 text-xs text-plum"><Plus size={13} /> Add option</button>}</div>
+              <div className="space-y-2">{values.options.map((option, index) => <div className="flex items-center gap-2" key={index}><input type="radio" name="correct-option" checked={option.isCorrect} onChange={() => updateOption(index, "isCorrect", true)} className="h-4 w-4 shrink-0 accent-jade" aria-label={`Mark option ${index + 1} correct`} /><input required className="input" value={option.text} readOnly={values.questionType === "true_false"} onChange={(event) => updateOption(index, "text", event.target.value)} placeholder={`Option ${index + 1}`} />{values.questionType === "multiple_choice" && values.options.length > 2 && <button type="button" onClick={() => update("options", values.options.filter((_, optionIndex) => optionIndex !== index))} className="btn-ghost min-h-9 text-coral" aria-label={`Remove option ${index + 1}`}><X size={14} /></button>}</div>)}</div>
+            </div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <AdminEditorField label="Explanation" className="sm:col-span-2"><textarea className="input min-h-20 resize-y py-3" value={values.explanation} onChange={(event) => update("explanation", event.target.value)} placeholder="Optional feedback shown after completion." /></AdminEditorField>
+              <AdminEditorField label="Status"><select className="select" value={values.status} onChange={(event) => update("status", event.target.value)}><option value="draft">Draft</option><option value="published">Published</option><option value="needs_review">Needs review</option></select></AdminEditorField>
+            </div>
+          </>
+        )}
+        {error && <p className="mt-4 rounded-xl bg-coral/10 px-3 py-2 text-xs font-bold text-coral">{error}</p>}
+        <div className="mt-7 flex justify-end gap-3"><button type="button" onClick={onClose} className="btn-secondary">Cancel</button><button disabled={saving || !assessmentRecords.length} className="btn-primary !bg-plum disabled:opacity-50">{saving ? "Saving..." : record ? "Save question" : "Add question"} <ArrowRight size={15} /></button></div>
+      </form>
+    </div>
+  );
+}
+
+function JobEditorModal({ record, onClose, onSubmit }) {
+  const expiryValue = record?.expires_at && !Number.isNaN(new Date(record.expires_at).getTime())
+    ? new Date(record.expires_at).toISOString().slice(0, 10)
+    : "";
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const [values, setValues] = useState({
+    companyName: record?.company_name || "",
+    companyDescription: record?.company_description || "",
+    companyWebsite: record?.company_website || "",
+    title: record?.title || "",
+    description: record?.description || "",
+    responsibilities: record?.responsibilities || "",
+    requirements: record?.requirements || "",
+    category: record?.category || "",
+    employmentType: record?.employment_type || "Full-time",
+    location: record?.location || "",
+    workplaceType: record?.workplace_type || "On-site",
+    salaryMin: record?.salary_min ?? "",
+    salaryMax: record?.salary_max ?? "",
+    currency: record?.currency || "BDT",
+    expiresAt: expiryValue,
+    status: record?.status || "draft",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const update = (key, value) => setValues((current) => ({ ...current, [key]: value }));
+  const submit = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      await onSubmit(values);
+    } catch (requestError) {
+      setError(requestError.message);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <form onSubmit={submit} className="modal-card max-h-[92vh] max-w-4xl overflow-y-auto" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between"><div><span className="eyebrow">Real opportunity</span><h2 className="mt-2 text-xl font-extrabold">{record ? "Edit job" : "Add job"}</h2><p className="mt-1 text-xs text-muted">Only live, unexpired jobs appear in the student portal.</p></div><button type="button" onClick={onClose} className="btn-ghost"><X size={18} /></button></div>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <AdminEditorField label="Company name"><input required className="input" value={values.companyName} onChange={(event) => update("companyName", event.target.value)} placeholder="Company or organization" /></AdminEditorField>
+          <AdminEditorField label="Company website"><input type="url" className="input" value={values.companyWebsite} onChange={(event) => update("companyWebsite", event.target.value)} placeholder="https://company.com" /></AdminEditorField>
+          <AdminEditorField label="Company description" className="sm:col-span-2"><textarea className="input min-h-20 resize-y py-3" value={values.companyDescription} onChange={(event) => update("companyDescription", event.target.value)} placeholder="Optional company overview" /></AdminEditorField>
+          <AdminEditorField label="Role title"><input required className="input" value={values.title} onChange={(event) => update("title", event.target.value)} placeholder="e.g. Junior Software Engineer" /></AdminEditorField>
+          <AdminEditorField label="Category"><input required className="input" value={values.category} onChange={(event) => update("category", event.target.value)} placeholder="e.g. Engineering" /></AdminEditorField>
+          <AdminEditorField label="Job description" className="sm:col-span-2"><textarea required className="input min-h-28 resize-y py-3" value={values.description} onChange={(event) => update("description", event.target.value)} placeholder="Describe the opportunity and team." /></AdminEditorField>
+          <AdminEditorField label="Responsibilities" className="sm:col-span-2"><textarea className="input min-h-24 resize-y py-3" value={values.responsibilities} onChange={(event) => update("responsibilities", event.target.value)} placeholder="One responsibility per line" /></AdminEditorField>
+          <AdminEditorField label="Candidate requirements" className="sm:col-span-2"><textarea required className="input min-h-28 resize-y py-3" value={values.requirements} onChange={(event) => update("requirements", event.target.value)} placeholder={"One requirement per line\ne.g. React and JavaScript\nStrong communication"} /></AdminEditorField>
+          <AdminEditorField label="Employment type"><select className="select" value={values.employmentType} onChange={(event) => update("employmentType", event.target.value)}>{["Full-time", "Part-time", "Internship", "Contract"].map((item) => <option key={item}>{item}</option>)}</select></AdminEditorField>
+          <AdminEditorField label="Workplace type"><select className="select" value={values.workplaceType} onChange={(event) => update("workplaceType", event.target.value)}>{["On-site", "Hybrid", "Remote"].map((item) => <option key={item}>{item}</option>)}</select></AdminEditorField>
+          <AdminEditorField label="Location"><input required className="input" value={values.location} onChange={(event) => update("location", event.target.value)} placeholder="e.g. Dhaka" /></AdminEditorField>
+          <AdminEditorField label="Expiry date"><input required min={tomorrow} type="date" className="input" value={values.expiresAt} onChange={(event) => update("expiresAt", event.target.value)} /></AdminEditorField>
+          <AdminEditorField label="Minimum salary"><input min="0" type="number" className="input" value={values.salaryMin} onChange={(event) => update("salaryMin", event.target.value)} placeholder="Optional" /></AdminEditorField>
+          <AdminEditorField label="Maximum salary"><input min="0" type="number" className="input" value={values.salaryMax} onChange={(event) => update("salaryMax", event.target.value)} placeholder="Optional" /></AdminEditorField>
+          <AdminEditorField label="Currency"><input required maxLength="3" className="input uppercase" value={values.currency} onChange={(event) => update("currency", event.target.value.toUpperCase())} /></AdminEditorField>
+          <AdminEditorField label="Status"><select className="select" value={values.status} onChange={(event) => update("status", event.target.value)}><option value="draft">Draft / hidden</option><option value="live">Live / visible</option><option value="pending">Pending review</option><option value="closed">Closed</option></select></AdminEditorField>
+        </div>
+        {error && <p className="mt-4 rounded-xl bg-coral/10 px-3 py-2 text-xs font-bold text-coral">{error}</p>}
+        <div className="mt-7 flex justify-end gap-3"><button type="button" onClick={onClose} className="btn-secondary">Cancel</button><button disabled={saving} className="btn-primary !bg-plum disabled:opacity-50">{saving ? "Saving..." : record ? "Save job" : "Create job"} <ArrowRight size={15} /></button></div>
+      </form>
+    </div>
+  );
+}
+
+function AdminEditorField({ label, className = "", children }) {
+  return <label className={`block ${className}`}><span className="mb-1.5 block text-xs font-bold">{label}</span>{children}</label>;
 }
 
 function CreateEntityModal({ entity, onClose, onSubmit }) {
