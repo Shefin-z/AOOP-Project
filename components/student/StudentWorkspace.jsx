@@ -348,6 +348,17 @@ export default function StudentWorkspace() {
     }
   };
 
+  const withdrawJobApplication = async (application) => {
+    if (!window.confirm(`Cancel your application for “${application.role}” at ${application.company}?`)) return;
+    try {
+      await apiRequest(`/jobs/applications/${application.id}/withdraw`, { method: "PATCH" });
+      await loadJobData();
+      notify(`Application to ${application.company} cancelled.`);
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
   const pageActions = {
     jobs: (
       <button className="btn-secondary"><BellRing size={16} /> Create job alert</button>
@@ -397,7 +408,7 @@ export default function StudentWorkspace() {
             onOpen={(job) => setModal({ type: "job", job })}
           />
         )}
-        {active === "applications" && <ApplicationsPage applications={applications} loading={jobsLoading} error={jobsError} onRetry={loadJobData} notify={notify} />}
+        {active === "applications" && <ApplicationsPage applications={applications} loading={jobsLoading} error={jobsError} onRetry={loadJobData} onWithdraw={withdrawJobApplication} />}
         {active === "vault" && <CareerVault notify={notify} photo={cvPhoto} setPhoto={setCvPhoto} data={cvData} setData={setCvData} />}
         {active === "assessments" && <AssessmentsPage assessments={assessmentRecords} loading={assessmentLoading} error={assessmentError} onRetry={loadAssessments} onStart={startAssessment} />}
         {active === "analytics" && <AnalyticsPage notify={notify} />}
@@ -616,22 +627,30 @@ function JobsPage({ jobs: availableJobs, loading, error, onRetry, search, setSea
   );
 }
 
-function ApplicationsPage({ applications, loading, error, onRetry, notify }) {
+function ApplicationsPage({ applications, loading, error, onRetry, onWithdraw }) {
   const [filter, setFilter] = useState("all");
+  const [withdrawingId, setWithdrawingId] = useState(null);
   const rows = filter === "all" ? applications : applications.filter((item) => item.status === filter);
+  const activeApplications = applications.filter((item) => !["withdrawn", "rejected"].includes(item.status));
+  const withdrawn = applications.filter((item) => item.status === "withdrawn").length;
   const inReview = applications.filter((item) => item.status === "in_review").length;
   const nextStage = applications.filter((item) => ["assessment", "interview", "offer"].includes(item.status)).length;
   const interviews = applications.filter((item) => item.status === "interview").length;
-  const interviewRate = applications.length ? `${Math.round((interviews / applications.length) * 100)}%` : "0%";
+  const interviewRate = activeApplications.length ? `${Math.round((interviews / activeApplications.length) * 100)}%` : "0%";
+  const cancel = async (application) => {
+    setWithdrawingId(application.id);
+    await onWithdraw(application);
+    setWithdrawingId(null);
+  };
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[["Total applications", applications.length, BriefcaseBusiness, "bg-cobalt"], ["In review", inReview, Eye, "bg-plum"], ["Next stage", nextStage, ListChecks, "bg-coral"], ["Interview rate", interviewRate, Target, "bg-jade"]].map(([label, value, Icon, tone]) => <Metric key={label} icon={Icon} label={label} value={value} delta="Live application data" tone={tone} />)}
+        {[["Active applications", activeApplications.length, BriefcaseBusiness, "bg-cobalt", `${withdrawn} cancelled`], ["In review", inReview, Eye, "bg-plum", "Live application data"], ["Next stage", nextStage, ListChecks, "bg-coral", "Live application data"], ["Interview rate", interviewRate, Target, "bg-jade", "Active applications"]].map(([label, value, Icon, tone, delta]) => <Metric key={label} icon={Icon} label={label} value={value} delta={delta} tone={tone} />)}
       </section>
       <section className="panel p-5">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
-            {[["all", "All"], ["applied", "Applied"], ["in_review", "In review"], ["assessment", "Assessment"], ["interview", "Interview"]].map(([value, label]) => <button key={value} onClick={() => setFilter(value)} className={`min-h-9 rounded-xl px-3 text-xs font-bold ${filter === value ? "bg-ink text-white" : "bg-white/60 text-muted"}`}>{label}</button>)}
+            {[["all", "All"], ["applied", "Applied"], ["in_review", "In review"], ["assessment", "Assessment"], ["interview", "Interview"], ["withdrawn", "Cancelled"]].map(([value, label]) => <button key={value} onClick={() => setFilter(value)} className={`min-h-9 rounded-xl px-3 text-xs font-bold ${filter === value ? "bg-ink text-white" : "bg-white/60 text-muted"}`}>{label}</button>)}
           </div>
           <button onClick={onRetry} className="btn-secondary min-h-10"><RefreshCw size={15} /> Refresh</button>
         </div>
@@ -651,8 +670,8 @@ function ApplicationsPage({ applications, loading, error, onRetry, notify }) {
                   <td className="px-4 py-4 text-xs text-muted">{item.applied}</td>
                   <td className="px-4 py-4 text-xs text-muted">{item.location} · {item.workplace_type}</td>
                   <td className="px-4 py-4"><Status value={item.displayStatus} /></td>
-                  <td className="px-4 py-4 text-xs font-semibold">{item.status === "interview" ? "Prepare for interview" : item.status === "assessment" ? "Complete employer assessment" : item.status === "offer" ? "Review offer" : "Monitor response"}</td>
-                  <td className="px-4 py-4"><button className="btn-ghost min-h-8"><MoreHorizontal size={16} /></button></td>
+                  <td className="px-4 py-4 text-xs font-semibold">{item.status === "withdrawn" ? "Application cancelled" : item.status === "interview" ? "Prepare for interview" : item.status === "assessment" ? "Complete employer assessment" : item.status === "offer" ? "Review offer" : item.status === "rejected" ? "Application closed" : "Monitor response"}</td>
+                  <td className="px-4 py-4">{!["withdrawn", "rejected"].includes(item.status) ? <button disabled={withdrawingId === item.id} onClick={() => cancel(item)} className="btn-ghost min-h-8 gap-1 text-coral disabled:opacity-50"><X size={14} /> {withdrawingId === item.id ? "Cancelling..." : "Cancel"}</button> : <span className="text-[10px] font-bold text-muted">{item.status === "withdrawn" ? "Can reapply" : "Closed"}</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -670,6 +689,9 @@ function Status({ value }) {
     Assessment: "bg-coral/12 text-coral",
     "In review": "bg-plum/12 text-plum",
     Applied: "bg-cobalt/10 text-cobalt",
+    Withdrawn: "bg-coral/10 text-coral",
+    Rejected: "bg-coral/10 text-coral",
+    Offer: "bg-jade/12 text-jade",
   };
   return <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${styles[value] || "bg-ink/10 text-muted"}`}>{value}</span>;
 }

@@ -464,7 +464,7 @@ function JobsAdmin({ records, loading, error, onRetry, onEdit, onStatus, onDelet
                       <td className="px-4 py-4 text-muted">{record.company_name}</td>
                       <td className="px-4 py-4 text-muted">{record.location} · {record.workplace_type}</td>
                       <td className="px-4 py-4 text-muted">{record.employment_type}</td>
-                      <td className="px-4 py-4"><b className="text-cobalt">{Number(record.application_count || 0)}</b></td>
+                      <td className="px-4 py-4"><b className="text-cobalt">{Number(record.application_count || 0)}</b>{Number(record.withdrawn_count || 0) > 0 && <small className="ml-2 text-muted">{Number(record.withdrawn_count)} cancelled</small>}</td>
                       <td className={`px-4 py-4 ${expired ? "font-bold text-coral" : "text-muted"}`}>{Number.isNaN(expiry.getTime()) ? "—" : expiry.toLocaleDateString()}</td>
                       <td className="px-4 py-4"><ContentStatus value={expired && record.status === "live" ? "expired" : record.status} /></td>
                       <td className="px-4 py-4"><div className="flex gap-1"><button onClick={() => onEdit(record)} className="btn-ghost min-h-8" aria-label="Edit job"><Pencil size={14} /></button><button onClick={() => onStatus(record, record.status === "live" ? "draft" : "live")} className={`btn-ghost min-h-8 gap-1 ${record.status === "live" ? "text-coral" : "text-jade"}`} aria-label={record.status === "live" ? "Hide job" : "Publish job"}>{record.status === "live" ? <><LockKeyhole size={14} /> Hide</> : <><Eye size={14} /> Publish</>}</button><button onClick={() => onDelete(record)} className="btn-ghost min-h-8 text-coral" aria-label="Delete job"><Trash2 size={14} /></button></div></td>
@@ -496,19 +496,21 @@ function ApplicationsAdmin({ records, loading, error, onRetry }) {
   const inReview = records.reduce((sum, record) => sum + Number(record.in_review_count || 0), 0);
   const interviews = records.reduce((sum, record) => sum + Number(record.interview_count || 0), 0);
   const offers = records.reduce((sum, record) => sum + Number(record.offer_count || 0), 0);
+  const withdrawn = records.reduce((sum, record) => sum + Number(record.withdrawn_count || 0), 0);
   const rate = total ? `${((offers / total) * 100).toFixed(1)}%` : "0%";
   return (
     <div className="space-y-5">
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <AdminMetric label="Applications" value={total} delta="Actual" note="all managed jobs" icon={FileText} tone="bg-cobalt" />
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <AdminMetric label="Applications" value={total} delta="Actual" note="excluding cancelled" icon={FileText} tone="bg-cobalt" />
         <AdminMetric label="In review" value={inReview} delta="Live" note="current review queue" icon={Eye} tone="bg-plum" />
         <AdminMetric label="Interviews" value={interviews} delta="Live" note="students at interview stage" icon={Users} tone="bg-coral" />
         <AdminMetric label="Offer rate" value={rate} delta={`${offers} offers`} note="of submitted applications" icon={CheckCircle2} tone="bg-jade" />
+        <AdminMetric label="Cancelled" value={withdrawn} delta="Withdrawn" note="by students" icon={X} tone="bg-ink" />
       </section>
       <section className="panel p-5">
         <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Application funnel by job</h2><p className="text-xs text-muted">Counts update from real student submissions.</p></div><button onClick={onRetry} className="btn-secondary"><RefreshCw size={14} /> Refresh</button></div>
         <ContentState loading={loading} error={error} empty={!records.length} emptyTitle="No application data yet" emptyCopy="Applications will appear after an administrator publishes a job and students apply." onRetry={onRetry}>
-          <div className="table-shell overflow-x-auto"><table className="w-full min-w-[850px] text-left text-xs"><thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.1em] text-muted"><tr>{["Role", "Total", "In review", "Assessment", "Interview", "Offers"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr></thead><tbody className="divide-y divide-ink/[0.06]">{records.map((record) => <tr key={record.id}><td className="px-4 py-4"><b className="block">{record.title}</b><small className="text-muted">{record.company_name}</small></td><td className="px-4 py-4 font-bold">{Number(record.application_count || 0)}</td><td className="px-4 py-4 text-muted">{Number(record.in_review_count || 0)}</td><td className="px-4 py-4 text-muted">{Number(record.assessment_count || 0)}</td><td className="px-4 py-4 text-muted">{Number(record.interview_count || 0)}</td><td className="px-4 py-4 font-bold text-jade">{Number(record.offer_count || 0)}</td></tr>)}</tbody></table></div>
+          <div className="table-shell overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.1em] text-muted"><tr>{["Role", "Non-cancelled", "Cancelled", "In review", "Assessment", "Interview", "Offers"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr></thead><tbody className="divide-y divide-ink/[0.06]">{records.map((record) => <tr key={record.id}><td className="px-4 py-4"><b className="block">{record.title}</b><small className="text-muted">{record.company_name}</small></td><td className="px-4 py-4 font-bold">{Number(record.application_count || 0)}</td><td className="px-4 py-4 text-muted">{Number(record.withdrawn_count || 0)}</td><td className="px-4 py-4 text-muted">{Number(record.in_review_count || 0)}</td><td className="px-4 py-4 text-muted">{Number(record.assessment_count || 0)}</td><td className="px-4 py-4 text-muted">{Number(record.interview_count || 0)}</td><td className="px-4 py-4 font-bold text-jade">{Number(record.offer_count || 0)}</td></tr>)}</tbody></table></div>
         </ContentState>
       </section>
     </div>

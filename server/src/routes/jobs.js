@@ -17,7 +17,10 @@ router.get("/", authenticate, async (req, res, next) => {
     const rows = await query(
       `SELECT j.*, c.name company, c.description company_description,
         c.website company_website, c.logo_url, c.employee_rating,
-        EXISTS(SELECT 1 FROM applications a WHERE a.job_id=j.id AND a.user_id=?) already_applied
+        EXISTS(
+          SELECT 1 FROM applications a
+          WHERE a.job_id=j.id AND a.user_id=? AND a.status<>'withdrawn'
+        ) already_applied
        FROM jobs j JOIN companies c ON c.id=j.company_id
        WHERE ${clauses.join(" AND ")} ORDER BY j.created_at DESC LIMIT 100`,
       [req.user.id, ...params],
@@ -51,6 +54,37 @@ router.get("/recommendations", authenticate, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.patch("/applications/:applicationId/withdraw", authenticate, async (req, res, next) => {
+  try {
+    await ensureJobSchema();
+    if (req.user.role !== "student") return res.status(403).json({ error: "Only students can withdraw applications" });
+    const [application] = await query(
+      `SELECT a.id, a.job_id, a.status
+       FROM applications a
+       JOIN jobs j ON j.id=a.job_id
+       WHERE a.id=? AND a.user_id=? AND j.created_by IS NOT NULL
+       LIMIT 1`,
+      [req.params.applicationId, req.user.id],
+    );
+    if (!application) return res.status(404).json({ error: "Application not found" });
+    if (application.status === "withdrawn") return res.status(409).json({ error: "This application is already cancelled" });
+    if (application.status === "rejected") return res.status(409).json({ error: "A rejected application cannot be cancelled" });
+
+    await query(
+      "UPDATE applications SET status='withdrawn', updated_at=NOW() WHERE id=? AND user_id=?",
+      [application.id, req.user.id],
+    );
+    const [applicationStats] = await query(
+      "SELECT COUNT(*) application_count FROM applications WHERE job_id=? AND status<>'withdrawn'",
+      [application.job_id],
+    );
+    res.json({
+      message: "Application cancelled",
+      applicationCount: Number(applicationStats.application_count || 0),
+    });
+  } catch (error) { next(error); }
+});
+
 router.post("/:jobId/apply", authenticate, async (req, res, next) => {
   try {
     await ensureJobSchema();
@@ -63,17 +97,28 @@ router.post("/:jobId/apply", authenticate, async (req, res, next) => {
     );
     if (!job) return res.status(404).json({ error: "This job is no longer accepting applications" });
     const [existingApplication] = await query(
-      "SELECT id FROM applications WHERE user_id=? AND job_id=? LIMIT 1",
+      "SELECT id, status FROM applications WHERE user_id=? AND job_id=? LIMIT 1",
       [req.user.id, req.params.jobId],
     );
-    if (existingApplication) return res.status(409).json({ error: "You have already applied for this job" });
-    await query(
-      `INSERT INTO applications (user_id, job_id, status, cover_letter, resume_url)
-       VALUES (?, ?, 'applied', ?, ?)`,
-      [req.user.id, req.params.jobId, coverLetter, resumeUrl],
-    );
+    if (existingApplication && existingApplication.status !== "withdrawn") {
+      return res.status(409).json({ error: "You have already applied for this job" });
+    }
+    if (existingApplication) {
+      await query(
+        `UPDATE applications
+         SET status='applied', cover_letter=?, resume_url=?, applied_at=NOW(), updated_at=NOW()
+         WHERE id=? AND user_id=?`,
+        [coverLetter, resumeUrl, existingApplication.id, req.user.id],
+      );
+    } else {
+      await query(
+        `INSERT INTO applications (user_id, job_id, status, cover_letter, resume_url)
+         VALUES (?, ?, 'applied', ?, ?)`,
+        [req.user.id, req.params.jobId, coverLetter, resumeUrl],
+      );
+    }
     const [applicationStats] = await query(
-      "SELECT COUNT(*) application_count FROM applications WHERE job_id=?",
+      "SELECT COUNT(*) application_count FROM applications WHERE job_id=? AND status<>'withdrawn'",
       [req.params.jobId],
     );
     res.status(201).json({

@@ -14,7 +14,7 @@ router.get("/stats", async (_req, res, next) => {
       query("SELECT COUNT(*) total FROM users WHERE role='student'"),
       query("SELECT COUNT(*) total FROM assessments WHERE created_by IS NOT NULL"),
       query("SELECT COUNT(*) total FROM jobs WHERE created_by IS NOT NULL"),
-      query("SELECT COUNT(*) total FROM applications a JOIN jobs j ON j.id=a.job_id WHERE j.created_by IS NOT NULL"),
+      query("SELECT COUNT(*) total FROM applications a JOIN jobs j ON j.id=a.job_id WHERE j.created_by IS NOT NULL AND a.status<>'withdrawn'"),
       query("SELECT COUNT(*) total FROM community_posts WHERE status='visible'"),
       query("SELECT COUNT(*) total FROM content_reports WHERE status='open'"),
     ]);
@@ -293,6 +293,7 @@ router.get("/jobs", async (_req, res, next) => {
        j.created_at, j.updated_at, c.name company_name, c.description company_description,
        c.website company_website, c.logo_url company_logo,
        COALESCE(application_totals.application_count, 0) application_count,
+       COALESCE(application_totals.withdrawn_count, 0) withdrawn_count,
        COALESCE(application_totals.in_review_count, 0) in_review_count,
        COALESCE(application_totals.assessment_count, 0) assessment_count,
        COALESCE(application_totals.interview_count, 0) interview_count,
@@ -301,7 +302,8 @@ router.get("/jobs", async (_req, res, next) => {
        JOIN companies c ON c.id=j.company_id
        LEFT JOIN (
          SELECT job_id,
-          COUNT(*) application_count,
+          SUM(CASE WHEN status<>'withdrawn' THEN 1 ELSE 0 END) application_count,
+          SUM(CASE WHEN status='withdrawn' THEN 1 ELSE 0 END) withdrawn_count,
           SUM(CASE WHEN status='in_review' THEN 1 ELSE 0 END) in_review_count,
           SUM(CASE WHEN status='assessment' THEN 1 ELSE 0 END) assessment_count,
           SUM(CASE WHEN status='interview' THEN 1 ELSE 0 END) interview_count,
