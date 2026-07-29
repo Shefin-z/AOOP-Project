@@ -6,6 +6,9 @@ export default function AdaptiveHeroImage({
   imageClassName = "",
 }) {
   const { isDark } = useTheme();
+  const source = isDark
+    ? "/careerforge-hero-dark-v2.webp"
+    : "/careerforge-hero-light-v2.webp";
 
   return (
     <div
@@ -14,16 +17,14 @@ export default function AdaptiveHeroImage({
       aria-label={alt}
     >
       <img
-        src="/careerforge-hero-light-v2.png"
+        src={source}
         alt=""
         aria-hidden="true"
-        className={`adaptive-hero-image ${imageClassName} ${isDark ? "opacity-0" : "opacity-100"}`}
-      />
-      <img
-        src="/careerforge-hero-dark-v2.png"
-        alt=""
-        aria-hidden="true"
-        className={`adaptive-hero-image ${imageClassName} ${isDark ? "opacity-100" : "opacity-0"}`}
+        width="1586"
+        height="992"
+        decoding="async"
+        fetchPriority="high"
+        className={`adaptive-hero-image opacity-100 ${imageClassName}`}
       />
     </div>
   );

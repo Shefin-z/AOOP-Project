@@ -11,7 +11,7 @@ module.exports = {
         canvas: "#F4F1EA",
         paper: "#FBF9F4",
         ink: "#1E2430",
-        muted: "#69717D",
+        muted: "#5E6673",
         line: "#DDD8CC",
         cobalt: "#3155C6",
         coral: "#C86D50",

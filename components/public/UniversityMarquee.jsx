@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { Pause, Play } from "lucide-react";
+
 const universities = [
   { short: "UIU", name: "United International University", featured: true },
   { short: "DU", name: "University of Dhaka" },
@@ -59,18 +62,35 @@ function UniversityGroup({ duplicate = false }) {
 }
 
 export default function UniversityMarquee() {
+  const [paused, setPaused] = useState(false);
+
   return (
     <section className="university-strip border-y border-ink/[0.07] bg-white/35 py-5">
-      <div className="page-shell grid items-center gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <span className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted">
+      <div className="page-shell grid grid-cols-[minmax(0,1fr)_40px] items-center gap-4 lg:grid-cols-[240px_minmax(0,1fr)_44px]">
+        <span className="col-span-2 text-xs font-extrabold uppercase tracking-[0.16em] text-muted lg:col-span-1">
           Built for ambitious students
         </span>
-        <div className="university-viewport" aria-label="Bangladeshi university community">
+        <div
+          className={`university-viewport ${paused ? "university-viewport-paused" : ""}`}
+          aria-label="Bangladeshi university community"
+          tabIndex="0"
+          onFocus={() => setPaused(true)}
+          onBlur={() => setPaused(false)}
+        >
           <div className="university-track">
             <UniversityGroup />
             <UniversityGroup duplicate />
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => setPaused((current) => !current)}
+          className="theme-toggle !h-9 !w-9"
+          aria-label={paused ? "Resume university names" : "Pause university names"}
+          aria-pressed={paused}
+        >
+          {paused ? <Play size={14} fill="currentColor" /> : <Pause size={14} fill="currentColor" />}
+        </button>
       </div>
     </section>
   );
