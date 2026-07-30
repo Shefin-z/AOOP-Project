@@ -56,9 +56,9 @@ import {
 } from "lucide-react";
 import DashboardShell from "../DashboardShell";
 import Toast from "../Toast";
+import { CommunityPage, CommunityPostCooldown, CommunityPostModal } from "./CommunityExperience";
 import {
   achievements as seedAchievements,
-  communityPosts as seedPosts,
   events as seedEvents,
   performanceSeries,
   resources,
@@ -211,7 +211,10 @@ export default function StudentWorkspace() {
   const [jobsError, setJobsError] = useState("");
   const [savedJobs, setSavedJobs] = useState([]);
   const [events, setEvents] = useState(seedEvents);
-  const [posts, setPosts] = useState(seedPosts);
+  const [posts, setPosts] = useState([]);
+  const [communityLoading, setCommunityLoading] = useState(true);
+  const [communityError, setCommunityError] = useState("");
+  const [postingStatus, setPostingStatus] = useState({ canPost: true, nextPostAt: null, cooldownHours: 12 });
   const [jobSearch, setJobSearch] = useState("");
   const [jobType, setJobType] = useState("All types");
   const [quiz, setQuiz] = useState({ index: 0, answers: {}, finished: false, score: 0, submitting: false, result: null, startedAt: null });
@@ -276,6 +279,44 @@ export default function StudentWorkspace() {
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, []);
+
+  const loadCommunity = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setCommunityLoading(true);
+      setCommunityError("");
+    }
+    try {
+      const [nextPosts, nextPostingStatus] = await Promise.all([
+        apiRequest("/community/posts"),
+        apiRequest("/community/posting-status"),
+      ]);
+      setPosts(nextPosts);
+      setPostingStatus(nextPostingStatus);
+      setCommunityError("");
+    } catch (error) {
+      if (!silent) setCommunityError(error.message);
+    } finally {
+      if (!silent) setCommunityLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCommunity();
+  }, []);
+
+  useEffect(() => {
+    if (postingStatus.canPost || !postingStatus.nextPostAt) return undefined;
+    const remaining = new Date(postingStatus.nextPostAt).getTime() - Date.now();
+    if (remaining <= 0) {
+      setPostingStatus((current) => ({ ...current, canPost: true }));
+      return undefined;
+    }
+    const timer = window.setTimeout(
+      () => setPostingStatus((current) => ({ ...current, canPost: true })),
+      Math.min(remaining + 250, 2147483647),
+    );
+    return () => window.clearTimeout(timer);
+  }, [postingStatus.canPost, postingStatus.nextPostAt]);
 
   const notify = (message) => {
     setToast(message);
@@ -359,6 +400,20 @@ export default function StudentWorkspace() {
     }
   };
 
+  const publishCommunityPost = async (payload) => {
+    try {
+      const result = await apiRequest("/community/posts", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      setModal(null);
+      await loadCommunity({ silent: true });
+      notify(result.message);
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
   const pageActions = {
     jobs: (
       <button className="btn-secondary"><BellRing size={16} /> Create job alert</button>
@@ -367,7 +422,10 @@ export default function StudentWorkspace() {
       <button onClick={() => window.print()} className="btn-accent"><Download size={16} /> Export PDF</button>
     ),
     community: (
-      <button onClick={() => setModal({ type: "post" })} className="btn-accent"><Plus size={16} /> New post</button>
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {!postingStatus.canPost && <CommunityPostCooldown nextPostAt={postingStatus.nextPostAt} className="text-xs font-extrabold text-coral" />}
+        <button disabled={!postingStatus.canPost} onClick={() => setModal({ type: "post" })} className="btn-accent disabled:cursor-not-allowed disabled:opacity-45"><Plus size={16} /> New post</button>
+      </div>
     ),
     events: (
       <button className="btn-secondary"><CalendarDays size={16} /> Sync calendar</button>
@@ -413,7 +471,7 @@ export default function StudentWorkspace() {
         {active === "assessments" && <AssessmentsPage assessments={assessmentRecords} loading={assessmentLoading} error={assessmentError} onRetry={loadAssessments} onStart={startAssessment} />}
         {active === "analytics" && <AnalyticsPage notify={notify} />}
         {active === "learning" && <LearningPage notify={notify} />}
-        {active === "community" && <CommunityPage posts={posts} setPosts={setPosts} notify={notify} viewer={currentUser} onNewPost={() => setModal({ type: "post" })} />}
+        {active === "community" && <CommunityPage posts={posts} setPosts={setPosts} loading={communityLoading} error={communityError} onRetry={loadCommunity} notify={notify} viewer={currentUser} onNewPost={() => setModal({ type: "post" })} postingStatus={postingStatus} />}
         {active === "events" && <EventsPage events={events} onRegister={(id) => { setEvents((current) => current.map((event) => event.id === id ? { ...event, registered: !event.registered } : event)); notify("Event registration updated."); }} />}
         {active === "achievements" && <AchievementsPage />}
         {active === "profile" && <ProfilePage notify={notify} user={currentUser} onSave={saveProfile} />}
@@ -439,7 +497,7 @@ export default function StudentWorkspace() {
         />
       )}
       {modal?.type === "quiz-loading" && <QuizLoadingModal assessment={modal.assessment} onClose={() => setModal(null)} />}
-      {modal?.type === "post" && <PostModal user={currentUser} onClose={() => setModal(null)} onSubmit={(text) => { setPosts((current) => [{ id: Date.now(), author: currentUser.name, role: "CareerForge student", time: "now", initials: getInitials(currentUser.name), tone: "bg-plum", text, tags: ["Career journey"], likes: 0, comments: 0, liked: false }, ...current]); setModal(null); notify("Your post is live."); }} />}
+      {modal?.type === "post" && <CommunityPostModal user={currentUser} onClose={() => setModal(null)} onSubmit={publishCommunityPost} />}
     </>
   );
 }
@@ -1102,7 +1160,7 @@ function LearningPage({ notify }) {
   );
 }
 
-function CommunityPage({ posts, setPosts, notify, viewer, onNewPost }) {
+function LegacyCommunityPage({ posts, setPosts, notify, viewer, onNewPost }) {
   const toggleLike = (id) => setPosts((current) => current.map((post) => post.id === id ? { ...post, liked: !post.liked, likes: post.likes + (post.liked ? -1 : 1) } : post));
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_330px]">

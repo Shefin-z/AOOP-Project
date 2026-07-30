@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import DashboardShell from "../DashboardShell";
 import Toast from "../Toast";
+import AdminCommunity from "./AdminCommunity";
 import { events as seedEvents, resources as seedResources } from "../../lib/mockData";
 import { apiRequest } from "../../lib/api";
 
@@ -57,7 +58,7 @@ const navItems = [
   { id: "resources", label: "Resources", icon: BookOpen },
   { id: "events", label: "Events", icon: CalendarDays },
   { id: "jobs", label: "Jobs", icon: BriefcaseBusiness, group: "Operations" },
-  { id: "community", label: "Moderation", icon: ShieldCheck, badge: "8" },
+  { id: "community", label: "Moderation", icon: ShieldCheck },
   { id: "applications", label: "Applications", icon: FileText },
   { id: "performance", label: "Performance", icon: BarChart3 },
   { id: "settings", label: "System settings", icon: Settings, group: "System" },
@@ -77,12 +78,6 @@ const meta = {
   settings: ["System settings", "Configure platform defaults, notifications and security."],
 };
 
-const moderationSeed = [
-  { id: 1, author: "Anonymous Student", content: "This workshop organizer is a complete scam. Everyone should spam their page until they refund us.", reason: "Harassment", reports: 5, time: "12 min ago", type: "Post" },
-  { id: 2, author: "CareerBoost BD", content: "Guaranteed job in 7 days! Pay the registration fee through this personal number.", reason: "Possible scam", reports: 12, time: "37 min ago", type: "Post" },
-  { id: 3, author: "Jubayer Hasan", content: "You clearly have no idea what you're talking about. Stop giving advice.", reason: "Incivility", reports: 2, time: "1 hr ago", type: "Comment" },
-];
-
 export default function AdminWorkspace() {
   const [active, setActive] = useState("overview");
   const [toast, setToast] = useState("");
@@ -90,7 +85,9 @@ export default function AdminWorkspace() {
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [usersError, setUsersError] = useState("");
-  const [moderation, setModeration] = useState(moderationSeed);
+  const [communityData, setCommunityData] = useState({ posts: [], stats: {} });
+  const [communityLoading, setCommunityLoading] = useState(true);
+  const [communityError, setCommunityError] = useState("");
   const [assessmentRecords, setAssessmentRecords] = useState([]);
   const [questionRecords, setQuestionRecords] = useState([]);
   const [contentLoading, setContentLoading] = useState(true);
@@ -203,6 +200,32 @@ export default function AdminWorkspace() {
     };
   }, []);
 
+  const loadCommunity = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setCommunityLoading(true);
+      setCommunityError("");
+    }
+    try {
+      setCommunityData(await apiRequest("/admin/community"));
+      setCommunityError("");
+    } catch (error) {
+      if (!silent) setCommunityError(error.message);
+    } finally {
+      if (!silent) setCommunityLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCommunity();
+    const refresh = () => loadCommunity({ silent: true });
+    const interval = window.setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
+
   const saveAssessmentContent = async (entity, values, record) => {
     const path = `/admin/${entity}${record?.id ? `/${record.id}` : ""}`;
     await apiRequest(path, {
@@ -259,11 +282,30 @@ export default function AdminWorkspace() {
     }
   };
 
+  const moderateCommunityPost = async (post, action) => {
+    const actionLabel = action === "remove" ? "remove" : action === "restore" ? "restore" : action;
+    if (["remove", "restore", "approve"].includes(action) && !window.confirm(`${actionLabel[0].toUpperCase()}${actionLabel.slice(1)} this community post?`)) return;
+    try {
+      const result = await apiRequest(`/admin/community/posts/${post.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action }),
+      });
+      await loadCommunity({ silent: true });
+      notify(result.message);
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
   const totalApplications = jobRecords.reduce((sum, job) => sum + Number(job.application_count || 0), 0);
   const dashboardNavItems = navItems.map((item) => {
     if (item.id === "users") return { ...item, badge: users.length ? String(users.length) : undefined };
     if (item.id === "questions") return { ...item, badge: questionRecords.length ? String(questionRecords.length) : undefined };
     if (item.id === "jobs") return { ...item, badge: jobRecords.length ? String(jobRecords.length) : undefined };
+    if (item.id === "community") {
+      const attention = Number(communityData.stats?.pending || 0) + Number(communityData.stats?.openReports || 0);
+      return { ...item, badge: attention ? String(attention) : undefined };
+    }
     if (item.id === "applications") return { ...item, badge: totalApplications ? String(totalApplications) : undefined };
     return item;
   });
@@ -287,14 +329,14 @@ export default function AdminWorkspace() {
         subtitle={meta[active][1]}
         actions={addLabel ? <button onClick={() => setModal({ type: "create", entity: active })} className="btn-primary !bg-plum hover:!bg-[#64465b]"><Plus size={16} /> {addLabel}</button> : active === "performance" ? <button onClick={() => notify("Analytics report exported.")} className="btn-secondary"><Download size={15} /> Export report</button> : null}
       >
-        {active === "overview" && <AdminOverview onNavigate={setActive} assessments={assessmentRecords} questions={questionRecords} jobs={jobRecords} users={users} />}
+        {active === "overview" && <AdminOverview onNavigate={setActive} assessments={assessmentRecords} questions={questionRecords} jobs={jobRecords} users={users} communityStats={communityData.stats} />}
         {active === "users" && <UsersPage users={users} loading={usersLoading} error={usersError} onRetry={loadUsers} onStatus={changeUserStatus} />}
         {active === "assessments" && <AssessmentAdmin records={assessmentRecords} loading={contentLoading} error={contentError} onRetry={loadAssessmentContent} onEdit={(record) => setModal({ type: "edit", entity: "assessments", record })} onDelete={(record) => deleteAssessmentContent("assessments", record)} />}
         {active === "questions" && <QuestionsAdmin records={questionRecords} loading={contentLoading} error={contentError} onRetry={loadAssessmentContent} onEdit={(record) => setModal({ type: "edit", entity: "questions", record })} onDelete={(record) => deleteAssessmentContent("questions", record)} />}
         {active === "resources" && <ResourcesAdmin notify={notify} />}
         {active === "events" && <EventsAdmin notify={notify} />}
         {active === "jobs" && <JobsAdmin records={jobRecords} loading={jobsLoading} error={jobsError} onRetry={loadJobs} onEdit={(record) => setModal({ type: "edit", entity: "jobs", record })} onStatus={changeJobStatus} onDelete={deleteJob} />}
-        {active === "community" && <ModerationPage items={moderation} setItems={setModeration} notify={notify} />}
+        {active === "community" && <AdminCommunity data={communityData} setData={setCommunityData} loading={communityLoading} error={communityError} onRetry={loadCommunity} onModerate={moderateCommunityPost} notify={notify} />}
         {active === "applications" && <ApplicationsAdmin records={jobRecords} loading={jobsLoading} error={jobsError} onRetry={loadJobs} />}
         {active === "performance" && <PerformanceAdmin />}
         {active === "settings" && <SettingsAdmin notify={notify} />}
@@ -314,7 +356,7 @@ export default function AdminWorkspace() {
   );
 }
 
-function AdminOverview({ onNavigate, assessments, questions, jobs, users }) {
+function AdminOverview({ onNavigate, assessments, questions, jobs, users, communityStats }) {
   const publishedAssessments = assessments.filter((assessment) => assessment.status === "published");
   const reviewQuestions = questions.filter((question) => question.status === "needs_review");
   const latestAssessment = assessments[0];
@@ -326,14 +368,14 @@ function AdminOverview({ onNavigate, assessments, questions, jobs, users }) {
   });
   const latestJob = jobs[0];
   const attentionItems = [
-    [Flag, "8 reported community items", "Review now", "community", "text-coral bg-coral/10"],
+    [Flag, `${Number(communityStats?.pending || 0) + Number(communityStats?.openReports || 0)} community items need attention`, "Review now", "community", "text-coral bg-coral/10"],
     [BriefcaseBusiness, `${expiringJobs.length} job listings expire soon`, "Manage", "jobs", "text-cobalt bg-cobalt/10"],
     [FileQuestion, `${reviewQuestions.length} questions need review`, "Open bank", "questions", "text-plum bg-plum/10"],
   ];
   const recentActivity = [
     ...(latestAssessment ? [["Assessment updated", `${latestAssessment.title} · ${latestAssessment.status}`, "Latest", FileCheck2, "bg-jade"]] : []),
     ...(latestJob ? [["Job listing updated", `${latestJob.title} · ${latestJob.company_name}`, "Latest", BriefcaseBusiness, "bg-cobalt"]] : []),
-    ["Community post removed", "Harassment policy violation", "32 min", ShieldCheck, "bg-coral"],
+    ...(Number(communityStats?.total || 0) ? [["Community activity", `${Number(communityStats.total)} real posts · ${Number(communityStats.visible || 0)} visible`, "Current", ShieldCheck, "bg-coral"]] : []),
     ["Resource downloaded 100 times", "Product Analytics Field Guide", "1 hr", BookOpen, "bg-plum"],
   ];
   return (

@@ -1,0 +1,365 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  ExternalLink,
+  Flag,
+  Heart,
+  Link2,
+  LoaderCircle,
+  MessageCircle,
+  RefreshCw,
+  Send,
+  Share2,
+  ShieldCheck,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
+import { apiRequest } from "../../lib/api";
+
+const initials = (name) => String(name || "Student")
+  .split(/\s+/)
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((part) => part[0])
+  .join("")
+  .toUpperCase();
+
+const jsonList = (value) => {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const timeAgo = (value) => {
+  const date = new Date(value);
+  const seconds = Math.max(1, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (!Number.isFinite(seconds)) return "recently";
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return date.toLocaleDateString();
+};
+
+export function CommunityPostCooldown({ nextPostAt, className = "" }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const remaining = Math.max(0, new Date(nextPostAt).getTime() - now);
+  if (!nextPostAt || !Number.isFinite(remaining) || remaining <= 0) return <span className={className}>Ready to post</span>;
+  const totalSeconds = Math.ceil(remaining / 1000);
+  const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+  const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return <span className={className}>Next post in {hours}:{minutes}:{seconds}</span>;
+}
+
+const authorTone = (role, id) => {
+  if (role === "admin") return "bg-plum";
+  return ["bg-cobalt", "bg-coral", "bg-jade", "bg-ink"][Number(id || 0) % 4];
+};
+
+function EmptyFeed({ onNewPost }) {
+  return (
+    <div className="panel px-6 py-16 text-center">
+      <span className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] bg-cobalt/10 text-cobalt"><Users size={27} /></span>
+      <h2 className="mt-5 text-xl font-extrabold">Start the real conversation.</h2>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">There are no community posts yet. Ask a career question, share a useful resource, or celebrate a learning win.</p>
+      <button onClick={onNewPost} className="btn-accent mt-6"><Send size={15} /> Create the first post</button>
+    </div>
+  );
+}
+
+function PostCard({ post, viewer, onUpdate, onRemove, notify }) {
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [commentSaving, setCommentSaving] = useState(false);
+  const [busyAction, setBusyAction] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const tags = jsonList(post.tags);
+
+  const loadComments = async () => {
+    setCommentsLoading(true);
+    try {
+      setComments(await apiRequest(`/community/posts/${post.id}/comments`));
+    } catch (error) {
+      notify(error.message);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const toggleComments = async () => {
+    const nextOpen = !commentsOpen;
+    setCommentsOpen(nextOpen);
+    if (nextOpen) await loadComments();
+  };
+
+  const toggleLike = async () => {
+    setBusyAction("like");
+    try {
+      const result = await apiRequest(`/community/posts/${post.id}/like`, { method: "POST" });
+      onUpdate(post.id, { liked: result.liked, likes: Number(result.likes || 0) });
+    } catch (error) {
+      notify(error.message);
+    } finally {
+      setBusyAction("");
+    }
+  };
+
+  const submitComment = async () => {
+    const content = commentText.trim();
+    if (!content) return;
+    setCommentSaving(true);
+    try {
+      const created = await apiRequest(`/community/posts/${post.id}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      });
+      setComments((current) => [...current, created]);
+      setCommentText("");
+      onUpdate(post.id, { comments: Number(post.comments || 0) + 1 });
+    } catch (error) {
+      notify(error.message);
+    } finally {
+      setCommentSaving(false);
+    }
+  };
+
+  const removeComment = async (comment) => {
+    if (!window.confirm("Remove this comment?")) return;
+    try {
+      await apiRequest(`/community/comments/${comment.id}`, { method: "DELETE" });
+      setComments((current) => current.filter((item) => item.id !== comment.id));
+      onUpdate(post.id, { comments: Math.max(0, Number(post.comments || 0) - 1) });
+      notify("Comment removed.");
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
+  const sharePost = async () => {
+    setBusyAction("share");
+    try {
+      const result = await apiRequest(`/community/posts/${post.id}/share`, { method: "POST" });
+      onUpdate(post.id, { share_count: Number(result.share_count || 0) });
+      const url = `${window.location.origin}/student?post=${post.id}`;
+      if (navigator.clipboard) await navigator.clipboard.writeText(url).catch(() => {});
+      notify("Post link copied.");
+    } catch (error) {
+      notify(error.message);
+    } finally {
+      setBusyAction("");
+    }
+  };
+
+  const reportPost = async (reason) => {
+    setMenuOpen(false);
+    if (!window.confirm(`Report this post as ${reason}? CareerForge administrators will review it.`)) return;
+    try {
+      await apiRequest(`/community/posts/${post.id}/report`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      });
+      notify("Report sent to administrators.");
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
+  const deletePost = async () => {
+    setMenuOpen(false);
+    if (!window.confirm("Remove this post from the community?")) return;
+    try {
+      await apiRequest(`/community/posts/${post.id}`, { method: "DELETE" });
+      onRemove(post.id);
+      notify("Post removed.");
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
+  return (
+    <article id={`community-post-${post.id}`} className="panel p-5 sm:p-6">
+      <header className="flex items-start gap-3">
+        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-xs font-extrabold text-white ${authorTone(post.author_role, post.user_id)}`}>{initials(post.author)}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <b className="text-sm">{post.author}</b>
+            {post.author_role === "admin" && <span className="tag !bg-plum/10 !text-plum"><ShieldCheck size={11} /> CareerForge admin</span>}
+          </div>
+          <small className="block truncate text-[11px] text-muted">{post.university || (post.author_role === "admin" ? "Platform team" : "CareerForge student")} · {timeAgo(post.created_at)}</small>
+        </div>
+        <div className="relative">
+          <button onClick={() => setMenuOpen((current) => !current)} className="btn-ghost min-h-8 px-2" aria-label="Post actions">•••</button>
+          {menuOpen && (
+            <div className="absolute right-0 top-10 z-20 w-44 rounded-2xl border border-ink/10 bg-[#FBF9F4] p-2 shadow-lift dark:bg-[#0A0A0A]">
+              {Number(post.is_owner) === 1 ? (
+                <button onClick={deletePost} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-coral hover:bg-coral/10"><Trash2 size={14} /> Remove post</button>
+              ) : (
+                <>
+                  <button onClick={() => reportPost("spam")} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold hover:bg-ink/[0.05]"><Flag size={14} /> Report spam</button>
+                  <button onClick={() => reportPost("fraud")} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-coral hover:bg-coral/10"><AlertTriangle size={14} /> Report fraud</button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </header>
+
+      <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-7 text-ink/80 dark:text-white/75">{post.content}</p>
+      {!!post.link_url && (
+        <a href={post.link_url} target="_blank" rel="noreferrer" className="mt-4 flex items-center gap-3 rounded-2xl border border-ink/10 bg-white/45 p-4 transition hover:-translate-y-0.5 hover:bg-white/70 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cobalt/10 text-cobalt"><Link2 size={18} /></span>
+          <span className="min-w-0 flex-1"><b className="block text-xs">Shared resource</b><small className="block truncate text-muted">{post.link_url}</small></span>
+          <ExternalLink size={15} className="text-muted" />
+        </a>
+      )}
+      {!!tags.length && <div className="mt-4 flex flex-wrap gap-2">{tags.map((tag) => <span className="tag" key={tag}>{tag}</span>)}</div>}
+
+      <footer className="mt-5 flex flex-wrap items-center gap-2 border-t border-ink/[0.07] pt-4">
+        <button disabled={busyAction === "like"} onClick={toggleLike} className={`btn-ghost min-h-9 ${Number(post.liked) === 1 ? "!bg-coral/10 !text-coral" : ""}`}>
+          <Heart size={15} fill={Number(post.liked) === 1 ? "currentColor" : "none"} /> {Number(post.likes || 0)}
+        </button>
+        <button onClick={toggleComments} className={`btn-ghost min-h-9 ${commentsOpen ? "!bg-cobalt/10 !text-cobalt" : ""}`}><MessageCircle size={15} /> {Number(post.comments || 0)}</button>
+        <button disabled={busyAction === "share"} onClick={sharePost} className="btn-ghost ml-auto min-h-9"><Share2 size={15} /> {Number(post.share_count || 0) ? Number(post.share_count) : "Share"}</button>
+      </footer>
+
+      {commentsOpen && (
+        <section className="mt-4 rounded-2xl bg-ink/[0.025] p-3 dark:bg-white/[0.035]">
+          <div className="flex gap-2">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cobalt text-[10px] font-extrabold text-white">{initials(viewer?.name)}</span>
+            <input
+              value={commentText}
+              onChange={(event) => setCommentText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  submitComment();
+                }
+              }}
+              className="input min-h-9"
+              placeholder="Write a real comment..."
+              maxLength={1500}
+            />
+            <button disabled={!commentText.trim() || commentSaving} onClick={submitComment} className="btn-accent min-h-9 px-3 disabled:opacity-40">
+              {commentSaving ? <LoaderCircle size={14} className="animate-spin" /> : <Send size={14} />}
+            </button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {commentsLoading && <p className="py-4 text-center text-xs text-muted"><LoaderCircle className="mr-2 inline animate-spin" size={14} /> Loading comments...</p>}
+            {!commentsLoading && !comments.length && <p className="py-3 text-center text-xs text-muted">No comments yet. Start the discussion.</p>}
+            {comments.map((comment) => (
+              <div key={comment.id} className="flex items-start gap-2 rounded-xl bg-white/55 p-3 dark:bg-white/[0.04]">
+                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[9px] font-extrabold text-white ${authorTone(comment.author_role, comment.user_id)}`}>{initials(comment.author)}</span>
+                <div className="min-w-0 flex-1"><p className="text-xs"><b>{comment.author}</b>{comment.author_role === "admin" && <span className="ml-1 text-[9px] font-bold uppercase text-plum">Admin</span>}</p><p className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-muted">{comment.content}</p></div>
+                {(Number(comment.is_owner) === 1 || viewer?.role === "admin") && <button onClick={() => removeComment(comment)} className="text-muted hover:text-coral" aria-label="Remove comment"><Trash2 size={13} /></button>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </article>
+  );
+}
+
+export function CommunityPage({ posts, setPosts, loading, error, onRetry, notify, viewer, onNewPost, postingStatus }) {
+  const stats = useMemo(() => posts.reduce((result, post) => ({
+    likes: result.likes + Number(post.likes || 0),
+    comments: result.comments + Number(post.comments || 0),
+    shares: result.shares + Number(post.share_count || 0),
+  }), { likes: 0, comments: 0, shares: 0 }), [posts]);
+
+  const updatePost = (id, patch) => setPosts((current) => current.map((post) => Number(post.id) === Number(id) ? { ...post, ...patch } : post));
+
+  return (
+    <div className="grid gap-5 xl:grid-cols-[1fr_330px]">
+      <section className="space-y-4">
+        <button disabled={!postingStatus.canPost} onClick={onNewPost} className="panel flex w-full items-center gap-3 p-4 text-left disabled:cursor-not-allowed disabled:opacity-75">
+          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-plum text-xs font-extrabold text-white">{initials(viewer?.name)}</span>
+          <span className="input flex min-h-10 items-center text-muted">{postingStatus.canPost ? "Share a question, insight or useful resource..." : <CommunityPostCooldown nextPostAt={postingStatus.nextPostAt} className="font-bold text-coral" />}</span>
+          <span className={`btn-accent min-h-10 px-4 ${postingStatus.canPost ? "" : "opacity-40"}`}><Send size={15} /></span>
+        </button>
+        {loading && <div className="panel py-16 text-center text-sm text-muted"><LoaderCircle className="mx-auto mb-3 animate-spin text-cobalt" size={25} /> Loading the live community...</div>}
+        {!loading && error && <div className="panel py-14 text-center"><AlertTriangle className="mx-auto text-coral" /><h2 className="mt-3 font-extrabold">Could not load the community</h2><p className="mt-1 text-xs text-muted">{error}</p><button onClick={onRetry} className="btn-secondary mt-5"><RefreshCw size={15} /> Try again</button></div>}
+        {!loading && !error && !posts.length && <EmptyFeed onNewPost={onNewPost} />}
+        {!loading && !error && posts.map((post) => (
+          <PostCard
+            key={post.id}
+            post={post}
+            viewer={viewer}
+            notify={notify}
+            onUpdate={updatePost}
+            onRemove={(id) => setPosts((current) => current.filter((item) => Number(item.id) !== Number(id)))}
+          />
+        ))}
+      </section>
+      <aside className="space-y-5">
+        <div className="panel p-5">
+          <div className="flex items-center justify-between"><h2 className="font-extrabold">Community pulse</h2><Users size={17} className="text-muted" /></div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {[["Live posts", posts.length], ["Appreciations", stats.likes], ["Comments", stats.comments], ["Shares", stats.shares]].map(([label, value]) => (
+              <div className="rounded-2xl bg-ink/[0.035] p-3 dark:bg-white/[0.04]" key={label}><b className="block text-lg">{value}</b><small className="text-[10px] font-bold text-muted">{label}</small></div>
+            ))}
+          </div>
+        </div>
+        <div className="overflow-hidden rounded-[28px] bg-cobalt p-6 text-white">
+          <ShieldCheck size={22} />
+          <h2 className="mt-5 text-xl font-extrabold">Community safety</h2>
+          <p className="mt-2 text-sm leading-6 text-white/70">Never share passwords, OTPs, or send money for a job. Report suspicious posts for administrator review.</p>
+          <div className="mt-5 flex items-center justify-between text-xs"><b>Real people. Safer conversations.</b><ArrowRight size={16} /></div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+export function CommunityPostModal({ user, onClose, onSubmit }) {
+  const [content, setContent] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [topics, setTopics] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const publish = async () => {
+    setSaving(true);
+    await onSubmit({
+      content: content.trim(),
+      linkUrl: linkUrl.trim(),
+      tags: topics.split(",").map((item) => item.trim()).filter(Boolean),
+    });
+    setSaving(false);
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card max-w-xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex justify-between">
+          <div><span className="eyebrow"><Users size={13} /> Career community</span><h2 className="mt-2 text-xl font-extrabold">Share with the community</h2></div>
+          <button onClick={onClose} className="btn-ghost"><X size={18} /></button>
+        </div>
+        <div className="mt-6 flex gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-plum text-xs font-bold text-white">{initials(user?.name)}</span>
+          <textarea autoFocus value={content} onChange={(event) => setContent(event.target.value)} className="input min-h-40 resize-none py-3" maxLength={5000} placeholder="What are you learning, building or wondering?" />
+        </div>
+        <div className="mt-4 grid gap-3">
+          <label><span className="mb-1.5 flex items-center gap-1 text-xs font-bold"><Link2 size={13} /> Resource link <small className="font-normal text-muted">(optional)</small></span><input type="url" className="input" value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder="https://..." /></label>
+          <label><span className="mb-1.5 block text-xs font-bold">Topics <small className="font-normal text-muted">(comma separated, maximum 5)</small></span><input className="input" value={topics} onChange={(event) => setTopics(event.target.value)} placeholder="Interview prep, JavaScript, Career advice" /></label>
+        </div>
+        <div className="mt-4 flex items-center gap-2 rounded-2xl bg-jade/10 p-3 text-xs text-jade"><CheckCircle2 size={16} className="shrink-0" /> Posts are checked for spam and fraud signals before publication.</div>
+        <div className="mt-6 flex justify-end gap-3"><button onClick={onClose} className="btn-secondary">Cancel</button><button disabled={!content.trim() || saving} onClick={publish} className="btn-accent disabled:opacity-40">{saving ? "Publishing..." : "Publish post"} <Send size={15} /></button></div>
+      </div>
+    </div>
+  );
+}

@@ -222,14 +222,28 @@ CREATE TABLE IF NOT EXISTS community_posts (
   user_id BIGINT UNSIGNED NOT NULL,
   content TEXT NOT NULL,
   media_url VARCHAR(500) NULL,
+  link_url VARCHAR(500) NULL,
   tags JSON NULL,
   share_count INT UNSIGNED NOT NULL DEFAULT 0,
   status ENUM('visible', 'removed', 'pending_review') NOT NULL DEFAULT 'visible',
+  risk_score TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  risk_label ENUM('safe', 'spam', 'fraud', 'suspicious') NOT NULL DEFAULT 'safe',
+  risk_reasons JSON NULL,
+  reviewed_by BIGINT UNSIGNED NULL,
+  reviewed_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_posts_status_created (status, created_at)
 );
+
+ALTER TABLE community_posts
+  ADD COLUMN IF NOT EXISTS link_url VARCHAR(500) NULL AFTER media_url,
+  ADD COLUMN IF NOT EXISTS risk_score TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER status,
+  ADD COLUMN IF NOT EXISTS risk_label ENUM('safe', 'spam', 'fraud', 'suspicious') NOT NULL DEFAULT 'safe' AFTER risk_score,
+  ADD COLUMN IF NOT EXISTS risk_reasons JSON NULL AFTER risk_label,
+  ADD COLUMN IF NOT EXISTS reviewed_by BIGINT UNSIGNED NULL AFTER risk_reasons,
+  ADD COLUMN IF NOT EXISTS reviewed_at DATETIME NULL AFTER reviewed_by;
 
 CREATE TABLE IF NOT EXISTS comments (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -251,6 +265,15 @@ CREATE TABLE IF NOT EXISTS post_likes (
   PRIMARY KEY (post_id, user_id),
   CONSTRAINT fk_likes_post FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE,
   CONSTRAINT fk_likes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS post_shares (
+  post_id BIGINT UNSIGNED NOT NULL,
+  user_id BIGINT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (post_id, user_id),
+  CONSTRAINT fk_shares_post FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_shares_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS content_reports (

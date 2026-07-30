@@ -3,6 +3,8 @@ const { randomBytes } = require("node:crypto");
 const { pool, query } = require("../config/db");
 const { authenticate, adminOnly } = require("../middleware/auth");
 const { ensureJobSchema } = require("../services/job-schema");
+const { ensureCommunitySchema } = require("../services/community-schema");
+const { analyseContent } = require("../services/content-moderation");
 
 const router = express.Router();
 router.use(authenticate, adminOnly);
@@ -474,6 +476,116 @@ router.patch("/users/:id/status", async (req, res, next) => {
     const result = await query("UPDATE users SET status=? WHERE id=? AND role='student'", [req.body.status, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: "Student account not found" });
     res.json({ message: "User status updated" });
+  } catch (error) { next(error); }
+});
+
+router.get("/community", async (req, res, next) => {
+  try {
+    await ensureCommunitySchema();
+    const [posts, totals, reports, today] = await Promise.all([
+      query(
+        `SELECT p.id, p.user_id, p.content, p.link_url, p.tags, p.status, p.risk_score,
+                p.risk_label, p.risk_reasons, p.share_count, p.created_at, p.reviewed_at,
+                u.name author, u.email author_email, u.role author_role,
+                sp.university, sp.avatar_url,
+                (SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) likes,
+                (SELECT COUNT(*) FROM comments c WHERE c.post_id=p.id AND c.status='visible') comments,
+                (SELECT COUNT(*) FROM content_reports r WHERE r.post_id=p.id AND r.status='open') report_count,
+                EXISTS(SELECT 1 FROM post_likes mine WHERE mine.post_id=p.id AND mine.user_id=?) liked,
+                (p.user_id=?) is_owner
+         FROM community_posts p
+         JOIN users u ON u.id=p.user_id
+         LEFT JOIN student_profiles sp ON sp.user_id=u.id
+         ORDER BY
+           CASE p.status WHEN 'pending_review' THEN 0 WHEN 'visible' THEN 1 ELSE 2 END,
+           report_count DESC, p.risk_score DESC, p.created_at DESC
+         LIMIT 250`,
+        [req.user.id, req.user.id],
+      ),
+      query(
+        `SELECT COUNT(*) total,
+                SUM(status='visible') visible,
+                SUM(status='pending_review') pending,
+                SUM(status='removed') removed
+         FROM community_posts`,
+      ),
+      query("SELECT COUNT(*) open_reports FROM content_reports WHERE status='open'"),
+      query("SELECT COUNT(*) posts_today FROM community_posts WHERE created_at >= CURDATE()"),
+    ]);
+    res.json({
+      posts,
+      stats: {
+        total: Number(totals[0]?.total || 0),
+        visible: Number(totals[0]?.visible || 0),
+        pending: Number(totals[0]?.pending || 0),
+        removed: Number(totals[0]?.removed || 0),
+        openReports: Number(reports[0]?.open_reports || 0),
+        postsToday: Number(today[0]?.posts_today || 0),
+      },
+    });
+  } catch (error) { next(error); }
+});
+
+router.patch("/community/posts/:id", async (req, res, next) => {
+  try {
+    await ensureCommunitySchema();
+    const action = String(req.body.action || "");
+    if (!["approve", "remove", "restore", "rescan"].includes(action)) {
+      return res.status(400).json({ error: "Invalid moderation action" });
+    }
+    const [post] = await query(
+      "SELECT id, user_id, content, link_url, status FROM community_posts WHERE id=? LIMIT 1",
+      [req.params.id],
+    );
+    if (!post) return res.status(404).json({ error: "Post not found" });
+
+    let message = "Moderation action saved";
+    if (action === "rescan") {
+      const duplicate = await query(
+        `SELECT id FROM community_posts
+         WHERE user_id=? AND id<>? AND LOWER(TRIM(content))=LOWER(?) AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+         LIMIT 1`,
+        [post.user_id, post.id, post.content],
+      );
+      const moderation = analyseContent(`${post.content} ${post.link_url || ""}`, { duplicate: duplicate.length > 0 });
+      const nextStatus = post.status === "removed"
+        ? "removed"
+        : moderation.requiresReview ? "pending_review" : "visible";
+      await query(
+        `UPDATE community_posts
+         SET risk_score=?, risk_label=?, risk_reasons=?, status=?, reviewed_by=NULL, reviewed_at=NULL
+         WHERE id=?`,
+        [
+          moderation.score,
+          moderation.label,
+          moderation.reasons.length ? JSON.stringify(moderation.reasons) : null,
+          nextStatus,
+          post.id,
+        ],
+      );
+      message = moderation.requiresReview ? "Risk signals found; post needs review" : "Rescan complete; no blocking signals found";
+    } else {
+      const nextStatus = action === "remove" ? "removed" : "visible";
+      await query(
+        "UPDATE community_posts SET status=?, reviewed_by=?, reviewed_at=NOW() WHERE id=?",
+        [nextStatus, req.user.id, post.id],
+      );
+      await query(
+        `UPDATE content_reports
+         SET status=?, reviewed_by=?, reviewed_at=NOW()
+         WHERE post_id=? AND status='open'`,
+        [action === "remove" ? "actioned" : "dismissed", req.user.id, post.id],
+      );
+      message = action === "remove"
+        ? "Post removed from the community"
+        : action === "restore" ? "Post restored to the community" : "Post approved and published";
+    }
+
+    await query(
+      "INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata, ip_address) VALUES (?, ?, 'community_post', ?, ?, ?)",
+      [req.user.id, `community.${action}`, String(post.id), JSON.stringify({ previousStatus: post.status }), req.ip],
+    );
+    res.json({ message });
   } catch (error) { next(error); }
 });
 
