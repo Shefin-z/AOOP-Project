@@ -117,6 +117,10 @@ CREATE TABLE IF NOT EXISTS applications (
   status ENUM('applied', 'in_review', 'assessment', 'interview', 'offer', 'rejected', 'withdrawn') NOT NULL DEFAULT 'applied',
   match_percentage DECIMAL(5,2) NULL,
   resume_url VARCHAR(500) NULL,
+  resume_snapshot JSON NULL,
+  resume_file_name VARCHAR(255) NULL,
+  resume_file_type VARCHAR(100) NULL,
+  resume_file_data LONGTEXT NULL,
   cover_letter LONGTEXT NULL,
   notes TEXT NULL,
   applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -127,6 +131,18 @@ CREATE TABLE IF NOT EXISTS applications (
   CONSTRAINT fk_applications_job FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
   INDEX idx_applications_status (status)
 );
+
+ALTER TABLE applications
+  ADD COLUMN IF NOT EXISTS resume_snapshot JSON NULL AFTER resume_url;
+
+ALTER TABLE applications
+  ADD COLUMN IF NOT EXISTS resume_file_name VARCHAR(255) NULL AFTER resume_snapshot;
+
+ALTER TABLE applications
+  ADD COLUMN IF NOT EXISTS resume_file_type VARCHAR(100) NULL AFTER resume_file_name;
+
+ALTER TABLE applications
+  ADD COLUMN IF NOT EXISTS resume_file_data LONGTEXT NULL AFTER resume_file_type;
 
 CREATE TABLE IF NOT EXISTS assessments (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

@@ -89,7 +89,34 @@ router.post("/:jobId/apply", authenticate, async (req, res, next) => {
   try {
     await ensureJobSchema();
     if (req.user.role !== "student") return res.status(403).json({ error: "Only students can apply for jobs" });
-    const { coverLetter = "", resumeUrl = null } = req.body;
+    const {
+      coverLetter = "",
+      resumeUrl = null,
+      resumeSnapshot = null,
+      resumeFile = null,
+    } = req.body;
+    const snapshotJson = resumeSnapshot && typeof resumeSnapshot === "object"
+      ? JSON.stringify(resumeSnapshot)
+      : null;
+    if (snapshotJson && snapshotJson.length > 250000) {
+      return res.status(413).json({ error: "Career Vault CV is too large to submit" });
+    }
+    const allowedResumeTypes = new Set([
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]);
+    let resumeFileName = null;
+    let resumeFileType = null;
+    let resumeFileData = null;
+    if (resumeFile) {
+      resumeFileName = String(resumeFile.name || "resume").trim().slice(0, 255);
+      resumeFileType = String(resumeFile.type || "").trim().slice(0, 100);
+      resumeFileData = String(resumeFile.data || "");
+      if (!allowedResumeTypes.has(resumeFileType)) return res.status(400).json({ error: "Resume file must be PDF, DOC or DOCX" });
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(resumeFileData)) return res.status(400).json({ error: "Resume file data is invalid" });
+      if (resumeFileData.length > 1750000) return res.status(413).json({ error: "Resume file must be smaller than 1.25 MB" });
+    }
     const [job] = await query(
       `SELECT id FROM jobs
        WHERE id=? AND created_by IS NOT NULL AND status='live' AND expires_at>NOW()`,
@@ -106,15 +133,37 @@ router.post("/:jobId/apply", authenticate, async (req, res, next) => {
     if (existingApplication) {
       await query(
         `UPDATE applications
-         SET status='applied', cover_letter=?, resume_url=?, applied_at=NOW(), updated_at=NOW()
+         SET status='applied', cover_letter=?, resume_url=?, resume_snapshot=?,
+             resume_file_name=?, resume_file_type=?, resume_file_data=?,
+             applied_at=NOW(), updated_at=NOW()
          WHERE id=? AND user_id=?`,
-        [coverLetter, resumeUrl, existingApplication.id, req.user.id],
+        [
+          String(coverLetter || "").trim().slice(0, 15000),
+          resumeUrl,
+          snapshotJson,
+          resumeFileName,
+          resumeFileType,
+          resumeFileData,
+          existingApplication.id,
+          req.user.id,
+        ],
       );
     } else {
       await query(
-        `INSERT INTO applications (user_id, job_id, status, cover_letter, resume_url)
-         VALUES (?, ?, 'applied', ?, ?)`,
-        [req.user.id, req.params.jobId, coverLetter, resumeUrl],
+        `INSERT INTO applications
+         (user_id, job_id, status, cover_letter, resume_url, resume_snapshot,
+          resume_file_name, resume_file_type, resume_file_data)
+         VALUES (?, ?, 'applied', ?, ?, ?, ?, ?, ?)`,
+        [
+          req.user.id,
+          req.params.jobId,
+          String(coverLetter || "").trim().slice(0, 15000),
+          resumeUrl,
+          snapshotJson,
+          resumeFileName,
+          resumeFileType,
+          resumeFileData,
+        ],
       );
     }
     const [applicationStats] = await query(

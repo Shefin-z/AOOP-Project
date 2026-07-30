@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import DashboardShell from "../DashboardShell";
 import Toast from "../Toast";
+import AdminApplications from "./AdminApplications";
 import AdminCommunity from "./AdminCommunity";
 import { events as seedEvents, resources as seedResources } from "../../lib/mockData";
 import { apiRequest } from "../../lib/api";
@@ -95,6 +96,9 @@ export default function AdminWorkspace() {
   const [jobRecords, setJobRecords] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [jobsError, setJobsError] = useState("");
+  const [applicationRecords, setApplicationRecords] = useState([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(true);
+  const [applicationsError, setApplicationsError] = useState("");
 
   const notify = (message) => {
     setToast(message);
@@ -200,6 +204,32 @@ export default function AdminWorkspace() {
     };
   }, []);
 
+  const loadApplications = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setApplicationsLoading(true);
+      setApplicationsError("");
+    }
+    try {
+      setApplicationRecords(await apiRequest("/admin/applications"));
+      setApplicationsError("");
+    } catch (error) {
+      if (!silent) setApplicationsError(error.message);
+    } finally {
+      if (!silent) setApplicationsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadApplications();
+    const refresh = () => loadApplications({ silent: true });
+    const interval = window.setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
+
   const loadCommunity = async ({ silent = false } = {}) => {
     if (!silent) {
       setCommunityLoading(true);
@@ -297,7 +327,6 @@ export default function AdminWorkspace() {
     }
   };
 
-  const totalApplications = jobRecords.reduce((sum, job) => sum + Number(job.application_count || 0), 0);
   const dashboardNavItems = navItems.map((item) => {
     if (item.id === "users") return { ...item, badge: users.length ? String(users.length) : undefined };
     if (item.id === "questions") return { ...item, badge: questionRecords.length ? String(questionRecords.length) : undefined };
@@ -306,7 +335,10 @@ export default function AdminWorkspace() {
       const attention = Number(communityData.stats?.pending || 0) + Number(communityData.stats?.openReports || 0);
       return { ...item, badge: attention ? String(attention) : undefined };
     }
-    if (item.id === "applications") return { ...item, badge: totalApplications ? String(totalApplications) : undefined };
+    if (item.id === "applications") {
+      const activeApplications = applicationRecords.filter((application) => application.status !== "withdrawn").length;
+      return { ...item, badge: activeApplications ? String(activeApplications) : undefined };
+    }
     return item;
   });
 
@@ -337,7 +369,7 @@ export default function AdminWorkspace() {
         {active === "events" && <EventsAdmin notify={notify} />}
         {active === "jobs" && <JobsAdmin records={jobRecords} loading={jobsLoading} error={jobsError} onRetry={loadJobs} onEdit={(record) => setModal({ type: "edit", entity: "jobs", record })} onStatus={changeJobStatus} onDelete={deleteJob} />}
         {active === "community" && <AdminCommunity data={communityData} setData={setCommunityData} loading={communityLoading} error={communityError} onRetry={loadCommunity} onModerate={moderateCommunityPost} notify={notify} />}
-        {active === "applications" && <ApplicationsAdmin records={jobRecords} loading={jobsLoading} error={jobsError} onRetry={loadJobs} />}
+        {active === "applications" && <AdminApplications records={applicationRecords} loading={applicationsLoading} error={applicationsError} onRetry={loadApplications} notify={notify} />}
         {active === "performance" && <PerformanceAdmin />}
         {active === "settings" && <SettingsAdmin notify={notify} />}
       </DashboardShell>

@@ -29,6 +29,7 @@ const questionStatuses = new Set(["draft", "published", "needs_review"]);
 const difficulties = new Set(["Beginner", "Intermediate", "Advanced"]);
 const questionTypes = new Set(["multiple_choice", "true_false"]);
 const jobStatuses = new Set(["draft", "pending", "live", "closed"]);
+const applicationStatuses = new Set(["applied", "in_review", "assessment", "interview", "offer", "rejected"]);
 const employmentTypes = new Set(["Full-time", "Part-time", "Internship", "Contract"]);
 const workplaceTypes = new Set(["On-site", "Hybrid", "Remote"]);
 
@@ -454,6 +455,92 @@ router.delete("/jobs/:id", async (req, res, next) => {
     );
     if (!result.affectedRows) return res.status(404).json({ error: "Job not found" });
     res.json({ message: "Job deleted" });
+  } catch (error) { next(error); }
+});
+
+router.get("/applications", async (_req, res, next) => {
+  try {
+    await ensureJobSchema();
+    res.json(await query(
+      `SELECT a.id, a.user_id, a.job_id, a.status, a.match_percentage, a.applied_at,
+              a.updated_at, a.resume_file_name,
+              (a.resume_snapshot IS NOT NULL) has_resume_snapshot,
+              (a.resume_file_data IS NOT NULL) has_resume_file,
+              u.name applicant_name, u.email applicant_email,
+              p.university, p.degree, p.graduation_year, p.location, p.phone,
+              p.readiness_score, p.avatar_url,
+              j.title job_title, c.name company_name
+       FROM applications a
+       JOIN users u ON u.id=a.user_id
+       LEFT JOIN student_profiles p ON p.user_id=u.id
+       JOIN jobs j ON j.id=a.job_id
+       JOIN companies c ON c.id=j.company_id
+       WHERE j.created_by IS NOT NULL
+       ORDER BY a.applied_at DESC`,
+    ));
+  } catch (error) { next(error); }
+});
+
+router.get("/applications/:id", async (req, res, next) => {
+  try {
+    await ensureJobSchema();
+    const [application] = await query(
+      `SELECT a.id, a.user_id, a.job_id, a.status, a.match_percentage, a.resume_url,
+              a.resume_snapshot, a.resume_file_name, a.resume_file_type,
+              (a.resume_file_data IS NOT NULL) has_resume_file,
+              a.cover_letter, a.notes, a.applied_at, a.updated_at,
+              u.name applicant_name, u.email applicant_email,
+              p.university, p.degree, p.graduation_year, p.location, p.phone,
+              p.bio, p.readiness_score, p.avatar_url,
+              j.title job_title, j.location job_location, j.workplace_type,
+              j.employment_type, c.name company_name
+       FROM applications a
+       JOIN users u ON u.id=a.user_id
+       LEFT JOIN student_profiles p ON p.user_id=u.id
+       JOIN jobs j ON j.id=a.job_id
+       JOIN companies c ON c.id=j.company_id
+       WHERE a.id=? AND j.created_by IS NOT NULL
+       LIMIT 1`,
+      [req.params.id],
+    );
+    if (!application) return res.status(404).json({ error: "Application not found" });
+    res.json(application);
+  } catch (error) { next(error); }
+});
+
+router.get("/applications/:id/resume-file", async (req, res, next) => {
+  try {
+    await ensureJobSchema();
+    const [application] = await query(
+      `SELECT a.resume_file_name, a.resume_file_type, a.resume_file_data
+       FROM applications a JOIN jobs j ON j.id=a.job_id
+       WHERE a.id=? AND j.created_by IS NOT NULL LIMIT 1`,
+      [req.params.id],
+    );
+    if (!application?.resume_file_data) return res.status(404).json({ error: "Uploaded resume file not found" });
+    const fileName = String(application.resume_file_name || "resume").replace(/[\r\n"]/g, "_");
+    const fileType = application.resume_file_type || "application/octet-stream";
+    const file = Buffer.from(application.resume_file_data, "base64");
+    res.setHeader("Content-Type", fileType);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Disposition", `${fileType === "application/pdf" ? "inline" : "attachment"}; filename="${fileName}"`);
+    res.send(file);
+  } catch (error) { next(error); }
+});
+
+router.patch("/applications/:id/status", async (req, res, next) => {
+  try {
+    await ensureJobSchema();
+    const status = applicationStatuses.has(req.body.status) ? req.body.status : null;
+    if (!status) return res.status(400).json({ error: "Invalid application status" });
+    const [application] = await query(
+      `SELECT a.id FROM applications a JOIN jobs j ON j.id=a.job_id
+       WHERE a.id=? AND j.created_by IS NOT NULL AND a.status<>'withdrawn' LIMIT 1`,
+      [req.params.id],
+    );
+    if (!application) return res.status(404).json({ error: "Active application not found" });
+    await query("UPDATE applications SET status=?, updated_at=NOW() WHERE id=?", [status, application.id]);
+    res.json({ message: "Application status updated" });
   } catch (error) { next(error); }
 });
 

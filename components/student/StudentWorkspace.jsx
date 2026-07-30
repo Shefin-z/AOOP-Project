@@ -375,11 +375,19 @@ export default function StudentWorkspace() {
     }
   };
 
-  const submitJobApplication = async (job, coverLetter) => {
+  const submitJobApplication = async (job, application) => {
     try {
       await apiRequest(`/jobs/${job.id}/apply`, {
         method: "POST",
-        body: JSON.stringify({ coverLetter, resumeUrl: null }),
+        body: JSON.stringify({
+          coverLetter: application.coverLetter,
+          resumeUrl: null,
+          resumeSnapshot: {
+            ...cvData,
+            capturedAt: new Date().toISOString(),
+          },
+          resumeFile: application.resumeFile,
+        }),
       });
       setModal(null);
       await loadJobData();
@@ -485,7 +493,7 @@ export default function StudentWorkspace() {
           onApply={() => setModal({ type: "apply", job: modal.job })}
         />
       )}
-      {modal?.type === "apply" && <ApplyModal job={modal.job} user={currentUser} resumeName={cvData.name} onClose={() => setModal(null)} onSubmit={(coverLetter) => submitJobApplication(modal.job, coverLetter)} />}
+      {modal?.type === "apply" && <ApplyModal job={modal.job} user={currentUser} resumeName={cvData.name} onClose={() => setModal(null)} onSubmit={(application) => submitJobApplication(modal.job, application)} />}
       {modal?.type === "quiz" && (
         <QuizModal
           assessment={modal.assessment}
@@ -1268,6 +1276,8 @@ function JobModal({ job, applied, onClose, onApply }) {
 
 function ApplyModal({ job, user, resumeName, onClose, onSubmit }) {
   const [coverLetter, setCoverLetter] = useState("");
+  const [resumeFile, setResumeFile] = useState(null);
+  const [fileError, setFileError] = useState("");
   const [saving, setSaving] = useState(false);
   const resumeOwner = (resumeName || user?.name || "Student").trim();
   const resumeFileName = `${resumeOwner.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "Student"}_Resume.pdf`;
@@ -1279,13 +1289,36 @@ I would welcome the opportunity to discuss how I can contribute to ${job.company
 
 Sincerely,
   ${user?.name || "Student"}`);
+  const selectResumeFile = (event) => {
+    const file = event.target.files?.[0];
+    setFileError("");
+    if (!file) return;
+    const allowed = new Set(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
+    if (!allowed.has(file.type)) {
+      setFileError("Choose a PDF, DOC or DOCX resume.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 1.25 * 1024 * 1024) {
+      setFileError("Uploaded resume must be smaller than 1.25 MB.");
+      event.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const encoded = String(reader.result || "").split(",")[1] || "";
+      setResumeFile({ name: file.name, type: file.type, data: encoded });
+    };
+    reader.onerror = () => setFileError("The resume file could not be read.");
+    reader.readAsDataURL(file);
+  };
   const submit = async () => {
     setSaving(true);
-    await onSubmit(coverLetter);
+    await onSubmit({ coverLetter, resumeFile });
     setSaving(false);
   };
   return (
-    <div className="modal-backdrop" onClick={onClose}><div className="modal-card" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between"><div><span className="eyebrow"><Sparkles size={13} /> Smart application</span><h2 className="mt-2 text-xl font-extrabold">{job.title} · {job.company}</h2></div><button onClick={onClose} className="btn-ghost"><X size={18} /></button></div><div className="mt-6 space-y-4"><div className="rounded-2xl border border-ink/[0.08] bg-white/55 p-4"><div className="flex items-center justify-between"><span><b className="block text-sm">{resumeFileName}</b><small className="text-muted">Career Vault · Updated today</small></span><span className="tag !text-jade"><Check size={12} /> Selected</span></div></div><label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-ink/20 bg-white/35 p-5 text-xs font-bold text-muted hover:bg-white/60"><Upload size={17} /> Upload a different resume<input className="hidden" type="file" accept=".pdf,.doc,.docx" /></label><div><div className="mb-2 flex items-center justify-between"><b className="text-xs">Cover letter</b><button onClick={generate} className="text-xs font-bold text-cobalt"><Sparkles size={13} className="mr-1 inline" />Generate with AI</button></div><textarea className="input min-h-40 resize-none py-3" value={coverLetter} onChange={(event) => setCoverLetter(event.target.value)} placeholder="Write your note or generate a tailored draft..." /></div></div><div className="mt-6 flex justify-end gap-3"><button onClick={onClose} className="btn-secondary">Save draft</button><button disabled={saving} onClick={submit} className="btn-accent disabled:opacity-50">{saving ? "Submitting..." : "Submit application"} <Send size={15} /></button></div></div></div>
+    <div className="modal-backdrop" onClick={onClose}><div className="modal-card" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between"><div><span className="eyebrow"><Sparkles size={13} /> Smart application</span><h2 className="mt-2 text-xl font-extrabold">{job.title} · {job.company}</h2></div><button onClick={onClose} className="btn-ghost"><X size={18} /></button></div><div className="mt-6 space-y-4"><div className="rounded-2xl border border-ink/[0.08] bg-white/55 p-4"><div className="flex items-center justify-between"><span><b className="block text-sm">{resumeFile?.name || resumeFileName}</b><small className="text-muted">{resumeFile ? "Uploaded resume file" : "Career Vault snapshot · captured when you apply"}</small></span><span className="tag !text-jade"><Check size={12} /> {resumeFile ? "Uploaded" : "Selected"}</span></div></div><label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-ink/20 bg-white/35 p-5 text-xs font-bold text-muted hover:bg-white/60"><Upload size={17} /> {resumeFile ? "Replace uploaded resume" : "Upload a different resume"}<input className="hidden" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={selectResumeFile} /></label>{fileError && <p className="rounded-xl bg-coral/10 px-3 py-2 text-xs font-bold text-coral">{fileError}</p>}<div><div className="mb-2 flex items-center justify-between"><b className="text-xs">Cover letter</b><button onClick={generate} className="text-xs font-bold text-cobalt"><Sparkles size={13} className="mr-1 inline" />Generate with AI</button></div><textarea className="input min-h-40 resize-none py-3" value={coverLetter} onChange={(event) => setCoverLetter(event.target.value)} placeholder="Write your note or generate a tailored draft..." /></div></div><div className="mt-6 flex justify-end gap-3"><button onClick={onClose} className="btn-secondary">Save draft</button><button disabled={saving} onClick={submit} className="btn-accent disabled:opacity-50">{saving ? "Submitting..." : "Submit application"} <Send size={15} /></button></div></div></div>
   );
 }
 
