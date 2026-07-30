@@ -228,6 +228,30 @@ export default function StudentWorkspace() {
     localStorage.setItem(getCvStorageKey(currentUser), JSON.stringify(cvData));
   }, [cvData, currentUser]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadProfile = async () => {
+      try {
+        const profile = await apiRequest("/auth/me");
+        if (cancelled || !profile) return;
+        localStorage.setItem("careerforge_session", JSON.stringify(profile));
+        setCurrentUser(profile);
+        setCvData((current) => ({
+          ...current,
+          name: profile.name || current.name,
+          email: profile.email || current.email,
+          location: profile.location || current.location,
+        }));
+      } catch (error) {
+        if (!cancelled) notify(error.message);
+      }
+    };
+    loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const loadAssessments = async () => {
     setAssessmentLoading(true);
     setAssessmentError("");
@@ -323,20 +347,34 @@ export default function StudentWorkspace() {
     window.setTimeout(() => setToast(""), 3200);
   };
 
-  const saveProfile = (profile) => {
-    const nextUser = {
-      ...currentUser,
-      name: profile.name.trim() || currentUser.name,
-      email: profile.email.trim() || currentUser.email,
-    };
-    localStorage.setItem("careerforge_session", JSON.stringify(nextUser));
-    setCurrentUser(nextUser);
-    setCvData((current) => ({
-      ...current,
-      name: nextUser.name,
-      email: nextUser.email || current.email,
-    }));
-    notify("Profile changes saved.");
+  const saveProfile = async (profile) => {
+    try {
+      const nextUser = await apiRequest("/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: profile.name,
+          email: profile.email,
+          university: profile.university,
+          degree: profile.degree,
+          graduation_year: profile.graduation,
+          target_role: profile.target,
+          location: profile.location,
+        }),
+      });
+      localStorage.setItem("careerforge_session", JSON.stringify(nextUser));
+      setCurrentUser(nextUser);
+      setCvData((current) => ({
+        ...current,
+        name: nextUser.name,
+        email: nextUser.email || current.email,
+        location: nextUser.location || current.location,
+      }));
+      notify("Profile changes saved.");
+      return true;
+    } catch (error) {
+      notify(error.message);
+      return false;
+    }
   };
 
   const startAssessment = async (assessment) => {
@@ -1230,15 +1268,33 @@ function AchievementsPage() {
 
 function ProfilePage({ user, onSave }) {
   const [avatar, setAvatar] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: user.name,
     email: user.email || "",
-    university: "",
-    degree: "",
-    graduation: "",
-    target: "",
-    location: "",
+    university: user.university || "",
+    degree: user.degree || "",
+    graduation: user.graduation_year || "",
+    target: user.target_role || "",
+    location: user.location || "",
   });
+  useEffect(() => {
+    setForm({
+      name: user.name || "",
+      email: user.email || "",
+      university: user.university || "",
+      degree: user.degree || "",
+      graduation: user.graduation_year || "",
+      target: user.target_role || "",
+      location: user.location || "",
+    });
+  }, [user.name, user.email, user.university, user.degree, user.graduation_year, user.target_role, user.location]);
+  const submit = async () => {
+    if (saving) return;
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
+  };
   return (
     <div className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]">
       <aside className="space-y-5">
@@ -1247,9 +1303,9 @@ function ProfilePage({ user, onSave }) {
       </aside>
       <section className="panel p-6">
         <div className="mb-6 flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Personal & career details</h2><p className="text-xs text-muted">Used to personalize recommendations.</p></div><Pencil size={17} className="text-muted" /></div>
-        <div className="grid gap-4 sm:grid-cols-2">{[["Full name", "name"], ["Email address", "email"], ["University", "university"], ["Degree", "degree"], ["Graduation year", "graduation"], ["Target role", "target"], ["Location", "location"]].map(([label, key]) => <label key={key} className="block"><span className="mb-1.5 block text-xs font-bold">{label}</span><input type={key === "email" ? "email" : "text"} value={form[key]} onChange={(e) => setForm((current) => ({ ...current, [key]: e.target.value }))} className="input" /></label>)}</div>
+        <div className="grid gap-4 sm:grid-cols-2">{[["Full name", "name"], ["Email address", "email"], ["University", "university"], ["Degree", "degree"], ["Graduation year", "graduation"], ["Target role", "target"], ["Location", "location"]].map(([label, key]) => <label key={key} className="block"><span className="mb-1.5 block text-xs font-bold">{label}</span><input type={key === "email" ? "email" : key === "graduation" ? "number" : "text"} min={key === "graduation" ? "1950" : undefined} max={key === "graduation" ? String(new Date().getFullYear() + 10) : undefined} value={form[key]} onChange={(e) => setForm((current) => ({ ...current, [key]: e.target.value }))} className="input" /></label>)}</div>
         <div className="mt-6"><span className="mb-2 block text-xs font-bold">Career interests</span><div className="flex flex-wrap gap-2">{["Product", "Data & Analytics", "Technology", "Research"].map((item) => <span className="tag !bg-cobalt/10 !text-cobalt" key={item}>{item}<X size={11} /></span>)}<button className="tag"><Plus size={11} /> Add</button></div></div>
-        <div className="mt-8 flex justify-end"><button onClick={() => onSave(form)} className="btn-accent"><Check size={16} /> Save changes</button></div>
+        <div className="mt-8 flex justify-end"><button disabled={saving} onClick={submit} className="btn-accent disabled:cursor-not-allowed disabled:opacity-60"><Check size={16} /> {saving ? "Saving..." : "Save changes"}</button></div>
       </section>
     </div>
   );

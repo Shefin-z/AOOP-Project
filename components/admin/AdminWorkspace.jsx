@@ -11,6 +11,7 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   CircleHelp,
   Clock3,
@@ -440,6 +441,10 @@ function AdminMetric({ label, value, delta, note, icon: Icon, tone }) {
 function UsersPage({ users, loading, error, onRetry, onStatus }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [selectedId, setSelectedId] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
   const tones = ["bg-cobalt", "bg-coral", "bg-jade", "bg-plum", "bg-ink"];
   const list = useMemo(() => users.filter((user) => {
     const matchesSearch = `${user.name} ${user.email} ${user.university || ""}`.toLowerCase().includes(search.toLowerCase());
@@ -472,6 +477,36 @@ function UsersPage({ users, loading, error, onRetry, onStatus }) {
     link.click();
     URL.revokeObjectURL(url);
   };
+  const openDetails = async (user) => {
+    setSelectedId(user.id);
+    setSelectedUser(null);
+    setDetailError("");
+    setDetailLoading(true);
+    try {
+      setSelectedUser(await apiRequest(`/admin/users/${user.id}`));
+    } catch (requestError) {
+      setDetailError(requestError.message);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+  const closeDetails = () => {
+    setSelectedId(null);
+    setSelectedUser(null);
+    setDetailError("");
+  };
+
+  if (selectedId) {
+    return (
+      <StudentDetailView
+        student={selectedUser}
+        loading={detailLoading}
+        error={detailError}
+        onBack={closeDetails}
+        onRetry={() => openDetails({ id: selectedId })}
+      />
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -489,7 +524,7 @@ function UsersPage({ users, loading, error, onRetry, onStatus }) {
         <ContentState loading={loading} error={error} empty={!list.length} emptyTitle={users.length ? "No students match these filters" : "No registered students yet"} emptyCopy={users.length ? "Try another name, email, university or status." : "New student sign-ups will appear here automatically."} onRetry={onRetry}>
           <div className="table-shell overflow-x-auto">
             <table className="w-full min-w-[950px] text-left">
-              <thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.1em] text-muted"><tr>{["Student", "University", "Joined", "Readiness", "Status", "Account access"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr></thead>
+              <thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.1em] text-muted"><tr>{["Student", "University", "Joined", "Readiness", "Status", "Actions"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr></thead>
               <tbody className="divide-y divide-ink/[0.06]">
                 {list.map((user, index) => {
                   const readiness = Math.min(100, Math.max(0, Number(user.readiness_score || 0)));
@@ -501,7 +536,7 @@ function UsersPage({ users, loading, error, onRetry, onStatus }) {
                       <td className="px-4 py-4 text-xs text-muted">{formatJoinedDate(user.created_at)}</td>
                       <td className="px-4 py-4"><div className="flex items-center gap-2"><div className="h-1.5 w-16 rounded-full bg-ink/[0.07]"><div className="h-full rounded-full bg-cobalt" style={{ width: `${readiness}%` }} /></div><b className="text-[10px]">{readiness}%</b></div></td>
                       <td className="px-4 py-4"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isActive ? "bg-jade/10 text-jade" : "bg-coral/10 text-coral"}`}>{isActive ? "Active" : "Suspended"}</span></td>
-                      <td className="px-4 py-4"><button onClick={() => onStatus(user)} className={`btn-ghost min-h-9 gap-1 ${isActive ? "text-coral" : "text-jade"}`}>{isActive ? <><LockKeyhole size={14} /> Suspend</> : <><UserCheck size={14} /> Activate</>}</button></td>
+                      <td className="px-4 py-4"><div className="flex items-center gap-1"><button onClick={() => openDetails(user)} className="btn-ghost min-h-9 gap-1 text-cobalt" aria-label={`View ${user.name}'s details`} title="View student details"><Eye size={15} /> View</button><button onClick={() => onStatus(user)} className={`btn-ghost min-h-9 gap-1 ${isActive ? "text-coral" : "text-jade"}`}>{isActive ? <><LockKeyhole size={14} /> Suspend</> : <><UserCheck size={14} /> Activate</>}</button></div></td>
                     </tr>
                   );
                 })}
@@ -511,6 +546,50 @@ function UsersPage({ users, loading, error, onRetry, onStatus }) {
         </ContentState>
         <p className="mt-4 text-xs text-muted">Showing {list.length} of {users.length} actual student accounts</p>
       </section>
+    </div>
+  );
+}
+
+function StudentDetailView({ student, loading, error, onBack, onRetry }) {
+  const value = (content) => content || "Not provided";
+  const formatDate = (content, includeTime = false) => {
+    if (!content) return "Not available";
+    const date = new Date(content);
+    if (Number.isNaN(date.getTime())) return "Not available";
+    return date.toLocaleString("en-BD", includeTime
+      ? { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }
+      : { day: "numeric", month: "short", year: "numeric" });
+  };
+
+  return (
+    <div className="space-y-5">
+      <button onClick={onBack} className="btn-secondary"><ChevronLeft size={16} /> Back to user management</button>
+      {loading && <section className="panel grid min-h-72 place-items-center text-center"><div><RefreshCw className="mx-auto animate-spin text-cobalt" size={28} /><p className="mt-3 text-xs font-bold text-muted">Loading student details...</p></div></section>}
+      {!loading && error && <section className="panel grid min-h-72 place-items-center text-center"><div><AlertTriangle className="mx-auto text-coral" size={30} /><h2 className="mt-3 text-lg font-extrabold">Could not load student details</h2><p className="mt-2 text-xs text-muted">{error}</p><button onClick={onRetry} className="btn-secondary mt-5"><RefreshCw size={14} /> Try again</button></div></section>}
+      {!loading && !error && student && (
+        <>
+          <section className="panel overflow-hidden">
+            <div className="bg-gradient-to-r from-cobalt to-[#6a52a0] p-6 text-white sm:p-8">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                <span className="grid h-20 w-20 shrink-0 place-items-center rounded-[24px] bg-white/15 text-2xl font-extrabold ring-1 ring-white/25">
+                  {String(student.name || "Student").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1"><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-white/65">Student profile</span><h2 className="mt-1 text-2xl font-extrabold">{student.name}</h2><p className="mt-1 flex items-center gap-2 text-sm text-white/75"><Mail size={14} /> {student.email}</p></div>
+                <span className={`w-fit rounded-full px-3 py-1.5 text-xs font-extrabold ${student.status === "active" ? "bg-white text-jade" : "bg-coral text-white"}`}>{student.status === "active" ? "Active account" : "Suspended account"}</span>
+              </div>
+            </div>
+            <div className="grid gap-4 p-6 sm:grid-cols-3">
+              {[["Profile completion", `${Number(student.profile_completion || 0)}%`], ["Career readiness", `${Number(student.readiness_score || 0)}%`], ["Joined", formatDate(student.created_at)]].map(([label, content]) => <div className="rounded-2xl bg-ink/[0.035] p-4" key={label}><span className="text-[10px] font-bold uppercase tracking-[.08em] text-muted">{label}</span><b className="mt-1 block text-lg">{content}</b></div>)}
+            </div>
+          </section>
+          <section className="panel p-6 sm:p-8">
+            <div><h2 className="text-lg font-extrabold">Personal & career details</h2><p className="mt-1 text-xs text-muted">The latest information saved by this student.</p></div>
+            <dl className="mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-2">
+              {[["Full name", student.name], ["Email address", student.email], ["University", value(student.university)], ["Degree", value(student.degree)], ["Graduation year", value(student.graduation_year)], ["Target role", value(student.target_role)], ["Location", value(student.location)], ["Last sign in", formatDate(student.last_login_at, true)], ["Profile last updated", formatDate(student.profile_updated_at, true)]].map(([label, content]) => <div className="border-b border-ink/[0.07] pb-4" key={label}><dt className="text-[10px] font-extrabold uppercase tracking-[.08em] text-muted">{label}</dt><dd className="mt-1 text-sm font-bold">{content}</dd></div>)}
+            </dl>
+          </section>
+        </>
+      )}
     </div>
   );
 }

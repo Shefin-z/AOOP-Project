@@ -1,10 +1,20 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { query } = require("../config/db");
+const { pool, query } = require("../config/db");
 const { authenticate, JWT_SECRET } = require("../middleware/auth");
 
 const router = express.Router();
+
+function profileResponse(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    graduation_year: row.graduation_year == null ? null : Number(row.graduation_year),
+    readiness_score: Number(row.readiness_score || 0),
+    profile_completion: Number(row.profile_completion || 0),
+  };
+}
 
 router.post("/register", async (req, res, next) => {
   try {
@@ -47,12 +57,90 @@ router.get("/me", authenticate, async (req, res, next) => {
   try {
     const rows = await query(
       `SELECT u.id, u.name, u.email, u.role, u.status, p.university, p.degree, p.graduation_year,
-              p.target_role, p.location, p.readiness_score, p.avatar_url
+              p.target_role, p.location, p.phone, p.bio, p.readiness_score,
+              p.profile_completion, p.avatar_url, p.updated_at
        FROM users u LEFT JOIN student_profiles p ON p.user_id = u.id WHERE u.id = ?`,
       [req.user.id],
     );
-    res.json(rows[0] || null);
+    res.json(profileResponse(rows[0]));
   } catch (error) { next(error); }
+});
+
+router.patch("/me", authenticate, async (req, res, next) => {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    if (req.user.role !== "student") {
+      return res.status(403).json({ error: "Student account required" });
+    }
+
+    const name = String(req.body.name || "").trim();
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const nullableText = (value, maxLength) => {
+      const cleaned = String(value || "").trim();
+      return cleaned ? cleaned.slice(0, maxLength) : null;
+    };
+    const university = nullableText(req.body.university, 190);
+    const degree = nullableText(req.body.degree, 190);
+    const targetRole = nullableText(req.body.target_role, 140);
+    const location = nullableText(req.body.location, 140);
+    const graduationValue = String(req.body.graduation_year ?? "").trim();
+    const graduationYear = graduationValue ? Number(graduationValue) : null;
+
+    if (name.length < 2 || name.length > 120) {
+      return res.status(400).json({ error: "Name must contain between 2 and 120 characters" });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 190) {
+      return res.status(400).json({ error: "Enter a valid email address" });
+    }
+    if (graduationYear != null && (!Number.isInteger(graduationYear) || graduationYear < 1950 || graduationYear > new Date().getFullYear() + 10)) {
+      return res.status(400).json({ error: "Enter a valid graduation year" });
+    }
+
+    const completedFields = [name, email, university, degree, graduationYear, targetRole, location]
+      .filter((value) => value !== null && value !== "").length;
+    const profileCompletion = Math.round((completedFields / 7) * 100);
+
+    await connection.beginTransaction();
+    const [duplicateRows] = await connection.execute(
+      "SELECT id FROM users WHERE email=? AND id<>? LIMIT 1",
+      [email, req.user.id],
+    );
+    if (duplicateRows.length) {
+      await connection.rollback();
+      return res.status(409).json({ error: "Another account already uses this email address" });
+    }
+    await connection.execute(
+      "UPDATE users SET name=?, email=? WHERE id=? AND role='student'",
+      [name, email, req.user.id],
+    );
+    await connection.execute(
+      `INSERT INTO student_profiles
+         (user_id, university, degree, graduation_year, target_role, location, profile_completion)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         university=VALUES(university), degree=VALUES(degree),
+         graduation_year=VALUES(graduation_year), target_role=VALUES(target_role),
+         location=VALUES(location), profile_completion=VALUES(profile_completion)`,
+      [req.user.id, university, degree, graduationYear, targetRole, location, profileCompletion],
+    );
+    await connection.commit();
+
+    const [rows] = await connection.execute(
+      `SELECT u.id, u.name, u.email, u.role, u.status, p.university, p.degree, p.graduation_year,
+              p.target_role, p.location, p.phone, p.bio, p.readiness_score,
+              p.profile_completion, p.avatar_url, p.updated_at
+       FROM users u LEFT JOIN student_profiles p ON p.user_id=u.id WHERE u.id=?`,
+      [req.user.id],
+    );
+    res.json(profileResponse(rows[0]));
+  } catch (error) {
+    try { await connection?.rollback(); } catch {}
+    next(error);
+  }
+  finally {
+    connection?.release();
+  }
 });
 
 module.exports = router;

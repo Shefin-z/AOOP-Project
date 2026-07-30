@@ -548,12 +548,35 @@ router.get("/users", async (req, res, next) => {
   try {
     const search = `%${req.query.search || ""}%`;
     res.json(await query(
-      `SELECT u.id, u.name, u.email, u.status, u.created_at, p.university, p.readiness_score
+      `SELECT u.id, u.name, u.email, u.status, u.created_at, p.university,
+              p.readiness_score, p.profile_completion
        FROM users u LEFT JOIN student_profiles p ON p.user_id=u.id
        WHERE u.role='student' AND (u.name LIKE ? OR u.email LIKE ? OR p.university LIKE ?)
        ORDER BY u.created_at DESC`,
       [search, search, search],
     ));
+  } catch (error) { next(error); }
+});
+
+router.get("/users/:id", async (req, res, next) => {
+  try {
+    const [student] = await query(
+      `SELECT u.id, u.name, u.email, u.status, u.last_login_at, u.created_at, u.updated_at,
+              p.university, p.degree, p.graduation_year, p.target_role, p.location,
+              p.phone, p.bio, p.avatar_url, p.readiness_score, p.profile_completion,
+              p.updated_at profile_updated_at
+       FROM users u LEFT JOIN student_profiles p ON p.user_id=u.id
+       WHERE u.id=? AND u.role='student'
+       LIMIT 1`,
+      [req.params.id],
+    );
+    if (!student) return res.status(404).json({ error: "Student account not found" });
+    res.json({
+      ...student,
+      graduation_year: student.graduation_year == null ? null : Number(student.graduation_year),
+      readiness_score: Number(student.readiness_score || 0),
+      profile_completion: Number(student.profile_completion || 0),
+    });
   } catch (error) { next(error); }
 });
 
