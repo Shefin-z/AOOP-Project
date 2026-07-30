@@ -2,6 +2,7 @@ const express = require("express");
 const { query } = require("../config/db");
 const { authenticate } = require("../middleware/auth");
 const { ensureJobSchema } = require("../services/job-schema");
+const { getPlatformSettings } = require("../services/platform-settings");
 
 const router = express.Router();
 
@@ -31,6 +32,8 @@ router.get("/", authenticate, async (req, res, next) => {
 
 router.get("/recommendations", authenticate, async (req, res, next) => {
   try {
+    const settings = await getPlatformSettings();
+    if (!settings.ai.jobRecommendationsEnabled) return res.json([]);
     await ensureJobSchema();
     const [profile] = await query("SELECT target_role, readiness_score FROM student_profiles WHERE user_id = ?", [req.user.id]);
     const skills = await query("SELECT s.name, us.score FROM user_skills us JOIN skills s ON s.id=us.skill_id WHERE us.user_id=?", [req.user.id]);
@@ -88,6 +91,7 @@ router.patch("/applications/:applicationId/withdraw", authenticate, async (req, 
 router.post("/:jobId/apply", authenticate, async (req, res, next) => {
   try {
     await ensureJobSchema();
+    const settings = await getPlatformSettings();
     if (req.user.role !== "student") return res.status(403).json({ error: "Only students can apply for jobs" });
     const {
       coverLetter = "",
@@ -130,6 +134,7 @@ router.post("/:jobId/apply", authenticate, async (req, res, next) => {
     if (existingApplication && existingApplication.status !== "withdrawn") {
       return res.status(409).json({ error: "You have already applied for this job" });
     }
+    let applicationId;
     if (existingApplication) {
       await query(
         `UPDATE applications
@@ -148,8 +153,9 @@ router.post("/:jobId/apply", authenticate, async (req, res, next) => {
           req.user.id,
         ],
       );
+      applicationId = existingApplication.id;
     } else {
-      await query(
+      const result = await query(
         `INSERT INTO applications
          (user_id, job_id, status, cover_letter, resume_url, resume_snapshot,
           resume_file_name, resume_file_type, resume_file_data)
@@ -165,11 +171,30 @@ router.post("/:jobId/apply", authenticate, async (req, res, next) => {
           resumeFileData,
         ],
       );
+      applicationId = result.insertId;
     }
     const [applicationStats] = await query(
       "SELECT COUNT(*) application_count FROM applications WHERE job_id=? AND status<>'withdrawn'",
       [req.params.jobId],
     );
+    if (settings.integrations.webhookEnabled && settings.integrations.webhookUrl) {
+      try {
+        await fetch(settings.integrations.webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event: "careerforge.application.submitted",
+            applicationId,
+            jobId: Number(req.params.jobId),
+            studentId: req.user.id,
+            submittedAt: new Date().toISOString(),
+          }),
+          signal: AbortSignal.timeout(3000),
+        });
+      } catch {
+        // A third-party webhook must never prevent a student's application.
+      }
+    }
     res.status(201).json({
       message: "Application submitted",
       applicationCount: Number(applicationStats.application_count || 0),

@@ -69,13 +69,13 @@ const authorTone = (role, id) => {
   return ["bg-cobalt", "bg-coral", "bg-jade", "bg-ink"][Number(id || 0) % 4];
 };
 
-function EmptyFeed({ onNewPost }) {
+function EmptyFeed({ onNewPost, canPost, disabledReason }) {
   return (
     <div className="panel px-6 py-16 text-center">
       <span className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] bg-cobalt/10 text-cobalt"><Users size={27} /></span>
       <h2 className="mt-5 text-xl font-extrabold">Start the real conversation.</h2>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">There are no community posts yet. Ask a career question, share a useful resource, or celebrate a learning win.</p>
-      <button onClick={onNewPost} className="btn-accent mt-6"><Send size={15} /> Create the first post</button>
+      {canPost ? <button onClick={onNewPost} className="btn-accent mt-6"><Send size={15} /> Create the first post</button> : <p className="mx-auto mt-5 max-w-md rounded-xl bg-coral/10 px-3 py-2 text-xs font-bold text-coral">{disabledReason || "Posting is currently unavailable."}</p>}
     </div>
   );
 }
@@ -289,12 +289,12 @@ export function CommunityPage({ posts, setPosts, loading, error, onRetry, notify
       <section className="space-y-4">
         <button disabled={!postingStatus.canPost} onClick={onNewPost} className="panel flex w-full items-center gap-3 p-4 text-left disabled:cursor-not-allowed disabled:opacity-75">
           <span className="grid h-10 w-10 place-items-center rounded-2xl bg-plum text-xs font-extrabold text-white">{initials(viewer?.name)}</span>
-          <span className="input flex min-h-10 items-center text-muted">{postingStatus.canPost ? "Share a question, insight or useful resource..." : <CommunityPostCooldown nextPostAt={postingStatus.nextPostAt} className="font-bold text-coral" />}</span>
+          <span className="input flex min-h-10 items-center text-muted">{postingStatus.canPost ? "Share a question, insight or useful resource..." : postingStatus.disabled ? <span className="font-bold text-coral">{postingStatus.reason}</span> : <CommunityPostCooldown nextPostAt={postingStatus.nextPostAt} className="font-bold text-coral" />}</span>
           <span className={`btn-accent min-h-10 px-4 ${postingStatus.canPost ? "" : "opacity-40"}`}><Send size={15} /></span>
         </button>
         {loading && <div className="panel py-16 text-center text-sm text-muted"><LoaderCircle className="mx-auto mb-3 animate-spin text-cobalt" size={25} /> Loading the live community...</div>}
         {!loading && error && <div className="panel py-14 text-center"><AlertTriangle className="mx-auto text-coral" /><h2 className="mt-3 font-extrabold">Could not load the community</h2><p className="mt-1 text-xs text-muted">{error}</p><button onClick={onRetry} className="btn-secondary mt-5"><RefreshCw size={15} /> Try again</button></div>}
-        {!loading && !error && !posts.length && <EmptyFeed onNewPost={onNewPost} />}
+        {!loading && !error && !posts.length && <EmptyFeed onNewPost={onNewPost} canPost={postingStatus.canPost} disabledReason={postingStatus.reason} />}
         {!loading && !error && posts.map((post) => (
           <PostCard
             key={post.id}

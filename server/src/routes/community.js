@@ -3,6 +3,7 @@ const { pool, query } = require("../config/db");
 const { authenticate } = require("../middleware/auth");
 const { ensureCommunitySchema } = require("../services/community-schema");
 const { analyseContent } = require("../services/content-moderation");
+const { getPlatformSettings } = require("../services/platform-settings");
 
 const router = express.Router();
 router.use(authenticate);
@@ -35,8 +36,18 @@ async function findPost(postId) {
 router.get("/posting-status", async (req, res, next) => {
   try {
     await ensureCommunitySchema();
+    const settings = await getPlatformSettings();
     if (req.user.role === "admin") {
       return res.json({ canPost: true, nextPostAt: null, cooldownHours: 0 });
+    }
+    if (!settings.features.communityPostingEnabled) {
+      return res.json({
+        canPost: false,
+        nextPostAt: null,
+        cooldownHours: 12,
+        disabled: true,
+        reason: "Student community posting is currently disabled by an administrator",
+      });
     }
     const [latest] = await query(
       `SELECT MAX(created_at) last_post_at,
@@ -76,6 +87,10 @@ router.post("/posts", async (req, res, next) => {
   let connection;
   try {
     await ensureCommunitySchema();
+    const settings = await getPlatformSettings();
+    if (req.user.role !== "admin" && !settings.features.communityPostingEnabled) {
+      return res.status(403).json({ error: "Student community posting is currently disabled" });
+    }
     const content = cleanText(req.body.content, 5000);
     if (!content) return res.status(400).json({ error: "Post content is required" });
     const rawLink = cleanText(req.body.linkUrl, 500);
@@ -107,7 +122,9 @@ router.post("/posts", async (req, res, next) => {
       [req.user.id, content],
     );
     const moderation = analyseContent(`${content} ${linkUrl || ""}`, { duplicate: duplicate.length > 0 });
-    const status = moderation.requiresReview ? "pending_review" : "visible";
+    const requiresReview = settings.ai.contentModerationEnabled
+      && moderation.score >= settings.ai.moderationThreshold;
+    const status = requiresReview ? "pending_review" : "visible";
     const [result] = await connection.execute(
       `INSERT INTO community_posts
        (user_id, content, link_url, tags, status, risk_score, risk_label, risk_reasons)

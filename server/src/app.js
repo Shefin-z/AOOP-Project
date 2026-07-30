@@ -59,8 +59,13 @@ app.use("/api/admin", adminRoutes);
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((error, _req, res, _next) => {
   console.error(error);
-  const status = error.code === "ER_DUP_ENTRY" ? 409 : 500;
-  res.status(status).json({ error: status === 500 ? "Unexpected server error" : "This record already exists" });
+  const status = Number(error.statusCode) || (error.code === "ER_DUP_ENTRY" ? 409 : 500);
+  const message = error.code === "ER_DUP_ENTRY"
+    ? "This record already exists"
+    : status >= 500
+      ? "Unexpected server error"
+      : error.message;
+  res.status(status).json({ error: message });
 });
 
 if (require.main === module) {

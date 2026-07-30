@@ -15,7 +15,7 @@ import {
 import Brand from "./Brand";
 import ThemeToggle from "./ThemeToggle";
 import AuthVisual from "./AuthVisual";
-import { registerStudent, signIn } from "../lib/api";
+import { apiRequest, registerStudent, signIn } from "../lib/api";
 import { navigateFresh } from "../lib/sessionNavigation";
 
 export default function AuthExperience({ role = "student" }) {
@@ -26,6 +26,10 @@ export default function AuthExperience({ role = "student" }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [platformConfig, setPlatformConfig] = useState({
+    features: { registrationEnabled: true, maintenanceMode: false },
+    security: { minimumPasswordLength: 8, requireUppercase: false, requireNumber: false },
+  });
   const workspacePath = isAdmin ? "/admin" : "/student";
 
   const enterWorkspace = (session, token) => {
@@ -36,9 +40,22 @@ export default function AuthExperience({ role = "student" }) {
 
   useEffect(() => {
     if (!isAdmin) {
-      setMode(new URLSearchParams(search).get("mode") === "register" ? "register" : "login");
+      const requestedMode = new URLSearchParams(search).get("mode") === "register" ? "register" : "login";
+      setMode(requestedMode === "register" && !platformConfig.features.registrationEnabled ? "login" : requestedMode);
     }
-  }, [isAdmin, search]);
+  }, [isAdmin, search, platformConfig.features.registrationEnabled]);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiRequest("/auth/config")
+      .then((config) => {
+        if (!cancelled) setPlatformConfig(config);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -52,8 +69,16 @@ export default function AuthExperience({ role = "student" }) {
       setError("Please enter your email and password.");
       return;
     }
-    if (password.length < 8) {
-      setError("Password must contain at least 8 characters.");
+    if (mode === "register" && password.length < platformConfig.security.minimumPasswordLength) {
+      setError(`Password must contain at least ${platformConfig.security.minimumPasswordLength} characters.`);
+      return;
+    }
+    if (mode === "register" && platformConfig.security.requireUppercase && !/[A-Z]/.test(password)) {
+      setError("Password must contain an uppercase letter.");
+      return;
+    }
+    if (mode === "register" && platformConfig.security.requireNumber && !/\d/.test(password)) {
+      setError("Password must contain a number.");
       return;
     }
     setError("");
@@ -140,13 +165,18 @@ export default function AuthExperience({ role = "student" }) {
                 {["login", "register"].map((item) => (
                   <button
                     key={item}
+                    disabled={item === "register" && !platformConfig.features.registrationEnabled}
                     onClick={() => { setMode(item); setError(""); setSuccess(""); setShowPassword(false); }}
-                    className={`min-h-10 rounded-xl text-sm font-bold transition ${mode === item ? "bg-white text-ink shadow-sm" : "text-muted"}`}
+                    className={`min-h-10 rounded-xl text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${mode === item ? "bg-white text-ink shadow-sm" : "text-muted"}`}
                   >
                     {item === "login" ? "Sign in" : "Create account"}
                   </button>
                 ))}
               </div>
+            )}
+
+            {!isAdmin && platformConfig.features.maintenanceMode && (
+              <p className="mb-5 rounded-2xl border border-coral/20 bg-coral/10 px-4 py-3 text-xs font-semibold leading-5 text-coral">Student services are temporarily under maintenance. Administrator access remains available.</p>
             )}
 
             <form key={`${role}-${mode}`} onSubmit={submit} className="space-y-4">
@@ -184,7 +214,7 @@ export default function AuthExperience({ role = "student" }) {
                     type={showPassword ? "text" : "password"}
                     autoComplete={mode === "register" ? "new-password" : "current-password"}
                     className="input pl-11 pr-11"
-                    placeholder="Minimum 8 characters"
+                    placeholder={mode === "register" ? `Minimum ${platformConfig.security.minimumPasswordLength} characters` : "Your password"}
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted" aria-label="Toggle password visibility">
                     {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
@@ -199,7 +229,7 @@ export default function AuthExperience({ role = "student" }) {
               )}
               {error && <p className="rounded-xl bg-coral/10 px-3 py-2 text-xs font-semibold text-coral">{error}</p>}
               {success && <p className="rounded-xl bg-jade/10 px-3 py-2 text-xs font-semibold text-jade">{success}</p>}
-              <button disabled={loading} className={`w-full ${isAdmin ? "btn-primary !bg-plum hover:!bg-[#64465b]" : "btn-accent"}`}>
+              <button disabled={loading || (!isAdmin && platformConfig.features.maintenanceMode)} className={`w-full disabled:cursor-not-allowed disabled:opacity-50 ${isAdmin ? "btn-primary !bg-plum hover:!bg-[#64465b]" : "btn-accent"}`}>
                 {loading ? "Preparing your workspace..." : mode === "register" ? "Create student account" : `Enter ${isAdmin ? "admin portal" : "workspace"}`}
                 {!loading && <ArrowRight size={17} />}
               </button>

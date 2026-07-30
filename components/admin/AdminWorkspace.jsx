@@ -788,7 +788,192 @@ function PerformanceAdmin() {
 }
 
 function SettingsAdmin({ notify }) {
-  return <div className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]"><aside className="panel h-fit p-4">{[["General", Settings], ["Security", ShieldCheck], ["Email templates", Mail], ["Integrations", Database], ["AI configuration", Sparkles]].map(([label, Icon], index) => <button className={`dash-side-link ${index === 0 ? "dash-side-link-active" : ""}`} key={label}><Icon size={16} />{label}</button>)}</aside><section className="panel p-6"><div><h2 className="text-lg font-extrabold">General platform settings</h2><p className="text-xs text-muted">Core presentation and operational defaults.</p></div><div className="mt-6 grid gap-4 sm:grid-cols-2">{[["Platform name", "CareerForge"], ["Support email", "support@careerforge.com"], ["Default timezone", "Asia/Dhaka"], ["Student locale", "English (Bangladesh)"]].map(([label, value]) => <label key={label}><span className="mb-1.5 block text-xs font-bold">{label}</span><input className="input" defaultValue={value} /></label>)}</div><div className="my-7 h-px bg-ink/[0.08]" /><h3 className="text-sm font-extrabold">Feature controls</h3><div className="mt-4 space-y-4">{[["Allow new student registration", "Students can create accounts from the public landing page.", true], ["AI cover letter generator", "Generate tailored drafts inside job applications.", true], ["Community posting", "Allow students to create public community posts.", true], ["Maintenance mode", "Temporarily restrict student access.", false]].map(([title, copy, checked]) => <label className="flex items-start justify-between gap-5" key={title}><span><b className="block text-xs">{title}</b><small className="text-[10px] leading-4 text-muted">{copy}</small></span><input type="checkbox" defaultChecked={checked} className="mt-1 h-4 w-4 accent-plum" /></label>)}</div><div className="mt-8 flex justify-end"><button onClick={() => notify("System settings saved.")} className="btn-primary !bg-plum"><Check size={15} /> Save settings</button></div></section></div>;
+  const tabs = [
+    ["general", "General", Settings],
+    ["security", "Security", ShieldCheck],
+    ["email", "Email templates", Mail],
+    ["integrations", "Integrations", Database],
+    ["ai", "AI configuration", Sparkles],
+  ];
+  const [tab, setTab] = useState("general");
+  const [settings, setSettings] = useState(null);
+  const [integrationStatus, setIntegrationStatus] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await apiRequest("/admin/settings");
+      setSettings(result.settings);
+      setIntegrationStatus(result.integrations || {});
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const update = (section, key, value) => {
+    setSettings((current) => ({
+      ...current,
+      [section]: { ...current[section], [key]: value },
+    }));
+  };
+
+  const save = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const result = await apiRequest("/admin/settings", {
+        method: "PATCH",
+        body: JSON.stringify(settings),
+      });
+      setSettings(result.settings);
+      setIntegrationStatus(result.integrations || {});
+      notify(result.message || "System settings saved.");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <section className="panel grid min-h-[420px] place-items-center"><div className="text-center"><RefreshCw className="mx-auto animate-spin text-plum" size={28} /><p className="mt-3 text-xs font-bold text-muted">Loading live system settings...</p></div></section>;
+  }
+
+  if (!settings) {
+    return <section className="panel grid min-h-[420px] place-items-center"><div className="text-center"><AlertTriangle className="mx-auto text-coral" size={30} /><h2 className="mt-3 text-lg font-extrabold">Settings could not be loaded</h2><p className="mt-2 text-xs text-muted">{error}</p><button onClick={load} className="btn-secondary mt-5"><RefreshCw size={14} /> Try again</button></div></section>;
+  }
+
+  const panels = {
+    general: (
+      <>
+        <SettingsPanelHeader title="General platform settings" copy="Core presentation and operational defaults." />
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <SettingsInput label="Platform name" value={settings.general.platformName} onChange={(value) => update("general", "platformName", value)} />
+          <SettingsInput label="Support email" type="email" value={settings.general.supportEmail} onChange={(value) => update("general", "supportEmail", value)} />
+          <SettingsInput label="Default timezone" value={settings.general.timezone} onChange={(value) => update("general", "timezone", value)} placeholder="Asia/Dhaka" />
+          <SettingsInput label="Student locale" value={settings.general.locale} onChange={(value) => update("general", "locale", value)} />
+        </div>
+        <SettingsDivider />
+        <h3 className="text-sm font-extrabold">Feature controls</h3>
+        <div className="mt-4 space-y-4">
+          <SettingsToggle title="Allow new student registration" copy="Controls whether public visitors can create student accounts." checked={settings.features.registrationEnabled} onChange={(value) => update("features", "registrationEnabled", value)} />
+          <SettingsToggle title="AI cover letter generator" copy="Shows or hides tailored cover-letter generation inside applications." checked={settings.features.coverLetterEnabled} onChange={(value) => update("features", "coverLetterEnabled", value)} />
+          <SettingsToggle title="Community posting" copy="Controls whether students can publish new community posts." checked={settings.features.communityPostingEnabled} onChange={(value) => update("features", "communityPostingEnabled", value)} />
+          <SettingsToggle title="Maintenance mode" copy="Immediately blocks student sign-in and authenticated student API access." checked={settings.features.maintenanceMode} onChange={(value) => update("features", "maintenanceMode", value)} tone="danger" />
+        </div>
+      </>
+    ),
+    security: (
+      <>
+        <SettingsPanelHeader title="Authentication & security" copy="Password policy and session controls applied to real student authentication." />
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <SettingsInput label="Minimum password length" type="number" min="8" max="64" value={settings.security.minimumPasswordLength} onChange={(value) => update("security", "minimumPasswordLength", value)} />
+          <SettingsInput label="Session duration (hours)" type="number" min="1" max="720" value={settings.security.sessionHours} onChange={(value) => update("security", "sessionHours", value)} />
+        </div>
+        <SettingsDivider />
+        <div className="space-y-4">
+          <SettingsToggle title="Require an uppercase letter" copy="New student passwords must contain A–Z." checked={settings.security.requireUppercase} onChange={(value) => update("security", "requireUppercase", value)} />
+          <SettingsToggle title="Require a number" copy="New student passwords must contain at least one digit." checked={settings.security.requireNumber} onChange={(value) => update("security", "requireNumber", value)} />
+        </div>
+        <div className="mt-6 rounded-2xl border border-plum/15 bg-plum/10 p-4 text-xs leading-5 text-plum"><b>Policy scope:</b> Password rules apply to new registrations. Session duration applies to tokens created after saving.</div>
+      </>
+    ),
+    email: (
+      <>
+        <SettingsPanelHeader title="Email templates" copy="Reusable operational copy stored centrally for future email delivery workflows." />
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <SettingsInput label="Sender name" value={settings.email.senderName} onChange={(value) => update("email", "senderName", value)} />
+          <SettingsInput label="Reply-to email" type="email" value={settings.email.replyTo} onChange={(value) => update("email", "replyTo", value)} />
+          <SettingsInput className="sm:col-span-2" label="Welcome email subject" value={settings.email.welcomeSubject} onChange={(value) => update("email", "welcomeSubject", value)} />
+          <SettingsTextarea className="sm:col-span-2" label="Welcome email body" value={settings.email.welcomeBody} onChange={(value) => update("email", "welcomeBody", value)} />
+          <SettingsInput className="sm:col-span-2" label="Application confirmation subject" value={settings.email.applicationSubject} onChange={(value) => update("email", "applicationSubject", value)} />
+          <SettingsTextarea className="sm:col-span-2" label="Application confirmation body" value={settings.email.applicationBody} onChange={(value) => update("email", "applicationBody", value)} />
+        </div>
+        <p className="mt-4 text-[10px] text-muted">Supported variables: {"{{name}}"}, {"{{job_title}}"}, {"{{company}}"}. Email delivery requires a configured provider.</p>
+      </>
+    ),
+    integrations: (
+      <>
+        <SettingsPanelHeader title="Integrations" copy="Connection status and safe, non-secret platform endpoints." />
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <IntegrationStatus label="TiDB Cloud" status={integrationStatus.database} />
+          <IntegrationStatus label="Python AI service" status={integrationStatus.aiService} />
+          <IntegrationStatus label="Email service" status={integrationStatus.emailService} />
+        </div>
+        <SettingsDivider />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SettingsInput label="Support portal URL" type="url" value={settings.integrations.supportPortalUrl} onChange={(value) => update("integrations", "supportPortalUrl", value)} placeholder="https://..." />
+          <SettingsInput label="External career page URL" type="url" value={settings.integrations.careerPageUrl} onChange={(value) => update("integrations", "careerPageUrl", value)} placeholder="https://..." />
+          <SettingsInput className="sm:col-span-2" label="Webhook endpoint" type="url" value={settings.integrations.webhookUrl} onChange={(value) => update("integrations", "webhookUrl", value)} placeholder="https://..." />
+        </div>
+        <div className="mt-4"><SettingsToggle title="Enable application webhook" copy="Stores the endpoint as active. Secret credentials must remain in Vercel environment variables." checked={settings.integrations.webhookEnabled} onChange={(value) => update("integrations", "webhookEnabled", value)} /></div>
+      </>
+    ),
+    ai: (
+      <>
+        <SettingsPanelHeader title="AI configuration" copy="Control recommendation availability, moderation sensitivity and writing tone." />
+        <div className="mt-6 space-y-4">
+          <SettingsToggle title="Job recommendations" copy="Allows the recommendation endpoint to return matching opportunities." checked={settings.ai.jobRecommendationsEnabled} onChange={(value) => update("ai", "jobRecommendationsEnabled", value)} />
+          <SettingsToggle title="Community content moderation" copy="Automatically sends risky posts to administrator review." checked={settings.ai.contentModerationEnabled} onChange={(value) => update("ai", "contentModerationEnabled", value)} />
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <SettingsInput label="Moderation threshold (1–100)" type="number" min="1" max="100" value={settings.ai.moderationThreshold} onChange={(value) => update("ai", "moderationThreshold", value)} />
+          <label className="block"><span className="mb-1.5 block text-xs font-bold">Cover-letter tone</span><select className="select" value={settings.ai.coverLetterTone} onChange={(event) => update("ai", "coverLetterTone", event.target.value)}>{["Professional", "Concise", "Confident", "Warm"].map((tone) => <option key={tone}>{tone}</option>)}</select></label>
+        </div>
+        <div className="mt-6 rounded-2xl border border-jade/15 bg-jade/10 p-4 text-xs leading-5 text-jade"><b>Moderation is live:</b> Scores at or above the selected threshold are held for admin review.</div>
+      </>
+    ),
+  };
+
+  return (
+    <form onSubmit={save} className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]">
+      <aside className="panel h-fit p-4">
+        {tabs.map(([id, label, Icon]) => <button type="button" onClick={() => { setTab(id); setError(""); }} className={`dash-side-link ${tab === id ? "dash-side-link-active" : ""}`} key={id}><Icon size={16} />{label}</button>)}
+      </aside>
+      <section className="panel p-6">
+        {panels[tab]}
+        {error && <p className="mt-5 rounded-xl bg-coral/10 px-3 py-2 text-xs font-bold text-coral">{error}</p>}
+        <div className="mt-8 flex flex-wrap justify-end gap-3"><button type="button" onClick={load} className="btn-secondary"><RefreshCw size={14} /> Reload</button><button disabled={saving} className="btn-primary !bg-plum disabled:opacity-50"><Check size={15} /> {saving ? "Saving..." : "Save settings"}</button></div>
+      </section>
+    </form>
+  );
+}
+
+function SettingsPanelHeader({ title, copy }) {
+  return <div><h2 className="text-lg font-extrabold">{title}</h2><p className="mt-1 text-xs text-muted">{copy}</p></div>;
+}
+
+function SettingsDivider() {
+  return <div className="my-7 h-px bg-ink/[0.08]" />;
+}
+
+function SettingsInput({ label, value, onChange, className = "", type = "text", ...props }) {
+  return <label className={`block ${className}`}><span className="mb-1.5 block text-xs font-bold">{label}</span><input required={type === "email"} type={type} className="input" value={value ?? ""} onChange={(event) => onChange(event.target.value)} {...props} /></label>;
+}
+
+function SettingsTextarea({ label, value, onChange, className = "" }) {
+  return <label className={`block ${className}`}><span className="mb-1.5 block text-xs font-bold">{label}</span><textarea className="input min-h-28 resize-y py-3" value={value || ""} onChange={(event) => onChange(event.target.value)} /></label>;
+}
+
+function SettingsToggle({ title, copy, checked, onChange, tone = "default" }) {
+  return <label className={`flex cursor-pointer items-start justify-between gap-5 rounded-2xl border p-4 transition ${tone === "danger" && checked ? "border-coral/25 bg-coral/10" : "border-ink/[0.07] bg-white/35 hover:bg-white/55"}`}><span><b className="block text-xs">{title}</b><small className="text-[10px] leading-4 text-muted">{copy}</small></span><input type="checkbox" checked={Boolean(checked)} onChange={(event) => onChange(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-plum" /></label>;
+}
+
+function IntegrationStatus({ label, status }) {
+  const healthy = status === "connected" || status === "configured";
+  const display = String(status || "not_configured").replace("_", " ");
+  return <div className="rounded-2xl border border-ink/[0.07] bg-white/35 p-4"><span className={`mb-3 block h-2.5 w-2.5 rounded-full ${healthy ? "bg-jade" : "bg-coral"}`} /><b className="block text-xs">{label}</b><small className={`mt-1 block capitalize ${healthy ? "text-jade" : "text-muted"}`}>{display}</small></div>;
 }
 
 function AssessmentEditorModal({ record, onClose, onSubmit }) {

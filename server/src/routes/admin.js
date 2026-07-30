@@ -6,9 +6,121 @@ const { ensureJobSchema } = require("../services/job-schema");
 const { ensureProfileSchema } = require("../services/profile-schema");
 const { ensureCommunitySchema } = require("../services/community-schema");
 const { analyseContent } = require("../services/content-moderation");
+const { getPlatformSettings, savePlatformSettings } = require("../services/platform-settings");
 
 const router = express.Router();
 router.use(authenticate, adminOnly);
+
+const cleanSettingText = (value, fallback, maximum) => {
+  const cleaned = String(value ?? fallback ?? "").trim();
+  return cleaned.slice(0, maximum);
+};
+
+const cleanSettingUrl = (value) => {
+  const cleaned = cleanSettingText(value, "", 500);
+  if (!cleaned) return "";
+  try {
+    const parsed = new URL(cleaned);
+    if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
+    return parsed.toString();
+  } catch {
+    const error = new Error("Integration URLs must use http or https");
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
+function sanitisePlatformSettings(input, current) {
+  const general = { ...current.general, ...(input.general || {}) };
+  const features = { ...current.features, ...(input.features || {}) };
+  const security = { ...current.security, ...(input.security || {}) };
+  const email = { ...current.email, ...(input.email || {}) };
+  const integrations = { ...current.integrations, ...(input.integrations || {}) };
+  const ai = { ...current.ai, ...(input.ai || {}) };
+  const supportEmail = cleanSettingText(general.supportEmail, current.general.supportEmail, 190).toLowerCase();
+  const replyTo = cleanSettingText(email.replyTo, supportEmail, 190).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) {
+    const error = new Error("Enter valid support and reply-to email addresses");
+    error.statusCode = 400;
+    throw error;
+  }
+  const minimumPasswordLength = Math.min(64, Math.max(8, Number(security.minimumPasswordLength) || 8));
+  const sessionHours = Math.min(720, Math.max(1, Number(security.sessionHours) || 168));
+  const moderationThreshold = Math.min(100, Math.max(1, Number(ai.moderationThreshold) || 38));
+  const coverLetterTone = ["Professional", "Concise", "Confident", "Warm"].includes(ai.coverLetterTone)
+    ? ai.coverLetterTone
+    : "Professional";
+
+  return {
+    general: {
+      platformName: cleanSettingText(general.platformName, "CareerForge", 80) || "CareerForge",
+      supportEmail,
+      timezone: cleanSettingText(general.timezone, "Asia/Dhaka", 80) || "Asia/Dhaka",
+      locale: cleanSettingText(general.locale, "English (Bangladesh)", 80) || "English (Bangladesh)",
+    },
+    features: {
+      registrationEnabled: Boolean(features.registrationEnabled),
+      coverLetterEnabled: Boolean(features.coverLetterEnabled),
+      communityPostingEnabled: Boolean(features.communityPostingEnabled),
+      maintenanceMode: Boolean(features.maintenanceMode),
+    },
+    security: {
+      minimumPasswordLength,
+      requireUppercase: Boolean(security.requireUppercase),
+      requireNumber: Boolean(security.requireNumber),
+      sessionHours,
+    },
+    email: {
+      senderName: cleanSettingText(email.senderName, "CareerForge", 120) || "CareerForge",
+      replyTo,
+      welcomeSubject: cleanSettingText(email.welcomeSubject, "Welcome to CareerForge", 200),
+      welcomeBody: cleanSettingText(email.welcomeBody, "", 5000),
+      applicationSubject: cleanSettingText(email.applicationSubject, "Application received", 200),
+      applicationBody: cleanSettingText(email.applicationBody, "", 5000),
+    },
+    integrations: {
+      supportPortalUrl: cleanSettingUrl(integrations.supportPortalUrl),
+      careerPageUrl: cleanSettingUrl(integrations.careerPageUrl),
+      webhookUrl: cleanSettingUrl(integrations.webhookUrl),
+      webhookEnabled: Boolean(integrations.webhookEnabled && integrations.webhookUrl),
+    },
+    ai: {
+      jobRecommendationsEnabled: Boolean(ai.jobRecommendationsEnabled),
+      contentModerationEnabled: Boolean(ai.contentModerationEnabled),
+      moderationThreshold,
+      coverLetterTone,
+    },
+  };
+}
+
+const integrationStatus = () => ({
+  database: "connected",
+  aiService: process.env.AI_SERVICE_URL ? "configured" : "fallback",
+  emailService: process.env.RESEND_API_KEY || process.env.SMTP_HOST ? "configured" : "not_configured",
+});
+
+router.get("/settings", async (_req, res, next) => {
+  try {
+    res.json({
+      settings: await getPlatformSettings({ fresh: true }),
+      integrations: integrationStatus(),
+    });
+  } catch (error) { next(error); }
+});
+
+router.patch("/settings", async (req, res, next) => {
+  try {
+    const current = await getPlatformSettings({ fresh: true });
+    const settings = sanitisePlatformSettings(req.body || {}, current);
+    const saved = await savePlatformSettings(settings, req.user.id);
+    await query(
+      `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata, ip_address)
+       VALUES (?, 'settings.update', 'platform_settings', 'platform', ?, ?)`,
+      [req.user.id, JSON.stringify({ sections: Object.keys(req.body || {}) }), req.ip || null],
+    );
+    res.json({ settings: saved, integrations: integrationStatus(), message: "System settings saved" });
+  } catch (error) { next(error); }
+});
 
 router.get("/stats", async (_req, res, next) => {
   try {

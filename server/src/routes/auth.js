@@ -4,8 +4,25 @@ const jwt = require("jsonwebtoken");
 const { pool, query } = require("../config/db");
 const { authenticate, JWT_SECRET } = require("../middleware/auth");
 const { ensureProfileSchema } = require("../services/profile-schema");
+const { getPlatformSettings } = require("../services/platform-settings");
 
 const router = express.Router();
+
+router.get("/config", async (_req, res, next) => {
+  try {
+    const settings = await getPlatformSettings();
+    res.json({
+      general: settings.general,
+      features: settings.features,
+      security: settings.security,
+      ai: {
+        jobRecommendationsEnabled: settings.ai.jobRecommendationsEnabled,
+        contentModerationEnabled: settings.ai.contentModerationEnabled,
+        coverLetterTone: settings.ai.coverLetterTone,
+      },
+    });
+  } catch (error) { next(error); }
+});
 
 function profileResponse(row) {
   if (!row) return null;
@@ -19,12 +36,24 @@ function profileResponse(row) {
 
 router.post("/register", async (req, res, next) => {
   try {
+    const settings = await getPlatformSettings();
+    if (!settings.features.registrationEnabled) {
+      return res.status(403).json({ error: "New student registration is currently disabled" });
+    }
     const { name, email, password, university } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: "Name, email and password are required" });
     const normalizedEmail = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) return res.status(400).json({ error: "Enter a valid email address" });
     if (name.trim().length < 2) return res.status(400).json({ error: "Name must contain at least 2 characters" });
-    if (password.length < 8) return res.status(400).json({ error: "Password must contain at least 8 characters" });
+    if (password.length < settings.security.minimumPasswordLength) {
+      return res.status(400).json({ error: `Password must contain at least ${settings.security.minimumPasswordLength} characters` });
+    }
+    if (settings.security.requireUppercase && !/[A-Z]/.test(password)) {
+      return res.status(400).json({ error: "Password must contain an uppercase letter" });
+    }
+    if (settings.security.requireNumber && !/\d/.test(password)) {
+      return res.status(400).json({ error: "Password must contain a number" });
+    }
     const existing = await query("SELECT id FROM users WHERE email = ? LIMIT 1", [normalizedEmail]);
     if (existing.length) return res.status(409).json({ error: "An account already exists for this email" });
     const hash = await bcrypt.hash(password, 12);
@@ -42,13 +71,21 @@ router.post("/register", async (req, res, next) => {
 
 router.post("/login", async (req, res, next) => {
   try {
+    const settings = await getPlatformSettings();
     const { email, password, role } = req.body;
     const rows = await query("SELECT id, name, email, password_hash, role, status FROM users WHERE email = ? LIMIT 1", [(email || "").toLowerCase()]);
     const user = rows[0];
     if (!user || !(await bcrypt.compare(password || "", user.password_hash))) return res.status(401).json({ error: "Incorrect email or password" });
     if (user.status !== "active") return res.status(403).json({ error: "This account is not active" });
     if (role && user.role !== role) return res.status(403).json({ error: `Use the ${user.role} sign-in page for this account` });
-    const token = jwt.sign({ id: user.id, name: user.name, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
+    if (user.role === "student" && settings.features.maintenanceMode) {
+      return res.status(503).json({ error: "CareerForge student services are temporarily under maintenance" });
+    }
+    const token = jwt.sign(
+      { id: user.id, name: user.name, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: `${settings.security.sessionHours}h` },
+    );
     await query("UPDATE users SET last_login_at = NOW() WHERE id = ?", [user.id]);
     res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (error) { next(error); }

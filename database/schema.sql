@@ -376,3 +376,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   CONSTRAINT fk_audit_actor FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL,
   INDEX idx_audit_created_at (created_at)
 );
+
+CREATE TABLE IF NOT EXISTS platform_settings (
+  setting_key VARCHAR(80) PRIMARY KEY,
+  setting_value JSON NOT NULL,
+  updated_by BIGINT UNSIGNED NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
