@@ -11,6 +11,7 @@
     "build": "npm run build:web && node scripts/prepare-sites.cjs",
     "build:web": "vite build",
     "test:navigation": "node scripts/navigation-smoke.mjs public && node scripts/navigation-smoke.mjs signup && node scripts/navigation-smoke.mjs login-student && node scripts/navigation-smoke.mjs login-admin && node scripts/navigation-smoke.mjs guard-student && node scripts/navigation-smoke.mjs guard-admin && node scripts/navigation-smoke.mjs student && node scripts/navigation-smoke.mjs brand",
+    "test:student-section": "node scripts/student-section-smoke.mjs",
     "test:runtime": "node scripts/runtime-smoke.mjs",
     "preview": "vite preview",
     "start:api": "node server/src/app.js",

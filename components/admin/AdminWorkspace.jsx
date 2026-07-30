@@ -571,8 +571,10 @@ function StudentDetailView({ student, loading, error, onBack, onRetry }) {
           <section className="panel overflow-hidden">
             <div className="bg-gradient-to-r from-cobalt to-[#6a52a0] p-6 text-white sm:p-8">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                <span className="grid h-20 w-20 shrink-0 place-items-center rounded-[24px] bg-white/15 text-2xl font-extrabold ring-1 ring-white/25">
-                  {String(student.name || "Student").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
+                <span className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-[24px] bg-white/15 text-2xl font-extrabold ring-1 ring-white/25">
+                  {student.avatar_data || student.avatar_url
+                    ? <img src={student.avatar_data || student.avatar_url} alt={`${student.name || "Student"} profile`} className="h-full w-full object-cover" />
+                    : String(student.name || "Student").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
                 </span>
                 <div className="min-w-0 flex-1"><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-white/65">Student profile</span><h2 className="mt-1 text-2xl font-extrabold">{student.name}</h2><p className="mt-1 flex items-center gap-2 text-sm text-white/75"><Mail size={14} /> {student.email}</p></div>
                 <span className={`w-fit rounded-full px-3 py-1.5 text-xs font-extrabold ${student.status === "active" ? "bg-white text-jade" : "bg-coral text-white"}`}>{student.status === "active" ? "Active account" : "Suspended account"}</span>

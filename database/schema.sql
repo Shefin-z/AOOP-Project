@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS student_profiles (
   phone VARCHAR(50) NULL,
   bio TEXT NULL,
   avatar_url VARCHAR(500) NULL,
+  avatar_data LONGTEXT NULL,
   resume_url VARCHAR(500) NULL,
   readiness_score DECIMAL(5,2) NOT NULL DEFAULT 0,
   profile_completion DECIMAL(5,2) NOT NULL DEFAULT 0,

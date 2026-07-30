@@ -3,6 +3,7 @@ const { randomBytes } = require("node:crypto");
 const { pool, query } = require("../config/db");
 const { authenticate, adminOnly } = require("../middleware/auth");
 const { ensureJobSchema } = require("../services/job-schema");
+const { ensureProfileSchema } = require("../services/profile-schema");
 const { ensureCommunitySchema } = require("../services/community-schema");
 const { analyseContent } = require("../services/content-moderation");
 
@@ -560,10 +561,11 @@ router.get("/users", async (req, res, next) => {
 
 router.get("/users/:id", async (req, res, next) => {
   try {
+    await ensureProfileSchema();
     const [student] = await query(
       `SELECT u.id, u.name, u.email, u.status, u.last_login_at, u.created_at, u.updated_at,
               p.university, p.degree, p.graduation_year, p.target_role, p.location,
-              p.phone, p.bio, p.avatar_url, p.readiness_score, p.profile_completion,
+              p.phone, p.bio, p.avatar_url, p.avatar_data, p.readiness_score, p.profile_completion,
               p.updated_at profile_updated_at
        FROM users u LEFT JOIN student_profiles p ON p.user_id=u.id
        WHERE u.id=? AND u.role='student'

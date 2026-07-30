@@ -22,6 +22,7 @@ export default function DashboardShell({
   subtitle,
   actions,
   profileName,
+  profileAvatar,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -110,7 +111,7 @@ export default function DashboardShell({
             </button>
             <div className="relative">
               <button onClick={() => setProfileOpen(!profileOpen)} className="flex h-11 items-center gap-2 rounded-2xl border border-ink/[0.08] bg-white/60 pl-1.5 pr-2.5 transition hover:bg-white">
-                <span className={`grid h-8 w-8 place-items-center rounded-xl text-xs font-extrabold text-white ${role === "admin" ? "bg-plum" : "bg-cobalt"}`}>{name.split(" ").map((x) => x[0]).slice(0, 2).join("")}</span>
+                <span className={`grid h-8 w-8 place-items-center overflow-hidden rounded-xl text-xs font-extrabold text-white ${role === "admin" ? "bg-plum" : "bg-cobalt"}`}>{profileAvatar ? <img src={profileAvatar} alt="" className="h-full w-full object-cover" /> : name.split(" ").map((x) => x[0]).slice(0, 2).join("")}</span>
                 <span className="hidden text-left sm:block">
                   <b className="block max-w-28 truncate text-xs">{name}</b>
                   <small className="block text-[10px] capitalize text-muted">{role}</small>

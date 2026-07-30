@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { pool, query } = require("../config/db");
 const { authenticate, JWT_SECRET } = require("../middleware/auth");
+const { ensureProfileSchema } = require("../services/profile-schema");
 
 const router = express.Router();
 
@@ -55,10 +56,11 @@ router.post("/login", async (req, res, next) => {
 
 router.get("/me", authenticate, async (req, res, next) => {
   try {
+    await ensureProfileSchema();
     const rows = await query(
       `SELECT u.id, u.name, u.email, u.role, u.status, p.university, p.degree, p.graduation_year,
               p.target_role, p.location, p.phone, p.bio, p.readiness_score,
-              p.profile_completion, p.avatar_url, p.updated_at
+              p.profile_completion, p.avatar_url, p.avatar_data, p.updated_at
        FROM users u LEFT JOIN student_profiles p ON p.user_id = u.id WHERE u.id = ?`,
       [req.user.id],
     );
@@ -69,10 +71,11 @@ router.get("/me", authenticate, async (req, res, next) => {
 router.patch("/me", authenticate, async (req, res, next) => {
   let connection;
   try {
-    connection = await pool.getConnection();
     if (req.user.role !== "student") {
       return res.status(403).json({ error: "Student account required" });
     }
+    await ensureProfileSchema();
+    connection = await pool.getConnection();
 
     const name = String(req.body.name || "").trim();
     const email = String(req.body.email || "").trim().toLowerCase();
@@ -86,6 +89,11 @@ router.patch("/me", authenticate, async (req, res, next) => {
     const location = nullableText(req.body.location, 140);
     const graduationValue = String(req.body.graduation_year ?? "").trim();
     const graduationYear = graduationValue ? Number(graduationValue) : null;
+    const avatarProvided = Object.prototype.hasOwnProperty.call(req.body, "avatar_data");
+    const avatarValue = avatarProvided && req.body.avatar_data != null
+      ? String(req.body.avatar_data).trim()
+      : null;
+    const avatarData = avatarValue || null;
 
     if (name.length < 2 || name.length > 120) {
       return res.status(400).json({ error: "Name must contain between 2 and 120 characters" });
@@ -95,6 +103,12 @@ router.patch("/me", authenticate, async (req, res, next) => {
     }
     if (graduationYear != null && (!Number.isInteger(graduationYear) || graduationYear < 1950 || graduationYear > new Date().getFullYear() + 10)) {
       return res.status(400).json({ error: "Enter a valid graduation year" });
+    }
+    if (avatarData && !/^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=\s]+$/i.test(avatarData)) {
+      return res.status(400).json({ error: "Upload a JPG, PNG or WebP profile photo" });
+    }
+    if (avatarData && avatarData.length > 1_400_000) {
+      return res.status(413).json({ error: "Profile photo is too large. Choose a smaller image." });
     }
 
     const completedFields = [name, email, university, degree, graduationYear, targetRole, location]
@@ -116,20 +130,31 @@ router.patch("/me", authenticate, async (req, res, next) => {
     );
     await connection.execute(
       `INSERT INTO student_profiles
-         (user_id, university, degree, graduation_year, target_role, location, profile_completion)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+         (user_id, university, degree, graduation_year, target_role, location, profile_completion, avatar_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          university=VALUES(university), degree=VALUES(degree),
          graduation_year=VALUES(graduation_year), target_role=VALUES(target_role),
-         location=VALUES(location), profile_completion=VALUES(profile_completion)`,
-      [req.user.id, university, degree, graduationYear, targetRole, location, profileCompletion],
+         location=VALUES(location), profile_completion=VALUES(profile_completion),
+         avatar_data=IF(?, VALUES(avatar_data), avatar_data)`,
+      [
+        req.user.id,
+        university,
+        degree,
+        graduationYear,
+        targetRole,
+        location,
+        profileCompletion,
+        avatarData,
+        avatarProvided ? 1 : 0,
+      ],
     );
     await connection.commit();
 
     const [rows] = await connection.execute(
       `SELECT u.id, u.name, u.email, u.role, u.status, p.university, p.degree, p.graduation_year,
               p.target_role, p.location, p.phone, p.bio, p.readiness_score,
-              p.profile_completion, p.avatar_url, p.updated_at
+              p.profile_completion, p.avatar_url, p.avatar_data, p.updated_at
        FROM users u LEFT JOIN student_profiles p ON p.user_id=u.id WHERE u.id=?`,
       [req.user.id],
     );

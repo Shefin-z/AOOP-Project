@@ -21,6 +21,7 @@ async function setupDatabase() {
     const schema = fs.readFileSync(path.join(databaseDir, "schema.sql"), "utf8");
     const seed = fs.readFileSync(path.join(databaseDir, "seed.sql"), "utf8");
     await connection.query(schema);
+    await connection.query("ALTER TABLE student_profiles ADD COLUMN IF NOT EXISTS avatar_data LONGTEXT NULL AFTER avatar_url");
     await connection.query(seed);
     console.log("CareerForge database schema and reference data are ready.");
   } finally {

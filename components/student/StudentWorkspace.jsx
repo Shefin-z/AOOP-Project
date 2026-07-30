@@ -93,6 +93,8 @@ const pageMeta = {
   profile: ["Profile & preferences", "Keep your career signal accurate and your experience personal."],
 };
 
+const studentSectionIds = new Set(Object.keys(pageMeta));
+
 const getInitials = (name) => String(name || "Student")
   .split(/\s+/)
   .filter(Boolean)
@@ -113,6 +115,61 @@ function readStudentUser() {
     }
   } catch {}
   return { name: "Student", email: "", role: "student" };
+}
+
+const getStudentSectionStorageKey = (user) => {
+  const owner = String(user?.id || user?.email || "student").trim().toLowerCase();
+  return `careerforge_student_section_${owner}`;
+};
+
+function readStudentSection() {
+  try {
+    const user = readStudentUser();
+    const saved = localStorage.getItem(getStudentSectionStorageKey(user));
+    if (studentSectionIds.has(saved)) return saved;
+  } catch {}
+  return "overview";
+}
+
+function prepareProfilePhoto(file) {
+  return new Promise((resolve, reject) => {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file?.type)) {
+      reject(new Error("Choose a JPG, PNG or WebP photo."));
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      reject(new Error("Choose a photo smaller than 8 MB."));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("The selected photo could not be read."));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("The selected file is not a valid image."));
+      image.onload = () => {
+        const maximumSide = 640;
+        const scale = Math.min(1, maximumSide / Math.max(image.naturalWidth, image.naturalHeight));
+        const width = Math.max(1, Math.round(image.naturalWidth * scale));
+        const height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        context.fillStyle = "#f7f4ee";
+        context.fillRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+        const data = canvas.toDataURL("image/jpeg", 0.84);
+        if (data.length > 1_400_000) {
+          reject(new Error("The compressed photo is still too large. Choose another image."));
+          return;
+        }
+        resolve(data);
+      };
+      image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 const createCvData = (user) => ({
@@ -202,7 +259,7 @@ const normalizeApplication = (application, index = 0) => ({
 export default function StudentWorkspace() {
   const [currentUser, setCurrentUser] = useState(readStudentUser);
   const firstName = currentUser.name.split(/\s+/)[0];
-  const [active, setActive] = useState("overview");
+  const [active, setActive] = useState(readStudentSection);
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null);
   const [applications, setApplications] = useState([]);
@@ -227,6 +284,11 @@ export default function StudentWorkspace() {
   useEffect(() => {
     localStorage.setItem(getCvStorageKey(currentUser), JSON.stringify(cvData));
   }, [cvData, currentUser]);
+
+  useEffect(() => {
+    if (!studentSectionIds.has(active)) return;
+    localStorage.setItem(getStudentSectionStorageKey(currentUser), active);
+  }, [active, currentUser.id, currentUser.email]);
 
   useEffect(() => {
     let cancelled = false;
@@ -359,6 +421,7 @@ export default function StudentWorkspace() {
           graduation_year: profile.graduation,
           target_role: profile.target,
           location: profile.location,
+          avatar_data: profile.avatar,
         }),
       });
       localStorage.setItem("careerforge_session", JSON.stringify(nextUser));
@@ -489,6 +552,7 @@ export default function StudentWorkspace() {
       <DashboardShell
         role="student"
         profileName={currentUser.name}
+        profileAvatar={currentUser.avatar_data || currentUser.avatar_url}
         navItems={studentNavItems}
         active={active}
         onNavigate={setActive}
@@ -1266,9 +1330,10 @@ function AchievementsPage() {
   );
 }
 
-function ProfilePage({ user, onSave }) {
-  const [avatar, setAvatar] = useState(null);
+function ProfilePage({ user, onSave, notify }) {
+  const [avatar, setAvatar] = useState(user.avatar_data || user.avatar_url || null);
   const [saving, setSaving] = useState(false);
+  const [photoLoading, setPhotoLoading] = useState(false);
   const [form, setForm] = useState({
     name: user.name,
     email: user.email || "",
@@ -1279,6 +1344,7 @@ function ProfilePage({ user, onSave }) {
     location: user.location || "",
   });
   useEffect(() => {
+    setAvatar(user.avatar_data || user.avatar_url || null);
     setForm({
       name: user.name || "",
       email: user.email || "",
@@ -1288,24 +1354,37 @@ function ProfilePage({ user, onSave }) {
       target: user.target_role || "",
       location: user.location || "",
     });
-  }, [user.name, user.email, user.university, user.degree, user.graduation_year, user.target_role, user.location]);
+  }, [user.name, user.email, user.university, user.degree, user.graduation_year, user.target_role, user.location, user.avatar_data, user.avatar_url]);
+  const choosePhoto = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setPhotoLoading(true);
+    try {
+      setAvatar(await prepareProfilePhoto(file));
+    } catch (error) {
+      notify(error.message);
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
   const submit = async () => {
-    if (saving) return;
+    if (saving || photoLoading) return;
     setSaving(true);
-    await onSave(form);
+    await onSave({ ...form, avatar });
     setSaving(false);
   };
   return (
     <div className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]">
       <aside className="space-y-5">
-        <div className="panel p-6 text-center"><label className="group relative mx-auto block h-28 w-28 cursor-pointer overflow-hidden rounded-[32px] bg-cobalt text-white shadow-lift">{avatar ? <img src={avatar} alt="Profile" className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-3xl font-extrabold">{getInitials(form.name)}</span>}<span className="absolute inset-0 grid place-items-center bg-ink/50 opacity-0 transition group-hover:opacity-100"><Camera size={22} /></span><input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setAvatar(URL.createObjectURL(file)); }} /></label><h2 className="mt-4 text-xl font-extrabold">{form.name || "Student"}</h2><p className="mt-1 text-xs text-muted">{form.degree || form.email}</p><span className="tag mt-4 !text-jade"><CheckCircle2 size={12} /> Authenticated student</span></div>
+        <div className="panel p-6 text-center"><label className={`group relative mx-auto block h-28 w-28 overflow-hidden rounded-[32px] bg-cobalt text-white shadow-lift ${photoLoading ? "cursor-wait opacity-70" : "cursor-pointer"}`}>{avatar ? <img src={avatar} alt={`${form.name || "Student"} profile`} className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-3xl font-extrabold">{getInitials(form.name)}</span>}<span className="absolute inset-0 grid place-items-center bg-ink/50 opacity-0 transition group-hover:opacity-100">{photoLoading ? <RefreshCw className="animate-spin" size={22} /> : <Camera size={22} />}</span><input disabled={photoLoading} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={choosePhoto} /></label><h2 className="mt-4 text-xl font-extrabold">{form.name || "Student"}</h2><p className="mt-1 text-xs text-muted">{form.degree || form.email}</p><p className="mt-2 text-[10px] text-muted">{photoLoading ? "Optimizing photo..." : "Click the photo to upload JPG, PNG or WebP"}</p><span className="tag mt-4 !text-jade"><CheckCircle2 size={12} /> Authenticated student</span></div>
         <div className="panel p-5"><h3 className="text-sm font-extrabold">Visibility</h3><div className="mt-4 space-y-3">{[["Open to opportunities", true], ["Show profile in community", true], ["Weekly progress email", false]].map(([label, enabled]) => <label key={label} className="flex items-center justify-between text-xs font-semibold"><span>{label}</span><input type="checkbox" defaultChecked={enabled} className="h-4 w-4 accent-cobalt" /></label>)}</div></div>
       </aside>
       <section className="panel p-6">
         <div className="mb-6 flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Personal & career details</h2><p className="text-xs text-muted">Used to personalize recommendations.</p></div><Pencil size={17} className="text-muted" /></div>
         <div className="grid gap-4 sm:grid-cols-2">{[["Full name", "name"], ["Email address", "email"], ["University", "university"], ["Degree", "degree"], ["Graduation year", "graduation"], ["Target role", "target"], ["Location", "location"]].map(([label, key]) => <label key={key} className="block"><span className="mb-1.5 block text-xs font-bold">{label}</span><input type={key === "email" ? "email" : key === "graduation" ? "number" : "text"} min={key === "graduation" ? "1950" : undefined} max={key === "graduation" ? String(new Date().getFullYear() + 10) : undefined} value={form[key]} onChange={(e) => setForm((current) => ({ ...current, [key]: e.target.value }))} className="input" /></label>)}</div>
         <div className="mt-6"><span className="mb-2 block text-xs font-bold">Career interests</span><div className="flex flex-wrap gap-2">{["Product", "Data & Analytics", "Technology", "Research"].map((item) => <span className="tag !bg-cobalt/10 !text-cobalt" key={item}>{item}<X size={11} /></span>)}<button className="tag"><Plus size={11} /> Add</button></div></div>
-        <div className="mt-8 flex justify-end"><button disabled={saving} onClick={submit} className="btn-accent disabled:cursor-not-allowed disabled:opacity-60"><Check size={16} /> {saving ? "Saving..." : "Save changes"}</button></div>
+        <div className="mt-8 flex justify-end"><button disabled={saving || photoLoading} onClick={submit} className="btn-accent disabled:cursor-not-allowed disabled:opacity-60"><Check size={16} /> {saving ? "Saving..." : photoLoading ? "Preparing photo..." : "Save changes"}</button></div>
       </section>
     </div>
   );
