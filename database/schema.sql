@@ -238,11 +238,21 @@ CREATE TABLE IF NOT EXISTS community_posts (
 );
 
 ALTER TABLE community_posts
-  ADD COLUMN IF NOT EXISTS link_url VARCHAR(500) NULL AFTER media_url,
-  ADD COLUMN IF NOT EXISTS risk_score TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER status,
-  ADD COLUMN IF NOT EXISTS risk_label ENUM('safe', 'spam', 'fraud', 'suspicious') NOT NULL DEFAULT 'safe' AFTER risk_score,
-  ADD COLUMN IF NOT EXISTS risk_reasons JSON NULL AFTER risk_label,
-  ADD COLUMN IF NOT EXISTS reviewed_by BIGINT UNSIGNED NULL AFTER risk_reasons,
+  ADD COLUMN IF NOT EXISTS link_url VARCHAR(500) NULL AFTER media_url;
+
+ALTER TABLE community_posts
+  ADD COLUMN IF NOT EXISTS risk_score TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER status;
+
+ALTER TABLE community_posts
+  ADD COLUMN IF NOT EXISTS risk_label ENUM('safe', 'spam', 'fraud', 'suspicious') NOT NULL DEFAULT 'safe' AFTER risk_score;
+
+ALTER TABLE community_posts
+  ADD COLUMN IF NOT EXISTS risk_reasons JSON NULL AFTER risk_label;
+
+ALTER TABLE community_posts
+  ADD COLUMN IF NOT EXISTS reviewed_by BIGINT UNSIGNED NULL AFTER risk_reasons;
+
+ALTER TABLE community_posts
   ADD COLUMN IF NOT EXISTS reviewed_at DATETIME NULL AFTER reviewed_by;
 
 CREATE TABLE IF NOT EXISTS comments (
