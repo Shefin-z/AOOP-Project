@@ -7,7 +7,7 @@ CareerForge is a full-stack AI career-development platform for university studen
 - Frontend: React 19, Vite 7, Tailwind CSS, Lucide icons
 - Backend: Node.js, Express, JWT authentication, bcrypt, MySQL2
 - Data: MySQL 8.4 with normalized schema and seed data
-- AI service: Python 3.12+, FastAPI, explainable job matching, career-readiness scoring, skill-gap analytics, and cover-letter generation
+- AI: Gemini API adaptive skill assessments plus Python 3.12+/FastAPI job matching, career-readiness scoring, skill-gap analytics, and cover-letter generation
 - Delivery: Docker Compose and ChatGPT Sites configuration
 
 ## Included experiences
@@ -49,6 +49,23 @@ python -m uvicorn main:app --app-dir ai-service --reload --port 8000
 
 MySQL must be available using the connection settings in `.env`.
 
+## Gemini adaptive skill assessments
+
+Student skill journeys contain 10 progressively harder levels with 6 personalized
+questions per level. Before starting, students must save their university, degree,
+graduation year, target role, location and at least one career interest. Only the
+degree, target role and career interests are sent to Gemini; account identity and
+contact details are not included in the generation prompt.
+
+Add the API key only to the server environment:
+
+```bash
+GEMINI_API_KEY=your-private-key
+GEMINI_MODEL=gemini-3.6-flash
+```
+
+Never use a `VITE_` prefix for this key or commit it to the repository.
+
 ## Authentication setup
 
 No account credentials are committed or prefilled. Students create an account and
@@ -83,6 +100,8 @@ as the frontend.
 
 ```bash
 npm run build
+npm run test:adaptive-assessment
+npm run test:adaptive-ui
 npm audit --omit=dev
 node --check server/src/app.js
 python -m py_compile ai-service/main.py

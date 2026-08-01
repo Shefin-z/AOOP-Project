@@ -278,6 +278,9 @@ export default function StudentWorkspace() {
   const [assessmentRecords, setAssessmentRecords] = useState([]);
   const [assessmentLoading, setAssessmentLoading] = useState(true);
   const [assessmentError, setAssessmentError] = useState("");
+  const [adaptiveAssessment, setAdaptiveAssessment] = useState(null);
+  const [adaptiveLoading, setAdaptiveLoading] = useState(true);
+  const [adaptiveError, setAdaptiveError] = useState("");
   const [platformConfig, setPlatformConfig] = useState({
     features: { coverLetterEnabled: true },
     ai: { coverLetterTone: "Professional" },
@@ -344,6 +347,22 @@ export default function StudentWorkspace() {
 
   useEffect(() => {
     loadAssessments();
+  }, []);
+
+  const loadAdaptiveAssessment = async () => {
+    setAdaptiveLoading(true);
+    setAdaptiveError("");
+    try {
+      setAdaptiveAssessment(await apiRequest("/adaptive-assessment/overview"));
+    } catch (error) {
+      setAdaptiveError(error.message);
+    } finally {
+      setAdaptiveLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAdaptiveAssessment();
   }, []);
 
   const loadJobData = async ({ silent = false } = {}) => {
@@ -436,6 +455,7 @@ export default function StudentWorkspace() {
           degree: profile.degree,
           graduation_year: profile.graduation,
           target_role: profile.target,
+          career_interests: profile.interests,
           location: profile.location,
           avatar_data: profile.avatar,
         }),
@@ -448,11 +468,31 @@ export default function StudentWorkspace() {
         email: nextUser.email || current.email,
         location: nextUser.location || current.location,
       }));
+      await loadAdaptiveAssessment();
       notify("Profile changes saved.");
       return true;
     } catch (error) {
       notify(error.message);
       return false;
+    }
+  };
+
+  const startAdaptiveAssessment = async () => {
+    if (!adaptiveAssessment?.profileReady) {
+      setActive("profile");
+      notify(`Complete your required career details first${adaptiveAssessment?.missingFields?.length ? `: ${adaptiveAssessment.missingFields.join(", ")}` : "."}`);
+      return;
+    }
+    setModal({ type: "adaptive-loading", level: adaptiveAssessment.program.currentLevel });
+    try {
+      const result = await apiRequest("/adaptive-assessment/start", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setModal({ type: "adaptive-quiz", attempt: result.attempt });
+    } catch (error) {
+      setModal(null);
+      notify(error.message);
     }
   };
 
@@ -594,7 +634,21 @@ export default function StudentWorkspace() {
         )}
         {active === "applications" && <ApplicationsPage applications={applications} loading={jobsLoading} error={jobsError} onRetry={loadJobData} onWithdraw={withdrawJobApplication} />}
         {active === "vault" && <CareerVault notify={notify} photo={cvPhoto} setPhoto={setCvPhoto} data={cvData} setData={setCvData} />}
-        {active === "assessments" && <AssessmentsPage assessments={assessmentRecords} loading={assessmentLoading} error={assessmentError} onRetry={loadAssessments} onStart={startAssessment} />}
+        {active === "assessments" && (
+          <AssessmentsPage
+            assessments={assessmentRecords}
+            loading={assessmentLoading}
+            error={assessmentError}
+            onRetry={loadAssessments}
+            onStart={startAssessment}
+            adaptive={adaptiveAssessment}
+            adaptiveLoading={adaptiveLoading}
+            adaptiveError={adaptiveError}
+            onRetryAdaptive={loadAdaptiveAssessment}
+            onStartAdaptive={startAdaptiveAssessment}
+            onCompleteProfile={() => setActive("profile")}
+          />
+        )}
         {active === "analytics" && <AnalyticsPage notify={notify} />}
         {active === "learning" && <LearningPage notify={notify} />}
         {active === "community" && <CommunityPage posts={posts} setPosts={setPosts} loading={communityLoading} error={communityError} onRetry={loadCommunity} notify={notify} viewer={currentUser} onNewPost={() => setModal({ type: "post" })} postingStatus={postingStatus} />}
@@ -623,6 +677,17 @@ export default function StudentWorkspace() {
         />
       )}
       {modal?.type === "quiz-loading" && <QuizLoadingModal assessment={modal.assessment} onClose={() => setModal(null)} />}
+      {modal?.type === "adaptive-loading" && <AdaptiveLoadingModal level={modal.level} onClose={() => setModal(null)} />}
+      {modal?.type === "adaptive-quiz" && (
+        <AdaptiveQuizModal
+          attempt={modal.attempt}
+          onClose={() => setModal(null)}
+          onFinished={async () => {
+            await loadAdaptiveAssessment();
+          }}
+          notify={notify}
+        />
+      )}
       {modal?.type === "post" && <CommunityPostModal user={currentUser} onClose={() => setModal(null)} onSubmit={publishCommunityPost} />}
     </>
   );
@@ -1172,7 +1237,113 @@ function ResumeEntry({ title, place, date, points }) {
   return <div className="mb-5 last:mb-0"><div className="flex justify-between gap-4"><div><b className="block text-xs">{title}</b><small className="text-[10px] text-muted">{place}</small></div><small className="shrink-0 text-[9px] font-bold text-muted">{date}</small></div><ul className="mt-2 space-y-1.5">{points.map((point) => <li className="flex gap-2 text-[10px] leading-4 text-muted" key={point}><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-cobalt" />{point}</li>)}</ul></div>;
 }
 
-function AssessmentsPage({ assessments, loading, error, onRetry, onStart }) {
+function AssessmentsPage({
+  assessments,
+  loading,
+  error,
+  onRetry,
+  onStart,
+  adaptive,
+  adaptiveLoading,
+  adaptiveError,
+  onRetryAdaptive,
+  onStartAdaptive,
+  onCompleteProfile,
+}) {
+  const [category, setCategory] = useState("All");
+  const categories = ["All", ...new Set(assessments.map((item) => item.category))];
+  const list = category === "All" ? assessments : assessments.filter((item) => item.category === category);
+  const colors = ["bg-cobalt", "bg-jade", "bg-coral", "bg-plum", "bg-ink", "bg-[#A57945]"];
+  const program = adaptive?.program;
+  const currentLevel = program?.currentLevel || 1;
+  const accuracy = program?.totalQuestions ? Math.round((program.totalCorrect / program.totalQuestions) * 100) : 0;
+  const fallbackLevels = Array.from({ length: 10 }, (_, index) => ({
+    level: index + 1,
+    label: `Level ${index + 1}`,
+    difficulty: index < 3 ? "Easy" : index < 7 ? "Intermediate" : "Hard",
+    state: index === 0 ? "unlocked" : "locked",
+  }));
+
+  return (
+    <div className="space-y-5">
+      <section className="panel overflow-hidden bg-ink text-white">
+        <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <span className="eyebrow !text-[#AFC0FF]"><Sparkles size={13} /> Gemini adaptive journey</span>
+            <h2 className="mt-3 text-3xl font-extrabold tracking-[-0.045em]">
+              {program?.status === "completed" ? "All 10 levels completed." : `Level ${currentLevel}: ${program?.levels?.[currentLevel - 1]?.label || "Foundation"}`}
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/60">
+              Six fresh questions are generated from your degree, target role and career interests. Score at least 4/6 to unlock the next level.
+            </p>
+            {adaptiveLoading ? (
+              <p className="mt-5 flex items-center gap-2 text-xs font-bold text-white/70"><RefreshCw className="animate-spin" size={14} /> Loading your assessment path...</p>
+            ) : adaptiveError ? (
+              <div className="mt-5 flex flex-wrap items-center gap-3"><span className="text-xs font-bold text-coral">{adaptiveError}</span><button onClick={onRetryAdaptive} className="btn-secondary min-h-9 !border-white/15 !bg-white/10 !text-white"><RefreshCw size={14} /> Retry</button></div>
+            ) : !adaptive?.profileReady ? (
+              <div className="mt-5">
+                <p className="text-xs font-bold text-[#FFD1C5]">Required first: {(adaptive?.missingFields || []).join(", ") || "personal and career details"}</p>
+                <button onClick={onCompleteProfile} className="btn-accent mt-3 !bg-white !text-ink">Complete career profile <ArrowRight size={15} /></button>
+              </div>
+            ) : !adaptive?.aiConfigured ? (
+              <div className="mt-5 rounded-2xl border border-coral/30 bg-coral/10 p-4 text-xs leading-5 text-[#FFD1C5]">The feature is implemented, but the server needs a private <b>GEMINI_API_KEY</b> environment variable before it can generate real questions.</div>
+            ) : program?.status === "completed" ? (
+              <div className="mt-5 inline-flex items-center gap-2 rounded-xl bg-jade/15 px-4 py-3 text-xs font-bold text-[#BEE8D5]"><Trophy size={16} /> Expert journey completed</div>
+            ) : (
+              <button onClick={onStartAdaptive} className="btn-accent mt-5 !bg-white !text-ink">
+                {adaptive?.activeAttempt ? "Resume current level" : `Generate level ${currentLevel}`} <ArrowRight size={16} />
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-3 lg:w-80">
+            <div className="rounded-2xl bg-white/10 p-4"><b className="block text-2xl">{program?.highestLevelCompleted || 0}/10</b><small className="text-[10px] font-bold uppercase tracking-wider text-white/50">Levels</small></div>
+            <div className="rounded-2xl bg-white/10 p-4"><b className="block text-2xl">{accuracy}%</b><small className="text-[10px] font-bold uppercase tracking-wider text-white/50">Accuracy</small></div>
+            <div className="rounded-2xl bg-white/10 p-4"><b className="block text-2xl">12m</b><small className="text-[10px] font-bold uppercase tracking-wider text-white/50">Per level</small></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel p-6">
+        <div className="flex flex-wrap items-end justify-between gap-3"><div><span className="eyebrow"><Target size={13} /> Progressive difficulty</span><h2 className="mt-2 text-xl font-extrabold">Your 10-level skill map</h2></div><p className="text-xs font-semibold text-muted">60 questions total · pass 4 of 6 per level</p></div>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {(program?.levels || fallbackLevels).map((level) => (
+            <article key={level.level} className={`rounded-[22px] border p-4 transition ${level.state === "completed" ? "border-jade/25 bg-jade/10" : level.state === "unlocked" ? "border-cobalt/30 bg-cobalt/10 shadow-lift" : "border-ink/[0.07] bg-white/35 opacity-65"}`}>
+              <div className="flex items-center justify-between"><span className={`grid h-9 w-9 place-items-center rounded-xl text-xs font-extrabold text-white ${level.state === "completed" ? "bg-jade" : level.state === "unlocked" ? "bg-cobalt" : "bg-muted"}`}>{level.state === "completed" ? <Check size={15} /> : level.level}</span>{level.state === "locked" ? <ShieldCheck size={15} className="text-muted" /> : level.state === "unlocked" ? <Zap size={15} className="text-cobalt" /> : <Trophy size={15} className="text-jade" />}</div>
+              <h3 className="mt-4 text-sm font-extrabold">{level.label}</h3>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted">{level.difficulty}</p>
+              <p className="mt-3 text-[10px] leading-4 text-muted">6 questions · pass 4</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-extrabold">Administrator assessments</h2><p className="text-xs text-muted">Optional published question banks from CareerForge administrators.</p></div>{loading && <RefreshCw className="animate-spin text-cobalt" size={18} />}</div>
+        {error ? (
+          <div className="mt-5 rounded-2xl bg-coral/10 p-4"><p className="text-xs font-bold text-coral">{error}</p><button onClick={onRetry} className="btn-secondary mt-3 min-h-9"><RefreshCw size={14} /> Try again</button></div>
+        ) : !loading && !assessments.length ? (
+          <div className="mt-5 rounded-2xl border border-dashed border-ink/10 p-6 text-center"><ListChecks className="mx-auto text-muted" size={26} /><p className="mt-3 text-xs font-bold text-muted">No administrator assessment is published. Your Gemini journey above is still available.</p></div>
+        ) : (
+          <>
+            <div className="mt-5 flex flex-wrap gap-2">{categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`min-h-9 rounded-xl px-3 text-xs font-bold transition ${category === item ? "bg-ink text-white" : "border border-ink/[0.07] bg-white/60 text-muted"}`}>{item}</button>)}</div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {list.map((assessment, index) => (
+                <article key={assessment.id} className="rounded-[22px] border border-ink/[0.07] bg-white/40 p-5">
+                  <div className="flex items-start justify-between"><span className={`grid h-11 w-11 place-items-center rounded-2xl text-white ${colors[index % colors.length]}`}><Code2 size={19} /></span>{assessment.best_score != null ? <span className="tag !text-jade"><CheckCircle2 size={12} /> {Math.round(Number(assessment.best_score))}% best</span> : <span className="tag">{assessment.difficulty}</span>}</div>
+                  <h3 className="mt-5 text-base font-extrabold">{assessment.title}</h3><p className="mt-1 text-xs text-muted">{assessment.category}</p>
+                  <div className="mt-4 flex gap-4 text-[11px] text-muted"><span><CircleHelp className="mr-1 inline" size={12} />{assessment.question_count} questions</span><span><Clock3 className="mr-1 inline" size={12} />{assessment.time_limit_minutes} min</span></div>
+                  <button onClick={() => onStart(assessment)} className={`mt-5 w-full ${assessment.best_score != null ? "btn-secondary" : "btn-primary"}`}>{assessment.best_score != null ? "Retake assessment" : "Start assessment"} <ArrowRight size={15} /></button>
+                </article>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function LegacyAssessmentsPage({ assessments, loading, error, onRetry, onStart }) {
   const [category, setCategory] = useState("All");
   const list = category === "All" ? assessments : assessments.filter((item) => item.category === category);
   const categories = ["All", ...new Set(assessments.map((item) => item.category))];
@@ -1350,6 +1521,7 @@ function ProfilePage({ user, onSave, notify }) {
   const [avatar, setAvatar] = useState(user.avatar_data || user.avatar_url || null);
   const [saving, setSaving] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
+  const [interestInput, setInterestInput] = useState("");
   const [form, setForm] = useState({
     name: user.name,
     email: user.email || "",
@@ -1358,6 +1530,7 @@ function ProfilePage({ user, onSave, notify }) {
     graduation: user.graduation_year || "",
     target: user.target_role || "",
     location: user.location || "",
+    interests: Array.isArray(user.career_interests) ? user.career_interests : [],
   });
   useEffect(() => {
     setAvatar(user.avatar_data || user.avatar_url || null);
@@ -1369,8 +1542,9 @@ function ProfilePage({ user, onSave, notify }) {
       graduation: user.graduation_year || "",
       target: user.target_role || "",
       location: user.location || "",
+      interests: Array.isArray(user.career_interests) ? user.career_interests : [],
     });
-  }, [user.name, user.email, user.university, user.degree, user.graduation_year, user.target_role, user.location, user.avatar_data, user.avatar_url]);
+  }, [user.name, user.email, user.university, user.degree, user.graduation_year, user.target_role, user.location, user.career_interests, user.avatar_data, user.avatar_url]);
   const choosePhoto = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -1386,10 +1560,40 @@ function ProfilePage({ user, onSave, notify }) {
   };
   const submit = async () => {
     if (saving || photoLoading) return;
+    const missing = [
+      ["University", form.university],
+      ["Degree", form.degree],
+      ["Graduation year", form.graduation],
+      ["Target role", form.target],
+      ["Location", form.location],
+      ["Career interests", form.interests.length],
+    ].filter(([, value]) => !String(value || "").trim()).map(([label]) => label);
+    if (missing.length) {
+      notify(`Complete these required fields: ${missing.join(", ")}`);
+      return;
+    }
     setSaving(true);
     await onSave({ ...form, avatar });
     setSaving(false);
   };
+  const addInterest = () => {
+    const value = interestInput.trim().replace(/\s+/g, " ");
+    if (value.length < 2) return;
+    if (form.interests.some((interest) => interest.toLowerCase() === value.toLowerCase())) {
+      notify("That career interest is already added.");
+      return;
+    }
+    if (form.interests.length >= 8) {
+      notify("You can add up to 8 career interests.");
+      return;
+    }
+    setForm((current) => ({ ...current, interests: [...current.interests, value.slice(0, 60)] }));
+    setInterestInput("");
+  };
+  const removeInterest = (interest) => setForm((current) => ({
+    ...current,
+    interests: current.interests.filter((item) => item !== interest),
+  }));
   return (
     <div className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]">
       <aside className="space-y-5">
@@ -1398,8 +1602,31 @@ function ProfilePage({ user, onSave, notify }) {
       </aside>
       <section className="panel p-6">
         <div className="mb-6 flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Personal & career details</h2><p className="text-xs text-muted">Used to personalize recommendations.</p></div><Pencil size={17} className="text-muted" /></div>
-        <div className="grid gap-4 sm:grid-cols-2">{[["Full name", "name"], ["Email address", "email"], ["University", "university"], ["Degree", "degree"], ["Graduation year", "graduation"], ["Target role", "target"], ["Location", "location"]].map(([label, key]) => <label key={key} className="block"><span className="mb-1.5 block text-xs font-bold">{label}</span><input type={key === "email" ? "email" : key === "graduation" ? "number" : "text"} min={key === "graduation" ? "1950" : undefined} max={key === "graduation" ? String(new Date().getFullYear() + 10) : undefined} value={form[key]} onChange={(e) => setForm((current) => ({ ...current, [key]: e.target.value }))} className="input" /></label>)}</div>
-        <div className="mt-6"><span className="mb-2 block text-xs font-bold">Career interests</span><div className="flex flex-wrap gap-2">{["Product", "Data & Analytics", "Technology", "Research"].map((item) => <span className="tag !bg-cobalt/10 !text-cobalt" key={item}>{item}<X size={11} /></span>)}<button className="tag"><Plus size={11} /> Add</button></div></div>
+        <div className="grid gap-4 sm:grid-cols-2">{[["Full name", "name", false], ["Email address", "email", false], ["University", "university", true], ["Degree", "degree", true], ["Graduation year", "graduation", true], ["Target role", "target", true], ["Location", "location", true]].map(([label, key, required]) => <label key={key} className="block"><span className="mb-1.5 block text-xs font-bold">{label}{required && <span className="ml-1 text-coral">*</span>}</span><input required={required} type={key === "email" ? "email" : key === "graduation" ? "number" : "text"} min={key === "graduation" ? "1950" : undefined} max={key === "graduation" ? String(new Date().getFullYear() + 10) : undefined} value={form[key]} onChange={(e) => setForm((current) => ({ ...current, [key]: e.target.value }))} className="input" placeholder={key === "target" ? "e.g. Backend Software Engineer" : undefined} /></label>)}</div>
+        <div className="mt-6">
+          <span className="mb-2 block text-xs font-bold">Career interests<span className="ml-1 text-coral">*</span></span>
+          <p className="mb-3 text-[10px] leading-4 text-muted">These interests, your degree and target role personalize every AI assessment level.</p>
+          <div className="flex flex-wrap gap-2">
+            {form.interests.map((item) => <button type="button" onClick={() => removeInterest(item)} className="tag !bg-cobalt/10 !text-cobalt" key={item}>{item}<X size={11} /></button>)}
+          </div>
+          <div className="mt-3 flex max-w-xl gap-2">
+            <input
+              className="input"
+              value={interestInput}
+              maxLength={60}
+              onChange={(event) => setInterestInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addInterest();
+                }
+              }}
+              placeholder="e.g. Backend Engineering"
+            />
+            <button type="button" onClick={addInterest} className="btn-secondary shrink-0"><Plus size={14} /> Add</button>
+          </div>
+          {!form.interests.length && <p className="mt-2 text-[10px] font-bold text-coral">Add at least one career interest to unlock skill assessments.</p>}
+        </div>
         <div className="mt-8 flex justify-end"><button disabled={saving || photoLoading} onClick={submit} className="btn-accent disabled:cursor-not-allowed disabled:opacity-60"><Check size={16} /> {saving ? "Saving..." : photoLoading ? "Preparing photo..." : "Save changes"}</button></div>
       </section>
     </div>
@@ -1477,6 +1704,118 @@ function ApplyModal({ job, user, resumeName, coverLetterEnabled, coverLetterTone
 
 function QuizLoadingModal({ assessment, onClose }) {
   return <div className="modal-backdrop"><div className="modal-card max-w-lg text-center"><RefreshCw className="mx-auto animate-spin text-cobalt" size={30} /><h2 className="mt-4 text-lg font-extrabold">Preparing {assessment.title}</h2><p className="mt-1 text-xs text-muted">Loading the latest published questions...</p><button onClick={onClose} className="btn-secondary mt-6">Cancel</button></div></div>;
+}
+
+function AdaptiveLoadingModal({ level }) {
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-card max-w-lg text-center">
+        <span className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] bg-cobalt text-white shadow-lift"><Sparkles className="animate-pulse" size={27} /></span>
+        <h2 className="mt-5 text-xl font-extrabold">Generating level {level}</h2>
+        <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-muted">Gemini is creating six unique questions from your degree, target role and career interests. This can take a few seconds.</p>
+        <p className="mt-6 text-[10px] font-bold uppercase tracking-wider text-muted">Please keep this window open</p>
+      </div>
+    </div>
+  );
+}
+
+function AdaptiveQuizModal({ attempt, onClose, onFinished, notify }) {
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
+  const initialSeconds = Math.max(0, Math.ceil((new Date(attempt.expiresAt).getTime() - Date.now()) / 1000));
+  const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
+  const questions = attempt.questions || [];
+  const question = questions[index];
+  const answeredCount = Object.keys(answers).length;
+
+  const submit = async () => {
+    if (submitting || result) return;
+    setSubmitting(true);
+    try {
+      const response = await apiRequest(`/adaptive-assessment/attempts/${attempt.id}/submit`, {
+        method: "POST",
+        body: JSON.stringify({
+          answers: questions.map((item) => ({
+            questionId: item.id,
+            optionIndex: Object.prototype.hasOwnProperty.call(answers, item.id) ? answers[item.id] : null,
+          })),
+        }),
+      });
+      setResult(response.result);
+      await onFinished();
+    } catch (error) {
+      notify(error.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (result || submitting) return undefined;
+    const timer = window.setInterval(() => setSecondsLeft((current) => Math.max(0, current - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [result, submitting]);
+
+  useEffect(() => {
+    if (secondsLeft === 0 && !result && !submitting) submit();
+  }, [secondsLeft, result, submitting]);
+
+  if (result) {
+    return (
+      <div className="modal-backdrop">
+        <div className="modal-card max-h-[92vh] max-w-4xl overflow-y-auto">
+          <div className="text-center">
+            <span className={`mx-auto grid h-20 w-20 place-items-center rounded-full text-white shadow-lift ${result.passed ? "bg-jade" : "bg-coral"}`}>{result.passed ? <Trophy size={32} /> : <Target size={32} />}</span>
+            <span className="eyebrow mt-5">Level {result.level} complete</span>
+            <h2 className="mt-2 font-display text-5xl">{result.correctCount}/6</h2>
+            <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted">{result.passed ? (result.nextLevel ? `Great work. Level ${result.nextLevel} is now unlocked.` : "You completed the full 10-level expert journey.") : "You need 4 correct answers to advance. Review the explanations and try this level again."}</p>
+          </div>
+          <div className="mt-7 space-y-3">
+            {result.review.map((item, reviewIndex) => (
+              <article key={item.id} className={`rounded-[20px] border p-4 ${item.correct ? "border-jade/20 bg-jade/10" : "border-coral/20 bg-coral/10"}`}>
+                <div className="flex items-start gap-3"><span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-white ${item.correct ? "bg-jade" : "bg-coral"}`}>{item.correct ? <Check size={14} /> : <X size={14} />}</span><div><b className="text-xs">Question {reviewIndex + 1} · {item.focusArea}</b><p className="mt-1 text-sm font-semibold leading-6">{item.prompt}</p></div></div>
+                <p className="mt-3 text-xs leading-5 text-muted"><b className="text-ink">Correct answer:</b> {item.options[item.correctIndex]}</p>
+                <p className="mt-1 text-xs leading-5 text-muted">{item.explanation}</p>
+              </article>
+            ))}
+          </div>
+          <div className="mt-7 flex justify-center"><button onClick={onClose} className="btn-accent">{result.passed && result.nextLevel ? "Continue to level map" : "Return to assessments"} <ArrowRight size={15} /></button></div>
+        </div>
+      </div>
+    );
+  }
+
+  const minutes = Math.floor(secondsLeft / 60);
+  const seconds = String(secondsLeft % 60).padStart(2, "0");
+  if (!question) return null;
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-card max-w-3xl">
+        <div className="flex items-center justify-between gap-4">
+          <div><span className="eyebrow"><Sparkles size={12} /> AI adaptive · {attempt.difficulty}</span><h2 className="mt-1 text-lg font-extrabold">Level {attempt.level} skill assessment</h2></div>
+          <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold ${secondsLeft < 60 ? "bg-coral text-white" : "bg-coral/10 text-coral"}`}><Clock3 size={15} /> {minutes}:{seconds}</div>
+        </div>
+        <div className="mt-6 flex gap-1.5">{questions.map((item, questionIndex) => <span key={item.id} className={`h-1.5 flex-1 rounded-full ${questionIndex <= index ? "bg-cobalt" : "bg-ink/[0.08]"}`} />)}</div>
+        <div className="mt-8 flex items-center justify-between"><p className="text-xs font-bold text-muted">QUESTION {index + 1} OF {questions.length}</p><p className="text-[10px] font-bold text-muted">{answeredCount}/{questions.length} answered</p></div>
+        <span className="tag mt-3">{question.focusArea}</span>
+        <h3 className="mt-3 text-xl font-extrabold leading-7">{question.prompt}</h3>
+        <div className="mt-6 grid gap-3">
+          {question.options.map((option, optionIndex) => (
+            <button key={`${question.id}-${optionIndex}`} onClick={() => setAnswers((current) => ({ ...current, [question.id]: optionIndex }))} className={`flex items-center gap-3 rounded-2xl border p-4 text-left text-sm font-semibold transition ${answers[question.id] === optionIndex ? "border-cobalt bg-cobalt/10 text-cobalt" : "border-ink/[0.08] bg-white/55 hover:bg-white"}`}>
+              <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs ${answers[question.id] === optionIndex ? "bg-cobalt text-white" : "bg-ink/[0.06] text-muted"}`}>{String.fromCharCode(65 + optionIndex)}</span>{option}
+            </button>
+          ))}
+        </div>
+        <div className="mt-7 flex items-center justify-between">
+          <button disabled={index === 0 || submitting} onClick={() => setIndex((current) => current - 1)} className="btn-secondary disabled:opacity-40"><ChevronLeft size={15} /> Back</button>
+          {index === questions.length - 1 ? <button disabled={answeredCount !== questions.length || submitting} onClick={submit} className="btn-accent disabled:opacity-40">{submitting ? "Submitting..." : "Submit level"} <Check size={15} /></button> : <button disabled={answers[question.id] === undefined || submitting} onClick={() => setIndex((current) => current + 1)} className="btn-primary disabled:opacity-40">Next question <ChevronRight size={15} /></button>}
+        </div>
+        <button onClick={onClose} className="mx-auto mt-4 block text-[10px] font-bold text-muted underline">Save progress and close</button>
+      </div>
+    </div>
+  );
 }
 
 function QuizModal({ assessment, questions, quiz, setQuiz, onSubmit, onClose }) {

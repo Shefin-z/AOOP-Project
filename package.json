@@ -2,6 +2,9 @@
   "name": "careerforge",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "dev:api": "node --watch server/src/app.js",
@@ -13,11 +16,14 @@
     "test:navigation": "node scripts/navigation-smoke.mjs public && node scripts/navigation-smoke.mjs signup && node scripts/navigation-smoke.mjs login-student && node scripts/navigation-smoke.mjs login-admin && node scripts/navigation-smoke.mjs guard-student && node scripts/navigation-smoke.mjs guard-admin && node scripts/navigation-smoke.mjs student && node scripts/navigation-smoke.mjs brand",
     "test:student-section": "node scripts/student-section-smoke.mjs",
     "test:runtime": "node scripts/runtime-smoke.mjs",
+    "test:adaptive-assessment": "node scripts/adaptive-assessment-smoke.cjs",
+    "test:adaptive-ui": "node scripts/adaptive-assessment-ui-smoke.mjs",
     "preview": "vite preview",
     "start:api": "node server/src/app.js",
     "start": "vite preview --host 0.0.0.0 --port 3000"
   },
   "dependencies": {
+    "@google/genai": "^2.15.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -32,8 +38,8 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "autoprefixer": "^10.4.20",
     "@vitejs/plugin-react": "^5.1.4",
+    "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.2",
     "happy-dom": "^20.11.1",
     "postcss": "^8.5.24",

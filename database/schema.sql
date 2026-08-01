@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS student_profiles (
   degree VARCHAR(190) NULL,
   graduation_year SMALLINT NULL,
   target_role VARCHAR(140) NULL,
+  career_interests JSON NULL,
   location VARCHAR(140) NULL,
   phone VARCHAR(50) NULL,
   bio TEXT NULL,
@@ -145,6 +146,9 @@ ALTER TABLE applications
 ALTER TABLE applications
   ADD COLUMN IF NOT EXISTS resume_file_data LONGTEXT NULL AFTER resume_file_type;
 
+ALTER TABLE student_profiles
+  ADD COLUMN IF NOT EXISTS career_interests JSON NULL AFTER target_role;
+
 CREATE TABLE IF NOT EXISTS assessments (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(180) NOT NULL,
@@ -205,6 +209,40 @@ CREATE TABLE IF NOT EXISTS assessment_attempts (
   CONSTRAINT fk_attempts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_attempts_assessment FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE,
   INDEX idx_attempts_user_assessment (user_id, assessment_id)
+);
+
+CREATE TABLE IF NOT EXISTS adaptive_assessment_programs (
+  user_id BIGINT UNSIGNED PRIMARY KEY,
+  current_level TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  highest_level_completed TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  total_questions INT UNSIGNED NOT NULL DEFAULT 0,
+  total_correct INT UNSIGNED NOT NULL DEFAULT 0,
+  status ENUM('active', 'completed') NOT NULL DEFAULT 'active',
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  completed_at DATETIME NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_adaptive_program_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS adaptive_assessment_attempts (
+  id CHAR(36) PRIMARY KEY,
+  user_id BIGINT UNSIGNED NOT NULL,
+  level_number TINYINT UNSIGNED NOT NULL,
+  difficulty_label VARCHAR(80) NOT NULL,
+  profile_snapshot JSON NOT NULL,
+  questions_json JSON NOT NULL,
+  answers_json JSON NULL,
+  generated_model VARCHAR(100) NOT NULL,
+  status ENUM('started', 'completed', 'expired') NOT NULL DEFAULT 'started',
+  correct_count TINYINT UNSIGNED NULL,
+  percentage DECIMAL(5,2) NULL,
+  passed BOOLEAN NULL,
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME NOT NULL,
+  completed_at DATETIME NULL,
+  CONSTRAINT fk_adaptive_attempt_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_adaptive_attempt_user_level (user_id, level_number, started_at),
+  INDEX idx_adaptive_attempt_status_expiry (status, expires_at)
 );
 
 CREATE TABLE IF NOT EXISTS learning_resources (

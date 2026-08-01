@@ -35,7 +35,7 @@ export function PublicHeader({ current = "" }) {
   return (
     <header className="page-shell relative z-50 pt-5">
       <nav className="glass flex h-[70px] items-center justify-between rounded-[22px] px-4 sm:px-5">
-        <Link to="/" aria-label="CareerForge home"><Brand /></Link>
+        <Brand href="/" />
         <div className="hidden items-center gap-1 lg:flex">
           {navigation.map((item) => (
             <PublicNavLink key={item.label} item={item} current={current} />
@@ -86,7 +86,7 @@ export function PublicFooter() {
   return (
     <footer className="border-t border-ink/[0.08] py-8">
       <div className="page-shell flex flex-col items-center justify-between gap-5 text-center sm:flex-row sm:text-left">
-        <Link to="/" aria-label="CareerForge home"><Brand /></Link>
+        <Brand href="/" />
         <p className="text-xs text-muted">© 2026 CareerForge. Built for the careers still becoming.</p>
         <div className="flex gap-1">
           {["Privacy", "Terms", "Support"].map((item) => (

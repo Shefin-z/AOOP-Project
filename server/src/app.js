@@ -9,6 +9,7 @@ const jobsRoutes = require("./routes/jobs");
 const learningRoutes = require("./routes/learning");
 const communityRoutes = require("./routes/community");
 const adminRoutes = require("./routes/admin");
+const adaptiveAssessmentRoutes = require("./routes/adaptive-assessment");
 
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
@@ -53,6 +54,7 @@ app.get("/api/health", async (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/jobs", jobsRoutes);
 app.use("/api", learningRoutes);
+app.use("/api/adaptive-assessment", adaptiveAssessmentRoutes);
 app.use("/api/community", communityRoutes);
 app.use("/api/admin", adminRoutes);
 

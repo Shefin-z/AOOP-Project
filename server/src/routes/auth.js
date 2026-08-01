@@ -26,8 +26,13 @@ router.get("/config", async (_req, res, next) => {
 
 function profileResponse(row) {
   if (!row) return null;
+  let careerInterests = row.career_interests;
+  if (typeof careerInterests === "string") {
+    try { careerInterests = JSON.parse(careerInterests); } catch { careerInterests = []; }
+  }
   return {
     ...row,
+    career_interests: Array.isArray(careerInterests) ? careerInterests : [],
     graduation_year: row.graduation_year == null ? null : Number(row.graduation_year),
     readiness_score: Number(row.readiness_score || 0),
     profile_completion: Number(row.profile_completion || 0),
@@ -96,7 +101,7 @@ router.get("/me", authenticate, async (req, res, next) => {
     await ensureProfileSchema();
     const rows = await query(
       `SELECT u.id, u.name, u.email, u.role, u.status, p.university, p.degree, p.graduation_year,
-              p.target_role, p.location, p.phone, p.bio, p.readiness_score,
+              p.target_role, p.career_interests, p.location, p.phone, p.bio, p.readiness_score,
               p.profile_completion, p.avatar_url, p.avatar_data, p.updated_at
        FROM users u LEFT JOIN student_profiles p ON p.user_id = u.id WHERE u.id = ?`,
       [req.user.id],
@@ -124,6 +129,12 @@ router.patch("/me", authenticate, async (req, res, next) => {
     const degree = nullableText(req.body.degree, 190);
     const targetRole = nullableText(req.body.target_role, 140);
     const location = nullableText(req.body.location, 140);
+    const careerInterests = Array.isArray(req.body.career_interests)
+      ? [...new Set(req.body.career_interests
+        .map((value) => String(value || "").trim().replace(/\s+/g, " ").slice(0, 60))
+        .filter((value) => value.length >= 2))]
+        .slice(0, 8)
+      : [];
     const graduationValue = String(req.body.graduation_year ?? "").trim();
     const graduationYear = graduationValue ? Number(graduationValue) : null;
     const avatarProvided = Object.prototype.hasOwnProperty.call(req.body, "avatar_data");
@@ -141,6 +152,11 @@ router.patch("/me", authenticate, async (req, res, next) => {
     if (graduationYear != null && (!Number.isInteger(graduationYear) || graduationYear < 1950 || graduationYear > new Date().getFullYear() + 10)) {
       return res.status(400).json({ error: "Enter a valid graduation year" });
     }
+    if (!university || !degree || !graduationYear || !targetRole || !location || !careerInterests.length) {
+      return res.status(400).json({
+        error: "Complete university, degree, graduation year, target role, location and at least one career interest",
+      });
+    }
     if (avatarData && !/^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=\s]+$/i.test(avatarData)) {
       return res.status(400).json({ error: "Upload a JPG, PNG or WebP profile photo" });
     }
@@ -148,9 +164,9 @@ router.patch("/me", authenticate, async (req, res, next) => {
       return res.status(413).json({ error: "Profile photo is too large. Choose a smaller image." });
     }
 
-    const completedFields = [name, email, university, degree, graduationYear, targetRole, location]
+    const completedFields = [name, email, university, degree, graduationYear, targetRole, location, careerInterests.length]
       .filter((value) => value !== null && value !== "").length;
-    const profileCompletion = Math.round((completedFields / 7) * 100);
+    const profileCompletion = Math.round((completedFields / 8) * 100);
 
     await connection.beginTransaction();
     const [duplicateRows] = await connection.execute(
@@ -167,12 +183,14 @@ router.patch("/me", authenticate, async (req, res, next) => {
     );
     await connection.execute(
       `INSERT INTO student_profiles
-         (user_id, university, degree, graduation_year, target_role, location, profile_completion, avatar_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         (user_id, university, degree, graduation_year, target_role, career_interests,
+          location, profile_completion, avatar_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          university=VALUES(university), degree=VALUES(degree),
          graduation_year=VALUES(graduation_year), target_role=VALUES(target_role),
-         location=VALUES(location), profile_completion=VALUES(profile_completion),
+         career_interests=VALUES(career_interests), location=VALUES(location),
+         profile_completion=VALUES(profile_completion),
          avatar_data=IF(?, VALUES(avatar_data), avatar_data)`,
       [
         req.user.id,
@@ -180,6 +198,7 @@ router.patch("/me", authenticate, async (req, res, next) => {
         degree,
         graduationYear,
         targetRole,
+        JSON.stringify(careerInterests),
         location,
         profileCompletion,
         avatarData,
@@ -190,7 +209,7 @@ router.patch("/me", authenticate, async (req, res, next) => {
 
     const [rows] = await connection.execute(
       `SELECT u.id, u.name, u.email, u.role, u.status, p.university, p.degree, p.graduation_year,
-              p.target_role, p.location, p.phone, p.bio, p.readiness_score,
+              p.target_role, p.career_interests, p.location, p.phone, p.bio, p.readiness_score,
               p.profile_completion, p.avatar_url, p.avatar_data, p.updated_at
        FROM users u LEFT JOIN student_profiles p ON p.user_id=u.id WHERE u.id=?`,
       [req.user.id],

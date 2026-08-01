@@ -676,7 +676,7 @@ router.get("/users/:id", async (req, res, next) => {
     await ensureProfileSchema();
     const [student] = await query(
       `SELECT u.id, u.name, u.email, u.status, u.last_login_at, u.created_at, u.updated_at,
-              p.university, p.degree, p.graduation_year, p.target_role, p.location,
+              p.university, p.degree, p.graduation_year, p.target_role, p.career_interests, p.location,
               p.phone, p.bio, p.avatar_url, p.avatar_data, p.readiness_score, p.profile_completion,
               p.updated_at profile_updated_at
        FROM users u LEFT JOIN student_profiles p ON p.user_id=u.id
@@ -685,8 +685,13 @@ router.get("/users/:id", async (req, res, next) => {
       [req.params.id],
     );
     if (!student) return res.status(404).json({ error: "Student account not found" });
+    let careerInterests = student.career_interests;
+    if (typeof careerInterests === "string") {
+      try { careerInterests = JSON.parse(careerInterests); } catch { careerInterests = []; }
+    }
     res.json({
       ...student,
+      career_interests: Array.isArray(careerInterests) ? careerInterests : [],
       graduation_year: student.graduation_year == null ? null : Number(student.graduation_year),
       readiness_score: Number(student.readiness_score || 0),
       profile_completion: Number(student.profile_completion || 0),
