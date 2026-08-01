@@ -12,6 +12,21 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX idx_users_created_at (created_at)
 );
 
+CREATE TABLE IF NOT EXISTS pending_student_registrations (
+  email VARCHAR(190) PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  university VARCHAR(190) NULL,
+  code_hash CHAR(64) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  attempt_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  send_count SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_pending_registration_expiry (expires_at)
+);
+
 CREATE TABLE IF NOT EXISTS student_profiles (
   user_id BIGINT UNSIGNED PRIMARY KEY,
   university VARCHAR(190) NULL,

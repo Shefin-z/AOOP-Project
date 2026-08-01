@@ -15,7 +15,13 @@ import {
 import Brand from "./Brand";
 import ThemeToggle from "./ThemeToggle";
 import AuthVisual from "./AuthVisual";
-import { apiRequest, registerStudent, signIn } from "../lib/api";
+import {
+  apiRequest,
+  registerStudent,
+  resendRegistrationCode,
+  signIn,
+  verifyStudentEmail,
+} from "../lib/api";
 import { navigateFresh } from "../lib/sessionNavigation";
 
 export default function AuthExperience({ role = "student" }) {
@@ -26,16 +32,38 @@ export default function AuthExperience({ role = "student" }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [pendingVerification, setPendingVerification] = useState(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("careerforge_pending_verification") || "null");
+      return saved?.email ? saved : null;
+    } catch {
+      return null;
+    }
+  });
+  const [resendRemaining, setResendRemaining] = useState(0);
   const [platformConfig, setPlatformConfig] = useState({
     features: { registrationEnabled: true, maintenanceMode: false },
     security: { minimumPasswordLength: 8, requireUppercase: false, requireNumber: false },
   });
   const workspacePath = isAdmin ? "/admin" : "/student";
+  const verificationActive = !isAdmin && mode === "register" && Boolean(pendingVerification?.email);
 
   const enterWorkspace = (session, token) => {
     if (token) localStorage.setItem("careerforge_token", token);
     localStorage.setItem("careerforge_session", JSON.stringify(session));
     navigateFresh(workspacePath);
+  };
+
+  const rememberPendingVerification = (details) => {
+    setPendingVerification(details);
+    sessionStorage.setItem("careerforge_pending_verification", JSON.stringify(details));
+  };
+
+  const clearPendingVerification = () => {
+    setPendingVerification(null);
+    setResendRemaining(0);
+    sessionStorage.removeItem("careerforge_pending_verification");
   };
 
   useEffect(() => {
@@ -56,6 +84,22 @@ export default function AuthExperience({ role = "student" }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!verificationActive || !pendingVerification?.resendAvailableAt) {
+      setResendRemaining(0);
+      return undefined;
+    }
+    const updateCountdown = () => {
+      setResendRemaining(Math.max(
+        0,
+        Math.ceil((Number(pendingVerification.resendAvailableAt) - Date.now()) / 1000),
+      ));
+    };
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 1000);
+    return () => window.clearInterval(timer);
+  }, [verificationActive, pendingVerification?.resendAvailableAt]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -87,12 +131,16 @@ export default function AuthExperience({ role = "student" }) {
 
     try {
       if (mode === "register") {
-        await registerStudent({ name, email, password });
+        const result = await registerStudent({ name, email, password });
+        const verification = {
+          email: result.email || email,
+          expiresAt: Date.now() + Number(result.expiresInSeconds || 600) * 1000,
+          resendAvailableAt: Date.now() + Number(result.resendAfterSeconds || 60) * 1000,
+        };
+        rememberPendingVerification(verification);
         form.reset();
         setShowPassword(false);
-        setMode("login");
-        setSuccess("Account created successfully. Sign in with your new email and password.");
-        window.history.replaceState({}, "", "/login/student");
+        setSuccess(result.message || "We sent a verification code to your email.");
         return;
       }
 
@@ -100,6 +148,60 @@ export default function AuthExperience({ role = "student" }) {
       enterWorkspace(result.user, result.token);
     } catch (requestError) {
       setError(requestError.message || "Authentication is temporarily unavailable.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitVerification = async (event) => {
+    event.preventDefault();
+    const code = String(new FormData(event.currentTarget).get("code") || "").replace(/\D/g, "");
+    if (!/^\d{6}$/.test(code)) {
+      setError("Enter the complete 6-digit code from your email.");
+      return;
+    }
+    setError("");
+    setSuccess("");
+    setLoading(true);
+    try {
+      const result = await verifyStudentEmail({ email: pendingVerification.email, code });
+      clearPendingVerification();
+      enterWorkspace(result.user, result.token);
+    } catch (requestError) {
+      setError(requestError.message || "We could not verify that code.");
+      if ([404, 410, 429].includes(requestError.status)) {
+        clearPendingVerification();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendCode = async () => {
+    if (!pendingVerification?.email || resendRemaining > 0 || loading) return;
+    setError("");
+    setSuccess("");
+    setLoading(true);
+    try {
+      const result = await resendRegistrationCode(pendingVerification.email);
+      const updated = {
+        ...pendingVerification,
+        expiresAt: Date.now() + Number(result.expiresInSeconds || 600) * 1000,
+        resendAvailableAt: Date.now() + Number(result.resendAfterSeconds || 60) * 1000,
+      };
+      rememberPendingVerification(updated);
+      setSuccess(result.message || "A new verification code was sent.");
+    } catch (requestError) {
+      setError(requestError.message || "We could not send another code.");
+      if ([404, 410].includes(requestError.status)) {
+        clearPendingVerification();
+      } else if (requestError.status === 429 && requestError.retryAfterSeconds) {
+        const updated = {
+          ...pendingVerification,
+          resendAvailableAt: Date.now() + Number(requestError.retryAfterSeconds) * 1000,
+        };
+        rememberPendingVerification(updated);
+      }
     } finally {
       setLoading(false);
     }
@@ -146,13 +248,15 @@ export default function AuthExperience({ role = "student" }) {
           <div className="mx-auto my-auto w-full max-w-[470px] py-10">
             <div className="mb-8">
               <span className={`mb-5 grid h-12 w-12 place-items-center rounded-[18px] text-white ${isAdmin ? "bg-plum" : "bg-cobalt"}`}>
-                {isAdmin ? <LockKeyhole size={21} /> : <User size={21} />}
+                {isAdmin ? <LockKeyhole size={21} /> : verificationActive ? <Mail size={21} /> : <User size={21} />}
               </span>
               <h2 className="font-display text-4xl leading-none tracking-[-0.045em] sm:text-5xl">
-                {mode === "register" ? "Start your journey." : isAdmin ? "Admin access." : "Welcome back."}
+                {verificationActive ? "Check your inbox." : mode === "register" ? "Start your journey." : isAdmin ? "Admin access." : "Welcome back."}
               </h2>
               <p className="mt-3 text-sm leading-6 text-muted">
-                {mode === "register"
+                {verificationActive
+                  ? `Enter the 6-digit code sent to ${pendingVerification.email}.`
+                  : mode === "register"
                   ? "Create your student profile and get your first readiness score."
                   : isAdmin
                     ? "Use your authorized administrator credentials."
@@ -179,6 +283,56 @@ export default function AuthExperience({ role = "student" }) {
               <p className="mb-5 rounded-2xl border border-coral/20 bg-coral/10 px-4 py-3 text-xs font-semibold leading-5 text-coral">Student services are temporarily under maintenance. Administrator access remains available.</p>
             )}
 
+            {verificationActive ? (
+              <form key="student-verification" onSubmit={submitVerification} className="space-y-4">
+                <div className="rounded-2xl border border-cobalt/15 bg-cobalt/[0.055] p-4 text-sm leading-6 text-muted">
+                  <div className="flex items-center gap-2 font-bold text-ink">
+                    <ShieldCheck size={17} className="text-cobalt" />
+                    Email verification required
+                  </div>
+                  <p className="mt-1 text-xs leading-5">The code expires after 10 minutes and can only be attempted five times.</p>
+                </div>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-bold text-ink">Verification code</span>
+                  <input
+                    name="code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    pattern="[0-9]{6}"
+                    className="input text-center text-2xl font-extrabold tracking-[0.35em]"
+                    placeholder="000000"
+                    onInput={(event) => {
+                      event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 6);
+                    }}
+                    autoFocus
+                  />
+                </label>
+                {error && <p className="rounded-xl bg-coral/10 px-3 py-2 text-xs font-semibold text-coral">{error}</p>}
+                {success && <p className="rounded-xl bg-jade/10 px-3 py-2 text-xs font-semibold text-jade">{success}</p>}
+                <button disabled={loading} className="btn-accent w-full disabled:cursor-not-allowed disabled:opacity-50">
+                  {loading ? "Verifying your email..." : "Verify & create account"}
+                  {!loading && <ArrowRight size={17} />}
+                </button>
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => { clearPendingVerification(); setError(""); setSuccess(""); }}
+                    className="font-bold text-muted hover:text-ink"
+                  >
+                    Use another email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resendCode}
+                    disabled={loading || resendRemaining > 0}
+                    className="font-bold text-cobalt disabled:cursor-not-allowed disabled:text-muted"
+                  >
+                    {resendRemaining > 0 ? `Resend code in ${resendRemaining}s` : "Resend code"}
+                  </button>
+                </div>
+              </form>
+            ) : (
             <form key={`${role}-${mode}`} onSubmit={submit} className="space-y-4">
               {mode === "register" && (
                 <label className="block">
@@ -234,6 +388,7 @@ export default function AuthExperience({ role = "student" }) {
                 {!loading && <ArrowRight size={17} />}
               </button>
             </form>
+            )}
 
             <p className="mt-7 text-center text-xs text-muted">
               {isAdmin ? "Student trying to sign in?" : "Platform administrator?"}{" "}

@@ -27,11 +27,21 @@ if (scenario === "student" || scenario === "brand") {
 
 const mockFetch = async (url, options = {}) => {
   const body = JSON.parse(options.body || "{}");
+  if (String(url).endsWith("/auth/register/verify")) {
+    return new window.Response(JSON.stringify({
+      message: "Email verified. Your CareerForge account is ready.",
+      token: "navigation-test-token",
+      user: { name: "New Student", email: body.email, role: "student" },
+    }), { status: 201, headers: { "Content-Type": "application/json" } });
+  }
   if (String(url).endsWith("/auth/register")) {
     return new window.Response(JSON.stringify({
-      message: "Account created successfully. Sign in to continue.",
-      user: { name: body.name, email: body.email, role: "student" },
-    }), { status: 201, headers: { "Content-Type": "application/json" } });
+      message: "We sent a 6-digit verification code to your email.",
+      verificationRequired: true,
+      email: body.email,
+      expiresInSeconds: 600,
+      resendAfterSeconds: 60,
+    }), { status: 202, headers: { "Content-Type": "application/json" } });
   }
   if (String(url).endsWith("/auth/login")) {
     return new window.Response(JSON.stringify({
@@ -167,7 +177,7 @@ function assertCredentialsAreBlank() {
   }
 }
 
-async function registerThenSignIn() {
+async function registerThenVerify() {
   await new Promise((resolve) => setTimeout(resolve, 40));
   const registrationForm = document.querySelector("form");
   registrationForm.querySelector('input[name="name"]').value = "New Student";
@@ -177,17 +187,18 @@ async function registerThenSignIn() {
   registrationForm.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
   await new Promise((resolve) => setTimeout(resolve, 80));
 
-  const successText = document.getElementById("root")?.textContent || "";
-  if (
-    window.location.pathname !== "/login/student" ||
-    !successText.includes("Account created successfully") ||
-    document.querySelector('input[name="email"]').value ||
-    document.querySelector('input[name="password"]').value
-  ) {
-    throw new Error("Registration did not return a blank sign-in form.");
+  const verificationText = document.getElementById("root")?.textContent || "";
+  const verificationForm = document.querySelector("form");
+  const code = verificationForm?.querySelector('input[name="code"]');
+  if (!verificationText.includes("Check your inbox.") || !code) {
+    throw new Error("Registration did not request the email verification code.");
   }
-
-  await submitLoginAndAssert("/student");
+  code.value = "123456";
+  verificationForm.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  if (window.location.pathname !== "/student") {
+    throw new Error("Verified registration did not enter the student workspace.");
+  }
 }
 
 if (scenario === "public") {
@@ -208,7 +219,7 @@ if (scenario === "public") {
 } else if (scenario === "login-admin") {
   await submitLoginAndAssert("/admin");
 } else if (scenario === "signup") {
-  await registerThenSignIn();
+  await registerThenVerify();
 } else if (scenario === "guard-student") {
   await new Promise((resolve) => setTimeout(resolve, 40));
   if (window.location.pathname !== "/login/student") throw new Error("Unauthenticated student route was not blocked.");

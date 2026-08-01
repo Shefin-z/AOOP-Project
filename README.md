@@ -66,6 +66,30 @@ GEMINI_MODEL=gemini-3.6-flash
 
 Never use a `VITE_` prefix for this key or commit it to the repository.
 
+### Student email verification
+
+Student signup uses a two-step email verification flow. The server sends a
+six-digit code, stores only its HMAC hash, expires it after 10 minutes and
+creates the student account only after a successful verification.
+
+Without buying a domain, Gmail can deliver the codes using a Google App
+Password. Enable 2-Step Verification on the sender account and add these
+server-only environment variables:
+
+```bash
+EMAIL_PROVIDER=gmail
+GMAIL_USER=your-email@gmail.com
+GMAIL_APP_PASSWORD=your-16-character-google-app-password
+EMAIL_FROM=CareerForge <your-email@gmail.com>
+EMAIL_VERIFICATION_SECRET=your-independent-long-random-secret
+```
+
+`EMAIL_PROVIDER=resend` with `RESEND_API_KEY` and a verified `EMAIL_FROM`
+domain remains supported as an alternative. For local development,
+`EMAIL_DELIVERY_MODE=console` prints the code only in the API terminal when no
+provider is configured. Hosted production never permits the console fallback.
+Never expose any of these values with a `VITE_` prefix.
+
 ## Authentication setup
 
 No account credentials are committed or prefilled. Students create an account and

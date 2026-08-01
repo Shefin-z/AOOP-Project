@@ -1,12 +1,37 @@
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { pool, query } = require("../config/db");
 const { authenticate, JWT_SECRET } = require("../middleware/auth");
 const { ensureProfileSchema } = require("../services/profile-schema");
 const { getPlatformSettings } = require("../services/platform-settings");
+const {
+  CODE_TTL_MINUTES,
+  RESEND_COOLDOWN_SECONDS,
+  MAX_VERIFICATION_ATTEMPTS,
+  ensureEmailVerificationSchema,
+  generateVerificationCode,
+  hashVerificationCode,
+  matchesVerificationCode,
+  sendVerificationEmail,
+} = require("../services/email-verification");
 
 const router = express.Router();
+const registrationEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many verification emails requested. Please try again later." },
+});
+const registrationVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many verification attempts. Please try again later." },
+});
 
 router.get("/config", async (_req, res, next) => {
   try {
@@ -39,17 +64,20 @@ function profileResponse(row) {
   };
 }
 
-router.post("/register", async (req, res, next) => {
+router.post("/register", registrationEmailLimiter, async (req, res, next) => {
   try {
     const settings = await getPlatformSettings();
     if (!settings.features.registrationEnabled) {
       return res.status(403).json({ error: "New student registration is currently disabled" });
     }
-    const { name, email, password, university } = req.body;
+    const name = String(req.body.name || "");
+    const email = String(req.body.email || "");
+    const password = String(req.body.password || "");
+    const university = String(req.body.university || "");
     if (!name || !email || !password) return res.status(400).json({ error: "Name, email and password are required" });
     const normalizedEmail = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) return res.status(400).json({ error: "Enter a valid email address" });
-    if (name.trim().length < 2) return res.status(400).json({ error: "Name must contain at least 2 characters" });
+    if (name.trim().length < 2 || name.trim().length > 120) return res.status(400).json({ error: "Name must contain between 2 and 120 characters" });
     if (password.length < settings.security.minimumPasswordLength) {
       return res.status(400).json({ error: `Password must contain at least ${settings.security.minimumPasswordLength} characters` });
     }
@@ -59,19 +87,195 @@ router.post("/register", async (req, res, next) => {
     if (settings.security.requireNumber && !/\d/.test(password)) {
       return res.status(400).json({ error: "Password must contain a number" });
     }
+    await ensureEmailVerificationSchema();
+    await query(
+      "DELETE FROM pending_student_registrations WHERE expires_at < DATE_SUB(NOW(), INTERVAL 1 DAY)",
+    );
     const existing = await query("SELECT id FROM users WHERE email = ? LIMIT 1", [normalizedEmail]);
     if (existing.length) return res.status(409).json({ error: "An account already exists for this email" });
-    const hash = await bcrypt.hash(password, 12);
-    const result = await query(
-      "INSERT INTO users (name, email, password_hash, role, status) VALUES (?, ?, ?, 'student', 'active')",
-      [name.trim(), normalizedEmail, hash],
+    const [pending] = await query(
+      `SELECT GREATEST(0, ${RESEND_COOLDOWN_SECONDS} - TIMESTAMPDIFF(SECOND, sent_at, NOW())) AS retry_after
+       FROM pending_student_registrations WHERE email=? LIMIT 1`,
+      [normalizedEmail],
     );
-    await query("INSERT INTO student_profiles (user_id, university, readiness_score) VALUES (?, ?, 35)", [result.insertId, university || null]);
-    res.status(201).json({
-      message: "Account created successfully. Sign in to continue.",
-      user: { id: result.insertId, name: name.trim(), email: normalizedEmail, role: "student" },
+    const retryAfter = Number(pending?.retry_after || 0);
+    if (retryAfter > 0) {
+      return res.status(429).json({
+        error: `Please wait ${retryAfter} seconds before requesting another code.`,
+        retryAfterSeconds: retryAfter,
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const code = generateVerificationCode();
+    const codeHash = hashVerificationCode(normalizedEmail, code);
+    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000);
+    const safeUniversity = String(university || "").trim().slice(0, 190) || null;
+
+    await query(
+      `INSERT INTO pending_student_registrations
+         (email, name, password_hash, university, code_hash, expires_at, attempt_count, sent_at, send_count)
+       VALUES (?, ?, ?, ?, ?, ?, 0, NOW(), 1)
+       ON DUPLICATE KEY UPDATE
+         name=VALUES(name), password_hash=VALUES(password_hash), university=VALUES(university),
+         code_hash=VALUES(code_hash), expires_at=VALUES(expires_at), attempt_count=0,
+         sent_at=NOW(), send_count=send_count+1`,
+      [normalizedEmail, name.trim(), passwordHash, safeUniversity, codeHash, expiresAt],
+    );
+
+    try {
+      await sendVerificationEmail({ email: normalizedEmail, name: name.trim(), code });
+    } catch (error) {
+      await query(
+        "DELETE FROM pending_student_registrations WHERE email=? AND code_hash=?",
+        [normalizedEmail, codeHash],
+      ).catch(() => {});
+      throw error;
+    }
+
+    res.status(202).json({
+      message: "We sent a 6-digit verification code to your email.",
+      verificationRequired: true,
+      email: normalizedEmail,
+      expiresInSeconds: CODE_TTL_MINUTES * 60,
+      resendAfterSeconds: RESEND_COOLDOWN_SECONDS,
     });
   } catch (error) { next(error); }
+});
+
+router.post("/register/resend", registrationEmailLimiter, async (req, res, next) => {
+  try {
+    const normalizedEmail = String(req.body.email || "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: "Enter a valid email address" });
+    }
+    await ensureEmailVerificationSchema();
+    const [pending] = await query(
+      `SELECT name,
+              GREATEST(0, ${RESEND_COOLDOWN_SECONDS} - TIMESTAMPDIFF(SECOND, sent_at, NOW())) AS retry_after
+       FROM pending_student_registrations WHERE email=? LIMIT 1`,
+      [normalizedEmail],
+    );
+    if (!pending) {
+      return res.status(404).json({ error: "No pending registration was found. Start the signup again." });
+    }
+    const retryAfter = Number(pending.retry_after || 0);
+    if (retryAfter > 0) {
+      return res.status(429).json({
+        error: `Please wait ${retryAfter} seconds before requesting another code.`,
+        retryAfterSeconds: retryAfter,
+      });
+    }
+
+    const code = generateVerificationCode();
+    const codeHash = hashVerificationCode(normalizedEmail, code);
+    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000);
+    await query(
+      `UPDATE pending_student_registrations
+       SET code_hash=?, expires_at=?, attempt_count=0, sent_at=NOW(), send_count=send_count+1
+       WHERE email=?`,
+      [codeHash, expiresAt, normalizedEmail],
+    );
+
+    try {
+      await sendVerificationEmail({ email: normalizedEmail, name: pending.name, code });
+    } catch (error) {
+      await query(
+        "UPDATE pending_student_registrations SET expires_at=NOW() WHERE email=? AND code_hash=?",
+        [normalizedEmail, codeHash],
+      ).catch(() => {});
+      throw error;
+    }
+
+    res.json({
+      message: "A new verification code was sent.",
+      expiresInSeconds: CODE_TTL_MINUTES * 60,
+      resendAfterSeconds: RESEND_COOLDOWN_SECONDS,
+    });
+  } catch (error) { next(error); }
+});
+
+router.post("/register/verify", registrationVerifyLimiter, async (req, res, next) => {
+  let connection;
+  try {
+    const settings = await getPlatformSettings();
+    const normalizedEmail = String(req.body.email || "").trim().toLowerCase();
+    const code = String(req.body.code || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || !/^\d{6}$/.test(code)) {
+      return res.status(400).json({ error: "Enter the 6-digit verification code from your email." });
+    }
+    await ensureEmailVerificationSchema();
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const [pendingRows] = await connection.execute(
+      `SELECT email, name, password_hash, university, code_hash, expires_at,
+              attempt_count, expires_at <= NOW() AS expired
+       FROM pending_student_registrations WHERE email=? LIMIT 1 FOR UPDATE`,
+      [normalizedEmail],
+    );
+    const pending = pendingRows[0];
+    if (!pending) {
+      await connection.rollback();
+      return res.status(404).json({ error: "No pending registration was found. Start the signup again." });
+    }
+    if (Boolean(pending.expired)) {
+      await connection.execute("DELETE FROM pending_student_registrations WHERE email=?", [normalizedEmail]);
+      await connection.commit();
+      return res.status(410).json({ error: "This verification code has expired. Start the signup again." });
+    }
+
+    const nextAttemptCount = Number(pending.attempt_count || 0) + 1;
+    if (!matchesVerificationCode(normalizedEmail, code, pending.code_hash)) {
+      if (nextAttemptCount >= MAX_VERIFICATION_ATTEMPTS) {
+        await connection.execute("DELETE FROM pending_student_registrations WHERE email=?", [normalizedEmail]);
+        await connection.commit();
+        return res.status(429).json({ error: "Too many incorrect codes. Start the signup again." });
+      }
+      await connection.execute(
+        "UPDATE pending_student_registrations SET attempt_count=? WHERE email=?",
+        [nextAttemptCount, normalizedEmail],
+      );
+      await connection.commit();
+      return res.status(400).json({
+        error: "That verification code is incorrect.",
+        attemptsRemaining: MAX_VERIFICATION_ATTEMPTS - nextAttemptCount,
+      });
+    }
+
+    const [existingRows] = await connection.execute(
+      "SELECT id FROM users WHERE email=? LIMIT 1",
+      [normalizedEmail],
+    );
+    if (existingRows.length) {
+      await connection.execute("DELETE FROM pending_student_registrations WHERE email=?", [normalizedEmail]);
+      await connection.commit();
+      return res.status(409).json({ error: "An account already exists for this email" });
+    }
+
+    const [result] = await connection.execute(
+      "INSERT INTO users (name, email, password_hash, role, status) VALUES (?, ?, ?, 'student', 'active')",
+      [pending.name, normalizedEmail, pending.password_hash],
+    );
+    await connection.execute(
+      "INSERT INTO student_profiles (user_id, university, readiness_score) VALUES (?, ?, 35)",
+      [result.insertId, pending.university || null],
+    );
+    await connection.execute("DELETE FROM pending_student_registrations WHERE email=?", [normalizedEmail]);
+    await connection.commit();
+
+    const user = { id: result.insertId, name: pending.name, email: normalizedEmail, role: "student" };
+    const token = jwt.sign(user, JWT_SECRET, { expiresIn: `${settings.security.sessionHours}h` });
+    res.status(201).json({
+      message: "Email verified. Your CareerForge account is ready.",
+      token,
+      user,
+    });
+  } catch (error) {
+    try { await connection?.rollback(); } catch {}
+    next(error);
+  } finally {
+    connection?.release();
+  }
 });
 
 router.post("/login", async (req, res, next) => {
