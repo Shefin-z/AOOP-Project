@@ -334,15 +334,14 @@ textarea:focus-visible {
 .hero-stage {
   position: relative;
   isolation: isolate;
-  transform: perspective(1200px) translateZ(0) rotateX(var(--hero-rx, 0deg)) rotateY(var(--hero-ry, 0deg));
   transition:
-    transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 600ms ease;
+    border-color 260ms ease,
+    box-shadow 420ms ease;
 }
 
 .hero-stage:hover {
-  transform: perspective(1200px) translateY(-4px) rotateX(var(--hero-rx, 0deg)) rotateY(var(--hero-ry, 0deg));
-  box-shadow: 0 34px 90px rgba(73, 65, 49, 0.2);
+  border-color: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 32px 88px rgba(73, 65, 49, 0.18);
 }
 
 .public-header {
@@ -427,48 +426,21 @@ textarea:focus-visible {
   z-index: 1;
 }
 
-.landing-hero-shell {
-  --hero-x: 62%;
-  --hero-y: 28%;
-  --hero-rx: 0deg;
-  --hero-ry: 0deg;
+.landing-hero-frame {
   isolation: isolate;
 }
 
-.landing-hero-shell::before {
+.landing-hero-frame::before {
   position: absolute;
-  inset: -14%;
+  inset: 10% -4% -7% 12%;
   z-index: -1;
   pointer-events: none;
   content: "";
-  background: radial-gradient(circle at var(--hero-x) var(--hero-y), rgba(49, 85, 198, 0.22), transparent 34%);
-  filter: blur(24px);
-  transition: background-position 180ms ease;
-}
-
-.landing-float-card,
-.landing-flow-card {
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 20px 55px rgba(43, 48, 58, 0.13);
-  backdrop-filter: blur(22px);
-}
-
-.landing-flow-card span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.landing-signal-card {
-  transition:
-    transform 300ms ease,
-    box-shadow 300ms ease;
-}
-
-.landing-signal-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 28px 82px rgba(43, 48, 58, 0.18);
+  border-radius: 3rem;
+  background:
+    linear-gradient(135deg, rgba(49, 85, 198, 0.18), rgba(200, 109, 80, 0.14)),
+    color-mix(in srgb, var(--surface) 70%, transparent);
+  filter: blur(2px);
 }
 
 .landing-feature-card {
@@ -538,9 +510,8 @@ textarea:focus-visible {
   height: 100%;
   transition:
     opacity 700ms ease,
-    transform 1100ms cubic-bezier(0.2, 0.8, 0.2, 1),
     filter 700ms ease;
-  will-change: opacity, transform;
+  will-change: opacity;
 }
 
 .adaptive-hero::after {
@@ -562,15 +533,10 @@ textarea:focus-visible {
     opacity 600ms ease;
 }
 
-.adaptive-hero:hover .adaptive-hero-image,
-.hero-stage:hover .adaptive-hero-image {
-  transform: scale(1.035);
-}
-
 .adaptive-hero:hover::after,
 .hero-stage:hover .adaptive-hero::after {
-  opacity: 0.58;
-  transform: translateX(42%) rotate(5deg);
+  opacity: 0.48;
+  transform: translateX(26%) rotate(5deg);
 }
 
 :root[data-theme="dark"] .adaptive-hero {
@@ -604,9 +570,7 @@ textarea:focus-visible {
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.92), transparent);
 }
 
-:root[data-theme="dark"] .public-nav:hover,
-:root[data-theme="dark"] .landing-float-card,
-:root[data-theme="dark"] .landing-flow-card {
+:root[data-theme="dark"] .public-nav:hover {
   border-color: rgba(255, 255, 255, 0.14);
   background: rgba(13, 13, 14, 0.88);
   box-shadow: 0 24px 72px rgba(0, 0, 0, 0.68);
@@ -617,7 +581,7 @@ textarea:focus-visible {
 }
 
 :root[data-theme="dark"] .landing-aurora-cobalt,
-:root[data-theme="dark"] .landing-hero-shell::before {
+:root[data-theme="dark"] .landing-hero-frame::before {
   opacity: 0.72;
 }
 
@@ -911,9 +875,6 @@ textarea:focus-visible {
     font-size: clamp(2.9rem, 15vw, 4.6rem);
   }
 
-  .landing-hero-shell {
-    padding-bottom: 0;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -952,8 +913,7 @@ textarea:focus-visible {
   }
 
   .landing-journey-step:hover,
-  .landing-resource-link:hover,
-  .landing-signal-card:hover {
+  .landing-resource-link:hover {
     padding-left: 0;
     transform: none;
   }

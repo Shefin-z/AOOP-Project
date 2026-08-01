@@ -64,17 +64,6 @@ if (!root || root.children.length === 0 || text.length < 20) {
 }
 
 if (targetPath === "/") {
-  const signalButtons = [...document.querySelectorAll('button[aria-label^="Show "][aria-label$=" signal"]')];
-  if (signalButtons.length !== 3) {
-    throw new Error("Landing career-signal controls did not render.");
-  }
-  signalButtons[1].click();
-  await new Promise((resolve) => setTimeout(resolve, 30));
-  text = root?.textContent?.replace(/\s+/g, " ").trim() || "";
-  if (!text.includes("Frontend Engineer") || !text.includes("91% fit")) {
-    throw new Error("Landing career-signal interaction did not update.");
-  }
-
   const expectedPublicLinks = ["/community", "/resources", "/login/student"];
   for (const href of expectedPublicLinks) {
     if (!document.querySelector(`footer a[href="${href}"]`)) {
