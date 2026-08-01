@@ -2,11 +2,13 @@ const mysql = require("mysql2/promise");
 
 const isProduction = process.env.NODE_ENV === "production";
 const databaseEnv = {
-  host: process.env.MYSQL_HOST || process.env.TIDB_HOST,
-  port: process.env.MYSQL_PORT || process.env.TIDB_PORT,
-  user: process.env.MYSQL_USER || process.env.TIDB_USER,
-  password: process.env.MYSQL_PASSWORD || process.env.TIDB_PASSWORD,
-  database: process.env.MYSQL_DATABASE || process.env.TIDB_DATABASE,
+  // Prefer the managed TiDB connection whenever the integration variables are
+  // available. This prevents local MYSQL_* defaults from shadowing production.
+  host: process.env.TIDB_HOST || process.env.MYSQL_HOST,
+  port: process.env.TIDB_PORT || process.env.MYSQL_PORT,
+  user: process.env.TIDB_USER || process.env.MYSQL_USER,
+  password: process.env.TIDB_PASSWORD || process.env.MYSQL_PASSWORD,
+  database: process.env.TIDB_DATABASE || process.env.MYSQL_DATABASE,
 };
 if (isProduction) {
   const missing = Object.entries(databaseEnv).filter(([, value]) => !value).map(([key]) => key);
