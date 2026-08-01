@@ -58,9 +58,29 @@ await window.happyDOM.waitUntilComplete();
 await new Promise((resolve) => setTimeout(resolve, 50));
 
 const root = document.getElementById("root");
-const text = root?.textContent?.replace(/\s+/g, " ").trim() || "";
+let text = root?.textContent?.replace(/\s+/g, " ").trim() || "";
 if (!root || root.children.length === 0 || text.length < 20) {
   throw new Error(`Route ${targetPath} did not render meaningful content.`);
+}
+
+if (targetPath === "/") {
+  const signalButtons = [...document.querySelectorAll('button[aria-label^="Show "][aria-label$=" signal"]')];
+  if (signalButtons.length !== 3) {
+    throw new Error("Landing career-signal controls did not render.");
+  }
+  signalButtons[1].click();
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  text = root?.textContent?.replace(/\s+/g, " ").trim() || "";
+  if (!text.includes("Frontend Engineer") || !text.includes("91% fit")) {
+    throw new Error("Landing career-signal interaction did not update.");
+  }
+
+  const expectedPublicLinks = ["/community", "/resources", "/login/student"];
+  for (const href of expectedPublicLinks) {
+    if (!document.querySelector(`footer a[href="${href}"]`)) {
+      throw new Error(`Landing footer link ${href} is missing.`);
+    }
+  }
 }
 
 console.log(JSON.stringify({

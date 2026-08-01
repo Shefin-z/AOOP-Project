@@ -1,17 +1,23 @@
+import { useRef, useState } from "react";
 import { Link } from "../lib/router";
 import {
   ArrowRight,
   BarChart3,
   BookOpen,
   Bot,
+  BriefcaseBusiness,
   CalendarDays,
   Check,
   ChevronRight,
   FileText,
+  GraduationCap,
+  Layers3,
   MessageCircle,
   Play,
+  ShieldCheck,
   Sparkles,
   Target,
+  TrendingUp,
   Users,
   Zap,
 } from "lucide-react";
@@ -25,28 +31,28 @@ const features = [
     tone: "bg-cobalt text-white",
     title: "AI job matching",
     copy: "See why a role fits, which skills matter, and the smartest next step—before you apply.",
-    stat: "92% match clarity",
+    stat: "Explainable matches",
   },
   {
     icon: BarChart3,
     tone: "bg-jade text-white",
     title: "Skill intelligence",
     copy: "Benchmark your strengths with timed assessments and get a living readiness score.",
-    stat: "12 skill paths",
+    stat: "10 adaptive levels",
   },
   {
     icon: FileText,
     tone: "bg-coral text-white",
     title: "Career Vault",
     copy: "Turn your profile into an ATS-ready resume and tailored cover letter in minutes.",
-    stat: "1-click export",
+    stat: "PDF-ready export",
   },
   {
     icon: Users,
     tone: "bg-plum text-white",
     title: "Community momentum",
     copy: "Learn from peers, share wins, discover events, and keep moving with accountability.",
-    stat: "8.4k learners",
+    stat: "Real student network",
   },
 ];
 
@@ -56,13 +62,61 @@ const steps = [
   ["03", "Apply with confidence", "Match with relevant jobs, tailor your story and track every application in one place."],
 ];
 
+const careerSignals = [
+  {
+    title: "Product Analyst",
+    score: 94,
+    gap: "3 focused steps",
+    skills: ["SQL", "Research", "Storytelling"],
+  },
+  {
+    title: "Frontend Engineer",
+    score: 91,
+    gap: "2 focused steps",
+    skills: ["React", "JavaScript", "UI systems"],
+  },
+  {
+    title: "Data Analyst",
+    score: 89,
+    gap: "4 focused steps",
+    skills: ["Python", "SQL", "Dashboards"],
+  },
+];
+
 export default function LandingPage() {
+  const heroVisualRef = useRef(null);
+  const [activeSignal, setActiveSignal] = useState(0);
+  const signal = careerSignals[activeSignal];
+
+  const handleHeroPointerMove = (event) => {
+    const element = heroVisualRef.current;
+    if (!element || event.pointerType === "touch") return;
+    const bounds = element.getBoundingClientRect();
+    const x = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
+    const y = Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height));
+    element.style.setProperty("--hero-x", `${x * 100}%`);
+    element.style.setProperty("--hero-y", `${y * 100}%`);
+    element.style.setProperty("--hero-rx", `${(0.5 - y) * 2.2}deg`);
+    element.style.setProperty("--hero-ry", `${(x - 0.5) * 2.2}deg`);
+  };
+
+  const resetHeroPointer = () => {
+    const element = heroVisualRef.current;
+    if (!element) return;
+    element.style.setProperty("--hero-x", "62%");
+    element.style.setProperty("--hero-y", "28%");
+    element.style.setProperty("--hero-rx", "0deg");
+    element.style.setProperty("--hero-ry", "0deg");
+  };
+
   return (
     <main className="noise min-h-screen overflow-hidden">
       <PublicHeader />
 
-      <section className="page-shell relative pb-16 pt-10 sm:pt-16 lg:pb-24 lg:pt-20">
-        <div className="grid items-center gap-10 lg:grid-cols-[0.88fr_1.12fr] lg:gap-4">
+      <section className="landing-hero-section page-shell relative pb-20 pt-10 sm:pt-16 lg:pb-28 lg:pt-20">
+        <div className="landing-aurora landing-aurora-coral" aria-hidden="true" />
+        <div className="landing-aurora landing-aurora-cobalt" aria-hidden="true" />
+        <div className="grid items-center gap-12 lg:grid-cols-[0.88fr_1.12fr] lg:gap-5">
           <div className="relative z-10">
             <div className="eyebrow mb-6">
               <span className="grid h-7 w-7 place-items-center rounded-full bg-cobalt text-white"><Sparkles size={14} /></span>
@@ -76,8 +130,9 @@ export default function LandingPage() {
               CareerForge connects your skills, goals and progress into one intelligent career system—so every next move feels deliberate.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link to="/login/student?mode=register" className="btn-accent px-6">
-                Start forging your path <ArrowRight size={17} />
+              <Link to="/login/student?mode=register" className="btn-accent landing-primary-cta px-6">
+                Start forging your path
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-white/15"><ArrowRight size={15} /></span>
               </Link>
               <a href="#journey" className="btn-secondary px-5">
                 <Play size={16} fill="currentColor" /> See how it works
@@ -91,27 +146,75 @@ export default function LandingPage() {
                 </span>
               ))}
             </div>
+            <div className="mt-8 flex max-w-xl items-center gap-4 border-t border-ink/[0.08] pt-5">
+              <div className="flex -space-x-2" aria-hidden="true">
+                {[
+                  ["UI", "bg-cobalt"],
+                  ["DU", "bg-jade"],
+                  ["BU", "bg-coral"],
+                  ["JU", "bg-plum"],
+                ].map(([label, tone]) => (
+                  <span key={label} className={`grid h-9 w-9 place-items-center rounded-full border-2 border-canvas text-[9px] font-extrabold text-white ${tone}`}>{label}</span>
+                ))}
+              </div>
+              <p className="text-xs font-semibold leading-5 text-muted">
+                Built for ambitious students across Bangladesh’s leading universities.
+              </p>
+            </div>
           </div>
 
-          <div className="relative lg:-mr-24">
-            <div className="absolute -left-2 top-10 z-10 hidden animate-float rounded-2xl border border-white/80 bg-white/80 p-3 shadow-glass backdrop-blur-xl sm:flex sm:items-center sm:gap-3">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-jade text-white"><Zap size={17} /></span>
-              <span><b className="block text-sm">Readiness +12%</b><small className="text-muted">this month</small></span>
+          <div
+            ref={heroVisualRef}
+            className="landing-hero-shell relative lg:-mr-24"
+            onPointerMove={handleHeroPointerMove}
+            onPointerLeave={resetHeroPointer}
+          >
+            <div className="landing-float-card absolute -left-2 top-8 z-20 hidden animate-float items-center gap-3 sm:flex">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-jade text-white"><TrendingUp size={18} /></span>
+              <span><b className="block text-sm">Readiness rising</b><small className="text-muted">Every action sharpens your signal</small></span>
             </div>
-            <div className="hero-stage overflow-hidden rounded-[40px] border-[8px] border-white/45 shadow-lift">
+            <div className="landing-flow-card absolute right-4 top-5 z-20 hidden items-center gap-2 rounded-full px-3 py-2 text-[10px] font-extrabold uppercase tracking-[0.08em] xl:flex">
+              <span><GraduationCap size={13} /> Profile</span>
+              <ChevronRight size={12} />
+              <span><Layers3 size={13} /> Skills</span>
+              <ChevronRight size={12} />
+              <span><BriefcaseBusiness size={13} /> Opportunity</span>
+            </div>
+            <div className="hero-stage overflow-hidden rounded-[34px] border-[7px] border-white/45 shadow-lift sm:rounded-[40px]">
               <AdaptiveHeroImage
                 alt="Two students exploring their AI-guided career path together"
                 className="aspect-[1.55/1] w-full lg:aspect-[1.45/1]"
                 imageClassName="object-cover object-center"
               />
             </div>
-            <div className="absolute -bottom-5 right-4 glass-strong hidden w-[230px] rounded-[22px] p-4 sm:block">
-              <div className="mb-3 flex items-center justify-between text-xs font-bold">
-                <span>Top role match</span><span className="text-cobalt">94%</span>
+            <div className="landing-signal-card glass-strong relative z-20 mx-4 -mt-9 rounded-[24px] p-4 sm:absolute sm:-bottom-10 sm:right-5 sm:mx-0 sm:mt-0 sm:w-[320px]">
+              <div className="flex items-center justify-between text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted">
+                <span className="flex items-center gap-1.5"><Sparkles size={12} className="text-cobalt" /> Live career signal</span>
+                <span className="text-cobalt">{signal.score}% fit</span>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-coral text-white"><Bot size={18} /></span>
-                <span><b className="block text-sm">Product Analyst</b><small className="text-muted">3 skills away</small></span>
+              <div className="mt-3 flex items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-coral text-white"><Bot size={18} /></span>
+                <span className="min-w-0 flex-1"><b className="block truncate text-sm">{signal.title}</b><small className="text-muted">{signal.gap} to stronger readiness</small></span>
+              </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink/[0.08]">
+                <span className="block h-full rounded-full bg-cobalt transition-[width] duration-500" style={{ width: `${signal.score}%` }} />
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="flex gap-1.5 overflow-hidden">
+                  {signal.skills.map((skill) => <span key={skill} className="rounded-full bg-ink/[0.055] px-2 py-1 text-[9px] font-bold text-muted">{skill}</span>)}
+                </div>
+                <div className="flex shrink-0 gap-1" aria-label="Explore sample career signals">
+                  {careerSignals.map((item, index) => (
+                    <button
+                      key={item.title}
+                      type="button"
+                      aria-label={`Show ${item.title} signal`}
+                      aria-pressed={activeSignal === index}
+                      onClick={() => setActiveSignal(index)}
+                      className={`h-2.5 rounded-full transition-all ${activeSignal === index ? "w-5 bg-cobalt" : "w-2.5 bg-ink/15 hover:bg-ink/30"}`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -133,8 +236,11 @@ export default function LandingPage() {
 
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {features.map(({ icon: Icon, tone, title, copy, stat }, index) => (
-            <article key={title} className={`panel group min-h-[310px] p-5 transition duration-300 hover:-translate-y-1 hover:shadow-lift ${index === 1 ? "lg:translate-y-7" : ""}`}>
-              <div className={`grid h-12 w-12 place-items-center rounded-[18px] ${tone}`}><Icon size={20} /></div>
+            <article key={title} className={`landing-feature-card panel group min-h-[310px] p-5 transition duration-300 hover:-translate-y-1 hover:shadow-lift ${index === 1 ? "lg:translate-y-7" : ""}`}>
+              <div className="flex items-start justify-between">
+                <div className={`grid h-12 w-12 place-items-center rounded-[18px] ${tone}`}><Icon size={20} /></div>
+                <span className="font-display text-2xl italic text-ink/20">0{index + 1}</span>
+              </div>
               <h3 className="mt-8 text-xl font-extrabold tracking-[-0.035em]">{title}</h3>
               <p className="mt-3 text-sm leading-6 text-muted">{copy}</p>
               <div className="mt-7 flex items-center justify-between border-t border-ink/[0.08] pt-4">
@@ -158,7 +264,7 @@ export default function LandingPage() {
             </div>
             <div>
               {steps.map(([number, title, copy]) => (
-                <article key={number} className="grid gap-5 border-b border-white/10 py-8 first:pt-0 sm:grid-cols-[70px_1fr]">
+                <article key={number} className="landing-journey-step grid gap-5 border-b border-white/10 py-8 first:pt-0 sm:grid-cols-[70px_1fr]">
                   <span className="font-display text-4xl italic text-[#E59779]">{number}</span>
                   <div>
                     <h3 className="text-2xl font-bold tracking-[-0.035em]">{title}</h3>
@@ -178,7 +284,7 @@ export default function LandingPage() {
               <div className="eyebrow mb-5 !text-ink"><MessageCircle size={14} /> Powered by peers</div>
               <h2 className="section-title">Progress feels better <i>together.</i></h2>
               <p className="mt-5 leading-7 text-ink/65">Ask questions, share breakthroughs, find accountability and meet people building toward the same future.</p>
-              <Link to="/login/student?mode=register" className="btn-primary mt-7">Join the community <ArrowRight size={16} /></Link>
+              <Link to="/community" className="btn-primary mt-7">Explore the community <ArrowRight size={16} /></Link>
             </div>
             <div className="absolute -bottom-14 -right-12 h-64 w-64 rounded-full border-[45px] border-coral/70" />
             <div className="absolute bottom-12 right-16 hidden rotate-3 rounded-[22px] bg-white/85 p-4 shadow-lift backdrop-blur-md sm:block">
@@ -190,18 +296,21 @@ export default function LandingPage() {
           </div>
 
           <div id="resources" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-1">
-            <div className="panel flex items-center gap-5 p-6">
+            <Link to="/resources" className="panel landing-resource-link flex items-center gap-5 p-6">
               <span className="icon-tile !bg-cobalt"><BookOpen size={20} /></span>
-              <div><b className="block text-base">Curated learning vault</b><p className="mt-1 text-sm text-muted">Resources matched to your current skill gaps.</p></div>
-            </div>
-            <div className="panel flex items-center gap-5 p-6">
+              <div className="min-w-0 flex-1"><b className="block text-base">Curated learning vault</b><p className="mt-1 text-sm text-muted">Resources matched to your current skill gaps.</p></div>
+              <ArrowRight className="landing-resource-arrow text-muted" size={17} />
+            </Link>
+            <Link to="/resources" className="panel landing-resource-link flex items-center gap-5 p-6">
               <span className="icon-tile !bg-coral"><CalendarDays size={20} /></span>
-              <div><b className="block text-base">Career events that matter</b><p className="mt-1 text-sm text-muted">Workshops, career fairs and live mentor sessions.</p></div>
-            </div>
-            <div className="panel flex items-center gap-5 p-6">
+              <div className="min-w-0 flex-1"><b className="block text-base">Career events that matter</b><p className="mt-1 text-sm text-muted">Workshops, career fairs and live mentor sessions.</p></div>
+              <ArrowRight className="landing-resource-arrow text-muted" size={17} />
+            </Link>
+            <Link to="/login/student?mode=register" className="panel landing-resource-link flex items-center gap-5 p-6">
               <span className="icon-tile !bg-jade"><BarChart3 size={20} /></span>
-              <div><b className="block text-base">Progress you can prove</b><p className="mt-1 text-sm text-muted">Weekly insights and achievement milestones.</p></div>
-            </div>
+              <div className="min-w-0 flex-1"><b className="block text-base">Progress you can prove</b><p className="mt-1 text-sm text-muted">Weekly insights and achievement milestones.</p></div>
+              <ArrowRight className="landing-resource-arrow text-muted" size={17} />
+            </Link>
           </div>
         </div>
       </section>
@@ -214,6 +323,10 @@ export default function LandingPage() {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/login/student?mode=register" className="btn-primary !bg-white !text-ink">Create free account <ArrowRight size={17} /></Link>
               <Link to="/login/admin" className="btn-secondary !border-white/20 !bg-white/10 !text-white hover:!bg-white/20">Administrator portal</Link>
+            </div>
+            <div className="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold text-white/70">
+              <span className="flex items-center gap-2"><ShieldCheck size={14} /> Verified student accounts</span>
+              <span className="flex items-center gap-2"><Zap size={14} /> Personalized next steps</span>
             </div>
           </div>
           <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full border-[70px] border-white/10" />

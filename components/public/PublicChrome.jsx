@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, Menu, X } from "lucide-react";
 import { Link } from "../../lib/router";
 import Brand from "../Brand";
@@ -32,9 +32,18 @@ function PublicNavLink({ item, current, mobile = false, onNavigate }) {
 export function PublicHeader({ current = "" }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [menuOpen]);
+
   return (
-    <header className="page-shell relative z-50 pt-5">
-      <nav className="glass flex h-[70px] items-center justify-between rounded-[22px] px-4 sm:px-5">
+    <header className="public-header page-shell sticky top-0 z-50 pt-4">
+      <nav aria-label="Primary navigation" className="glass public-nav flex h-[70px] items-center justify-between rounded-[22px] px-4 sm:px-5">
         <Brand href="/" />
         <div className="hidden items-center gap-1 lg:flex">
           {navigation.map((item) => (
@@ -55,6 +64,7 @@ export function PublicHeader({ current = "" }) {
             className="grid h-10 w-10 place-items-center rounded-xl bg-ink text-white"
             aria-label="Toggle navigation menu"
             aria-expanded={menuOpen}
+            aria-controls="public-mobile-navigation"
           >
             {menuOpen ? <X size={19} /> : <Menu size={19} />}
           </button>
@@ -62,7 +72,7 @@ export function PublicHeader({ current = "" }) {
       </nav>
 
       {menuOpen && (
-        <div className="glass-strong absolute left-5 right-5 top-24 z-50 animate-enter rounded-[22px] p-3 sm:hidden">
+        <div id="public-mobile-navigation" className="glass-strong absolute left-5 right-5 top-[5.65rem] z-50 animate-enter rounded-[22px] p-3 sm:hidden">
           {navigation.map((item) => (
             <PublicNavLink
               key={item.label}
@@ -89,9 +99,9 @@ export function PublicFooter() {
         <Brand href="/" />
         <p className="text-xs text-muted">© 2026 CareerForge. Built for the careers still becoming.</p>
         <div className="flex gap-1">
-          {["Privacy", "Terms", "Support"].map((item) => (
-            <button key={item} className="btn-ghost text-xs">{item}</button>
-          ))}
+          <Link to="/community" className="btn-ghost text-xs">Community</Link>
+          <Link to="/resources" className="btn-ghost text-xs">Resources</Link>
+          <Link to="/login/student" className="btn-ghost text-xs">Sign in</Link>
         </div>
       </div>
     </footer>
