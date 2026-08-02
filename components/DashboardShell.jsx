@@ -23,10 +23,12 @@ export default function DashboardShell({
   actions,
   profileName,
   profileAvatar,
+  readinessScore = 0,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [name, setName] = useState(() => getSessionName(role));
+  const studentReadiness = Math.min(100, Math.max(0, Number(readinessScore) || 0));
 
   useEffect(() => {
     if (profileName) {
@@ -60,9 +62,12 @@ export default function DashboardShell({
         <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-muted">{role === "admin" ? "Operations workspace" : "Career readiness"}</p>
         <div className="mt-2 flex items-center gap-3">
           <div className="relative h-8 flex-1 overflow-hidden rounded-full bg-ink/[0.08]">
-            <div className={`h-full rounded-full ${role === "admin" ? "w-[91%] bg-plum" : "w-[78%] bg-cobalt"}`} />
+            <div
+              className={`h-full rounded-full ${role === "admin" ? "w-[91%] bg-plum" : "bg-cobalt"}`}
+              style={role === "student" ? { width: `${studentReadiness}%` } : undefined}
+            />
           </div>
-          <b className="text-xs">{role === "admin" ? "Live" : "78%"}</b>
+          <b className="text-xs">{role === "admin" ? "Live" : `${studentReadiness}%`}</b>
         </div>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">

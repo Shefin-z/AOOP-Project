@@ -259,6 +259,8 @@ const normalizeApplication = (application, index = 0) => ({
 export default function StudentWorkspace() {
   const [currentUser, setCurrentUser] = useState(readStudentUser);
   const firstName = currentUser.name.split(/\s+/)[0];
+  const currentHour = new Date().getHours();
+  const greeting = currentHour < 12 ? "Good morning" : currentHour < 18 ? "Good afternoon" : "Good evening";
   const [active, setActive] = useState(readStudentSection);
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null);
@@ -281,6 +283,9 @@ export default function StudentWorkspace() {
   const [adaptiveAssessment, setAdaptiveAssessment] = useState(null);
   const [adaptiveLoading, setAdaptiveLoading] = useState(true);
   const [adaptiveError, setAdaptiveError] = useState("");
+  const [overviewData, setOverviewData] = useState(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [overviewError, setOverviewError] = useState("");
   const [platformConfig, setPlatformConfig] = useState({
     features: { coverLetterEnabled: true },
     ai: { coverLetterTone: "Professional" },
@@ -363,6 +368,43 @@ export default function StudentWorkspace() {
 
   useEffect(() => {
     loadAdaptiveAssessment();
+  }, []);
+
+  const loadOverview = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setOverviewLoading(true);
+      setOverviewError("");
+    }
+    try {
+      const nextOverview = await apiRequest("/student/overview");
+      setOverviewData(nextOverview);
+      setOverviewError("");
+      setCurrentUser((current) => ({
+        ...current,
+        readiness_score: nextOverview.readinessScore,
+        profile_completion: nextOverview.calculation.profileCompletion,
+      }));
+    } catch (error) {
+      if (!silent) setOverviewError(error.message);
+    } finally {
+      if (!silent) setOverviewLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOverview();
+    const refresh = () => loadOverview({ silent: true });
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const interval = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, []);
 
   const loadJobData = async ({ silent = false } = {}) => {
@@ -468,7 +510,7 @@ export default function StudentWorkspace() {
         email: nextUser.email || current.email,
         location: nextUser.location || current.location,
       }));
-      await loadAdaptiveAssessment();
+      await Promise.all([loadAdaptiveAssessment(), loadOverview()]);
       notify("Profile changes saved.");
       return true;
     } catch (error) {
@@ -525,7 +567,7 @@ export default function StudentWorkspace() {
         body: JSON.stringify({ answers, startedAt: quiz.startedAt }),
       });
       setQuiz((current) => ({ ...current, submitting: false, finished: true, score: result.percentage, result }));
-      await loadAssessments();
+      await Promise.all([loadAssessments(), loadOverview()]);
     } catch (error) {
       setQuiz((current) => ({ ...current, submitting: false }));
       notify(error.message);
@@ -547,7 +589,7 @@ export default function StudentWorkspace() {
         }),
       });
       setModal(null);
-      await loadJobData();
+      await Promise.all([loadJobData(), loadOverview()]);
       notify(`Application sent to ${job.company}.`);
     } catch (error) {
       notify(error.message);
@@ -558,7 +600,7 @@ export default function StudentWorkspace() {
     if (!window.confirm(`Cancel your application for “${application.role}” at ${application.company}?`)) return;
     try {
       await apiRequest(`/jobs/applications/${application.id}/withdraw`, { method: "PATCH" });
-      await loadJobData();
+      await Promise.all([loadJobData(), loadOverview()]);
       notify(`Application to ${application.company} cancelled.`);
     } catch (error) {
       notify(error.message);
@@ -609,14 +651,25 @@ export default function StudentWorkspace() {
         role="student"
         profileName={currentUser.name}
         profileAvatar={currentUser.avatar_data || currentUser.avatar_url}
+        readinessScore={overviewData?.readinessScore ?? currentUser.readiness_score ?? 0}
         navItems={studentNavItems}
         active={active}
         onNavigate={setActive}
-        title={active === "overview" ? `Good afternoon, ${firstName}` : pageMeta[active][0]}
+        title={active === "overview" ? `${greeting}, ${firstName}` : pageMeta[active][0]}
         subtitle={pageMeta[active][1]}
         actions={pageActions[active]}
       >
-        {active === "overview" && <Overview onNavigate={setActive} onOpenJob={(job) => setModal({ type: "job", job })} assessments={assessmentRecords} jobs={jobRecords} applications={applications} />}
+        {active === "overview" && (
+          <Overview
+            onNavigate={setActive}
+            onOpenJob={(job) => setModal({ type: "job", job })}
+            jobs={jobRecords}
+            data={overviewData}
+            loading={overviewLoading}
+            error={overviewError}
+            onRetry={loadOverview}
+          />
+        )}
         {active === "jobs" && (
           <JobsPage
             jobs={jobRecords}
@@ -683,7 +736,7 @@ export default function StudentWorkspace() {
           attempt={modal.attempt}
           onClose={() => setModal(null)}
           onFinished={async () => {
-            await loadAdaptiveAssessment();
+            await Promise.all([loadAdaptiveAssessment(), loadOverview()]);
           }}
           notify={notify}
         />
@@ -693,84 +746,124 @@ export default function StudentWorkspace() {
   );
 }
 
-function Overview({ onNavigate, onOpenJob, assessments, jobs: availableJobs, applications }) {
-  const completedAssessments = assessments.filter((assessment) => assessment.best_score != null);
-  const nextAssessment = assessments.find((assessment) => assessment.best_score == null) || assessments[0];
-  const careerActions = [
-    nextAssessment
-      ? [`Complete ${nextAssessment.title}`, `${nextAssessment.question_count} questions`, "bg-coral", nextAssessment.best_score == null ? "Start" : "Retry"]
-      : ["No published assessment yet", "Your administrator can publish one", "bg-coral", "Pending"],
-    ["Add one quantified project result", "Profile", "bg-cobalt", "+2%"],
-    ["Finish SQL learning module", "45 min left", "bg-jade", "+3%"],
+function Overview({ onNavigate, onOpenJob, jobs: availableJobs, data, loading, error, onRetry }) {
+  if (loading) {
+    return (
+      <section className="panel grid min-h-[420px] place-items-center p-6 text-center">
+        <div>
+          <RefreshCw className="mx-auto animate-spin text-cobalt" size={30} />
+          <h2 className="mt-4 text-lg font-extrabold">Calculating your real progress</h2>
+          <p className="mt-1 text-xs text-muted">Reading your saved profile, assessments and learning activity.</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <section className="panel grid min-h-[420px] place-items-center p-6 text-center">
+        <div>
+          <AlertTriangle className="mx-auto text-coral" size={30} />
+          <h2 className="mt-4 text-lg font-extrabold">Overview could not be calculated</h2>
+          <p className="mt-1 max-w-md text-xs text-muted">{error || "No dashboard data was returned."}</p>
+          <button onClick={() => onRetry()} className="btn-secondary mt-5"><RefreshCw size={14} /> Try again</button>
+        </div>
+      </section>
+    );
+  }
+
+  const { metrics, calculation, skillSignals, nextActions, readinessScore } = data;
+  const strongestSignal = skillSignals[0];
+  const progressSources = [
+    ["Profile completion", calculation.profileCompletion, "bg-cobalt", "35% weight"],
+    ["Assessment performance", calculation.assessmentPerformance, "bg-jade", "45% weight"],
+    ["Learning progress", calculation.learningProgress, "bg-plum", "20% weight"],
   ];
 
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric icon={Target} label="Readiness score" value="78%" delta="+6% this month" tone="bg-cobalt" />
-        <Metric icon={ListChecks} label="Assessments" value={assessments.length} delta={`${completedAssessments.length} completed`} tone="bg-jade" />
-        <Metric icon={BriefcaseBusiness} label="Applications" value={applications.length} delta={`${availableJobs.length} available jobs`} tone="bg-coral" />
-        <Metric icon={Flame} label="Learning streak" value="6 days" delta="Personal best: 11 days" tone="bg-plum" />
+        <Metric icon={Target} label="Readiness score" value={`${readinessScore}%`} delta="Calculated from saved activity" tone="bg-cobalt" />
+        <Metric icon={ListChecks} label="Assessments completed" value={metrics.assessmentsCompleted} delta={`${metrics.assessmentsPublished} currently published`} tone="bg-jade" />
+        <Metric icon={BriefcaseBusiness} label="Active applications" value={metrics.applicationsActive} delta={`${metrics.availableJobs} live jobs available`} tone="bg-coral" />
+        <Metric icon={BookOpen} label="Learning progress" value={`${calculation.learningProgress}%`} delta={`${metrics.resourcesStarted} started · ${metrics.resourcesCompleted} completed`} tone="bg-plum" />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
         <div className="panel overflow-hidden p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <span className="eyebrow"><Sparkles size={13} /> Career intelligence</span>
-              <h2 className="mt-2 text-xl font-extrabold tracking-[-0.035em]">You are closer than you think.</h2>
-              <p className="mt-1 text-sm text-muted">Three focused actions can move your readiness above 80%.</p>
+              <span className="eyebrow"><Sparkles size={13} /> Real progress summary</span>
+              <h2 className="mt-2 text-xl font-extrabold tracking-[-0.035em]">{readinessScore}% readiness from your saved progress.</h2>
+              <p className="mt-1 text-sm text-muted">No demo scores—this result uses your profile, verified assessments and learning records.</p>
             </div>
-            <button onClick={() => onNavigate("analytics")} className="btn-ghost">View analysis <ArrowRight size={15} /></button>
+            <button onClick={() => onRetry()} className="btn-ghost"><RefreshCw size={15} /> Recalculate</button>
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-[180px_1fr] md:items-center">
-            <div className="relative mx-auto grid h-40 w-40 place-items-center rounded-full" style={{ background: "conic-gradient(#3155C6 0 78%, rgba(30,36,48,.08) 78% 100%)" }}>
+            <div
+              className="relative mx-auto grid h-40 w-40 place-items-center rounded-full"
+              style={{ background: `conic-gradient(#3155C6 0 ${readinessScore}%, rgba(30,36,48,.08) ${readinessScore}% 100%)` }}
+            >
               <div className="grid h-[124px] w-[124px] place-items-center rounded-full bg-paper text-center shadow-inner">
-                <span><b className="block text-3xl tracking-[-0.05em]">78%</b><small className="text-[10px] font-bold uppercase tracking-[.12em] text-muted">Role ready</small></span>
+                <span><b className="block text-3xl tracking-[-0.05em]">{readinessScore}%</b><small className="text-[10px] font-bold uppercase tracking-[.12em] text-muted">Calculated</small></span>
               </div>
             </div>
             <div className="space-y-3">
-              {careerActions.map(([title, label, tone, impact]) => (
-                <div key={title} className="flex items-center gap-3 rounded-2xl border border-ink/[0.07] bg-white/55 p-3">
-                  <span className={`h-9 w-1 rounded-full ${tone}`} />
-                  <span className="flex-1"><b className="block text-sm">{title}</b><small className="text-muted">{label}</small></span>
-                  <b className="text-xs text-jade">{impact}</b>
+              {nextActions.map((action) => (
+                <button
+                  key={action.id}
+                  onClick={() => onNavigate(action.target)}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-ink/[0.07] bg-white/55 p-3 text-left transition hover:border-cobalt/20 hover:bg-white"
+                >
+                  <span className={`h-9 w-1 rounded-full ${action.tone}`} />
+                  <span className="flex-1"><b className="block text-sm">{action.title}</b><small className="text-muted">{action.detail}</small></span>
                   <ChevronRight size={15} className="text-muted" />
-                </div>
+                </button>
               ))}
+              {!nextActions.length && (
+                <div className="rounded-2xl border border-dashed border-ink/15 p-5 text-center text-xs text-muted">
+                  Your saved profile and current activity have no pending dashboard actions.
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         <div className="panel p-6">
           <div className="flex items-center justify-between">
-            <div><h2 className="text-lg font-extrabold tracking-[-0.03em]">Skill signal</h2><p className="text-xs text-muted">Role-weighted strength</p></div>
+            <div><h2 className="text-lg font-extrabold tracking-[-0.03em]">Verified skill results</h2><p className="text-xs text-muted">Best completed score by assessment category</p></div>
             <button onClick={() => onNavigate("assessments")} className="btn-ghost"><Plus size={15} /> Assess</button>
           </div>
-          <div className="mt-6 space-y-5">
-            {[
-              ["Communication", 91, "bg-coral"],
-              ["JavaScript", 82, "bg-cobalt"],
-              ["SQL & data", 76, "bg-jade"],
-              ["Product thinking", 68, "bg-plum"],
-            ].map(([label, value, color]) => (
-              <div key={label}>
-                <div className="mb-2 flex justify-between text-xs"><b>{label}</b><span className="font-bold text-muted">{value}%</span></div>
-                <div className="progress-track"><div className={`reveal-bar h-full rounded-full ${color}`} style={{ width: `${value}%` }} /></div>
+          {skillSignals.length > 0 ? (
+            <>
+              <div className="mt-6 space-y-5">
+                {skillSignals.map((signal) => (
+                  <div key={signal.label}>
+                    <div className="mb-2 flex justify-between text-xs"><b>{signal.label}</b><span className="font-bold text-muted">{signal.score}%</span></div>
+                    <div className="progress-track"><div className={`reveal-bar h-full rounded-full ${signal.tone}`} style={{ width: `${signal.score}%` }} /></div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="mt-6 rounded-2xl bg-jade/10 p-4 text-xs leading-5 text-jade">
-            <b className="block">Strongest signal: Communication</b>
-            You score in the top 18% of students targeting analyst roles.
-          </div>
+              <div className="mt-6 rounded-2xl bg-jade/10 p-4 text-xs leading-5 text-jade">
+                <b className="block">Highest verified result: {strongestSignal.label}</b>
+                Your saved best score in this category is {strongestSignal.score}%.
+              </div>
+            </>
+          ) : (
+            <div className="mt-6 rounded-2xl border border-dashed border-ink/15 p-6 text-center">
+              <ListChecks className="mx-auto text-muted" size={25} />
+              <b className="mt-3 block text-sm">No verified skill result yet</b>
+              <p className="mt-1 text-xs leading-5 text-muted">Complete a published or adaptive assessment to create real skill signals.</p>
+              <button onClick={() => onNavigate("assessments")} className="btn-secondary mt-4">Open assessments</button>
+            </div>
+          )}
         </div>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1.3fr_.7fr]">
         <div className="panel p-6">
           <div className="mb-5 flex items-center justify-between">
-            <div><h2 className="text-lg font-extrabold tracking-[-0.03em]">Best matches for you</h2><p className="text-xs text-muted">Refreshed from your latest assessment</p></div>
+            <div><h2 className="text-lg font-extrabold tracking-[-0.03em]">Latest live opportunities</h2><p className="text-xs text-muted">Published by administrators and still accepting applications</p></div>
             <button onClick={() => onNavigate("jobs")} className="btn-ghost">View all <ArrowRight size={15} /></button>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
@@ -778,14 +871,23 @@ function Overview({ onNavigate, onOpenJob, assessments, jobs: availableJobs, app
             {!availableJobs.length && <div className="rounded-2xl border border-dashed border-ink/15 p-5 text-center text-xs text-muted">No administrator-published jobs are available yet.</div>}
           </div>
         </div>
+
         <div className="panel p-6">
-          <div className="mb-5 flex items-center justify-between">
-            <div><h2 className="text-lg font-extrabold tracking-[-0.03em]">Next event</h2><p className="text-xs text-muted">Sunday · Online</p></div>
-            <span className="icon-tile !h-9 !w-9 !rounded-xl !bg-coral"><CalendarDays size={16} /></span>
+          <div className="mb-5">
+            <h2 className="text-lg font-extrabold tracking-[-0.03em]">Readiness calculation</h2>
+            <p className="text-xs text-muted">Every value comes from your saved account data</p>
           </div>
-          <p className="text-base font-bold leading-6">Designing your first 90-day career plan</p>
-          <div className="mt-4 flex items-center gap-4 text-xs text-muted"><span><Clock3 className="mr-1 inline" size={13} />7:00 PM</span><span><Users className="mr-1 inline" size={13} />126 going</span></div>
-          <button onClick={() => onNavigate("events")} className="btn-secondary mt-5 w-full">View event details</button>
+          <div className="space-y-5">
+            {progressSources.map(([label, value, tone, weight]) => (
+              <div key={label}>
+                <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+                  <span><b>{label}</b><small className="ml-2 text-muted">{weight}</small></span>
+                  <b>{value}%</b>
+                </div>
+                <div className="progress-track"><div className={`h-full rounded-full ${tone}`} style={{ width: `${value}%` }} /></div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     </div>

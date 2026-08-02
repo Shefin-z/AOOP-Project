@@ -18,6 +18,7 @@
     "test:runtime": "node scripts/runtime-smoke.mjs",
     "test:adaptive-assessment": "node scripts/adaptive-assessment-smoke.cjs",
     "test:adaptive-ui": "node scripts/adaptive-assessment-ui-smoke.mjs",
+    "test:student-overview": "node scripts/student-overview-smoke.cjs",
     "test:email-verification": "node scripts/email-verification-smoke.cjs",
     "preview": "vite preview",
     "start:api": "node server/src/app.js",

@@ -1,0 +1,55 @@
+const clampPercentage = (value) => Math.min(100, Math.max(0, Number(value) || 0));
+
+function parseCareerInterests(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function calculateProfileCompletion(profile = {}) {
+  const completedFields = [
+    profile.name,
+    profile.email,
+    profile.university,
+    profile.degree,
+    profile.graduation_year,
+    profile.target_role,
+    profile.location,
+    parseCareerInterests(profile.career_interests).length,
+  ].filter((value) => value !== null && value !== undefined && String(value).trim() !== "").length;
+
+  return Math.round((completedFields / 8) * 100);
+}
+
+function calculateReadiness({
+  profileCompletion = 0,
+  assessmentPerformance = 0,
+  learningProgress = 0,
+} = {}) {
+  const profile = clampPercentage(profileCompletion);
+  const assessments = clampPercentage(assessmentPerformance);
+  const learning = clampPercentage(learningProgress);
+
+  return Math.round((profile * 0.35) + (assessments * 0.45) + (learning * 0.20));
+}
+
+function average(values = []) {
+  const numbers = values
+    .map(Number)
+    .filter((value) => Number.isFinite(value));
+  if (!numbers.length) return 0;
+  return Math.round(numbers.reduce((sum, value) => sum + value, 0) / numbers.length);
+}
+
+module.exports = {
+  average,
+  calculateProfileCompletion,
+  calculateReadiness,
+  clampPercentage,
+  parseCareerInterests,
+};

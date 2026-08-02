@@ -257,7 +257,7 @@ router.post("/register/verify", registrationVerifyLimiter, async (req, res, next
       [pending.name, normalizedEmail, pending.password_hash],
     );
     await connection.execute(
-      "INSERT INTO student_profiles (user_id, university, readiness_score) VALUES (?, ?, 35)",
+      "INSERT INTO student_profiles (user_id, university, readiness_score) VALUES (?, ?, 0)",
       [result.insertId, pending.university || null],
     );
     await connection.execute("DELETE FROM pending_student_registrations WHERE email=?", [normalizedEmail]);
