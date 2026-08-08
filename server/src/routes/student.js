@@ -4,6 +4,7 @@ const { authenticate } = require("../middleware/auth");
 const { ensureAdaptiveAssessmentSchema } = require("../services/adaptive-assessment-schema");
 const { ensureJobSchema } = require("../services/job-schema");
 const { ensureProfileSchema } = require("../services/profile-schema");
+const { ensureMatchingSchema } = require("../services/matching-schema");
 const {
   average,
   calculateProfileCompletion,
@@ -24,6 +25,7 @@ router.get("/overview", async (req, res, next) => {
   try {
     await Promise.all([
       ensureProfileSchema(),
+      ensureMatchingSchema(),
       ensureAdaptiveAssessmentSchema(),
       ensureJobSchema(),
     ]);
@@ -36,6 +38,7 @@ router.get("/overview", async (req, res, next) => {
       applicationRows,
       jobRows,
       learningRows,
+      skillRows,
     ] = await Promise.all([
       query(
         `SELECT u.name, u.email, p.university, p.degree, p.graduation_year,
@@ -91,9 +94,15 @@ router.get("/overview", async (req, res, next) => {
          WHERE lr.status='published'`,
         [req.user.id],
       ),
+      query(
+        `SELECT s.name FROM user_skills us
+         JOIN skills s ON s.id=us.skill_id
+         WHERE us.user_id=? ORDER BY s.name`,
+        [req.user.id],
+      ),
     ]);
 
-    const profile = profileRows[0] || {};
+    const profile = { ...(profileRows[0] || {}), skills: skillRows.map((skill) => skill.name) };
     const program = programRows[0] || {};
     const applicationStats = applicationRows[0] || {};
     const jobStats = jobRows[0] || {};

@@ -5,6 +5,8 @@ const jwt = require("jsonwebtoken");
 const { pool, query } = require("../config/db");
 const { authenticate, JWT_SECRET } = require("../middleware/auth");
 const { ensureProfileSchema } = require("../services/profile-schema");
+const { ensureMatchingSchema } = require("../services/matching-schema");
+const { sanitizeSkillNames } = require("../services/job-matching");
 const { getPlatformSettings } = require("../services/platform-settings");
 const {
   CODE_TTL_MINUTES,
@@ -58,10 +60,57 @@ function profileResponse(row) {
   return {
     ...row,
     career_interests: Array.isArray(careerInterests) ? careerInterests : [],
+    skills: Array.isArray(row.skills) ? row.skills : [],
     graduation_year: row.graduation_year == null ? null : Number(row.graduation_year),
     readiness_score: Number(row.readiness_score || 0),
     profile_completion: Number(row.profile_completion || 0),
   };
+}
+
+async function profileWithSkills(row) {
+  if (!row?.id || row.role !== "student") return profileResponse(row);
+  const skills = await query(
+    `SELECT s.name, us.score, us.source
+     FROM user_skills us JOIN skills s ON s.id=us.skill_id
+     WHERE us.user_id=? ORDER BY s.name`,
+    [row.id],
+  );
+  return profileResponse({ ...row, skills });
+}
+
+async function syncProfileSkills(connection, userId, profileSkills) {
+  const selectedNames = new Set(profileSkills.map((skill) => skill.toLowerCase()));
+  const [existingRows] = await connection.execute(
+    `SELECT us.skill_id, s.name
+     FROM user_skills us JOIN skills s ON s.id=us.skill_id
+     WHERE us.user_id=? AND us.source='profile'`,
+    [userId],
+  );
+
+  for (const skill of profileSkills) {
+    await connection.execute(
+      "INSERT INTO skills (name, category) VALUES (?, 'CareerForge skills') ON DUPLICATE KEY UPDATE name=VALUES(name)",
+      [skill],
+    );
+    const [skillRows] = await connection.execute("SELECT id FROM skills WHERE name=? LIMIT 1", [skill]);
+    await connection.execute(
+      `INSERT INTO user_skills (user_id, skill_id, score, source)
+       VALUES (?, ?, 50, 'profile')
+       ON DUPLICATE KEY UPDATE
+        score=IF(source='profile', VALUES(score), score),
+        source=IF(source='profile', 'profile', source)`,
+      [userId, skillRows[0].id],
+    );
+  }
+
+  for (const existing of existingRows) {
+    if (!selectedNames.has(String(existing.name).toLowerCase())) {
+      await connection.execute(
+        "DELETE FROM user_skills WHERE user_id=? AND skill_id=? AND source='profile'",
+        [userId, existing.skill_id],
+      );
+    }
+  }
 }
 
 router.post("/register", registrationEmailLimiter, async (req, res, next) => {
@@ -302,7 +351,7 @@ router.post("/login", async (req, res, next) => {
 
 router.get("/me", authenticate, async (req, res, next) => {
   try {
-    await ensureProfileSchema();
+    await Promise.all([ensureProfileSchema(), ensureMatchingSchema()]);
     const rows = await query(
       `SELECT u.id, u.name, u.email, u.role, u.status, p.university, p.degree, p.graduation_year,
               p.target_role, p.career_interests, p.location, p.phone, p.bio, p.readiness_score,
@@ -310,7 +359,7 @@ router.get("/me", authenticate, async (req, res, next) => {
        FROM users u LEFT JOIN student_profiles p ON p.user_id = u.id WHERE u.id = ?`,
       [req.user.id],
     );
-    res.json(profileResponse(rows[0]));
+    res.json(await profileWithSkills(rows[0]));
   } catch (error) { next(error); }
 });
 
@@ -320,7 +369,7 @@ router.patch("/me", authenticate, async (req, res, next) => {
     if (req.user.role !== "student") {
       return res.status(403).json({ error: "Student account required" });
     }
-    await ensureProfileSchema();
+    await Promise.all([ensureProfileSchema(), ensureMatchingSchema()]);
     connection = await pool.getConnection();
 
     const name = String(req.body.name || "").trim();
@@ -339,6 +388,7 @@ router.patch("/me", authenticate, async (req, res, next) => {
         .filter((value) => value.length >= 2))]
         .slice(0, 8)
       : [];
+    const profileSkills = sanitizeSkillNames(req.body.skills, 20);
     const graduationValue = String(req.body.graduation_year ?? "").trim();
     const graduationYear = graduationValue ? Number(graduationValue) : null;
     const avatarProvided = Object.prototype.hasOwnProperty.call(req.body, "avatar_data");
@@ -409,6 +459,7 @@ router.patch("/me", authenticate, async (req, res, next) => {
         avatarProvided ? 1 : 0,
       ],
     );
+    await syncProfileSkills(connection, req.user.id, profileSkills);
     await connection.commit();
 
     const [rows] = await connection.execute(
@@ -418,7 +469,7 @@ router.patch("/me", authenticate, async (req, res, next) => {
        FROM users u LEFT JOIN student_profiles p ON p.user_id=u.id WHERE u.id=?`,
       [req.user.id],
     );
-    res.json(profileResponse(rows[0]));
+    res.json(await profileWithSkills(rows[0]));
   } catch (error) {
     try { await connection?.rollback(); } catch {}
     next(error);

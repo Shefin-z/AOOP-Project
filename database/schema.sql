@@ -127,6 +127,22 @@ CREATE TABLE IF NOT EXISTS job_skills (
   CONSTRAINT fk_job_skills_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS job_match_insights (
+  user_id BIGINT UNSIGNED NOT NULL,
+  job_id BIGINT UNSIGNED NOT NULL,
+  profile_signature CHAR(64) NOT NULL,
+  job_signature CHAR(64) NOT NULL,
+  reasons JSON NOT NULL,
+  skill_gaps JSON NOT NULL,
+  generated_model VARCHAR(180) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME NOT NULL,
+  PRIMARY KEY (user_id, job_id, profile_signature, job_signature),
+  INDEX idx_job_match_insights_lookup (user_id, profile_signature, expires_at),
+  CONSTRAINT fk_job_match_insights_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_job_match_insights_job FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS applications (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NOT NULL,

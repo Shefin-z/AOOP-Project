@@ -12,6 +12,9 @@ function parseCareerInterests(value) {
 }
 
 function calculateProfileCompletion(profile = {}) {
+  const skills = Array.isArray(profile.skills)
+    ? profile.skills
+    : parseCareerInterests(profile.skills);
   const completedFields = [
     profile.name,
     profile.email,
@@ -21,9 +24,10 @@ function calculateProfileCompletion(profile = {}) {
     profile.target_role,
     profile.location,
     parseCareerInterests(profile.career_interests).length,
+    skills.length,
   ].filter((value) => value !== null && value !== undefined && String(value).trim() !== "").length;
 
-  return Math.round((completedFields / 8) * 100);
+  return Math.round((completedFields / 9) * 100);
 }
 
 function calculateReadiness({

@@ -4,6 +4,8 @@ const { pool, query } = require("../config/db");
 const { authenticate, adminOnly } = require("../middleware/auth");
 const { ensureJobSchema } = require("../services/job-schema");
 const { ensureProfileSchema } = require("../services/profile-schema");
+const { ensureMatchingSchema } = require("../services/matching-schema");
+const { sanitizeSkillNames } = require("../services/job-matching");
 const { ensureCommunitySchema } = require("../services/community-schema");
 const { analyseContent } = require("../services/content-moderation");
 const { getPlatformSettings, savePlatformSettings } = require("../services/platform-settings");
@@ -207,6 +209,7 @@ function jobPayload(body) {
     description: cleanText(body.description, 20000),
     responsibilities: cleanText(body.responsibilities, 10000) || null,
     requirements: cleanText(body.requirements, 10000),
+    requiredSkills: sanitizeSkillNames(body.requiredSkills, 15),
     category: cleanText(body.category, 100),
     employmentType: employmentTypes.has(body.employmentType) ? body.employmentType : "Full-time",
     location: cleanText(body.location, 180),
@@ -217,6 +220,21 @@ function jobPayload(body) {
     status: jobStatuses.has(body.status) ? body.status : "live",
     expiresAt: expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null,
   };
+}
+
+async function syncJobSkills(connection, jobId, requiredSkills) {
+  await connection.execute("DELETE FROM job_skills WHERE job_id=?", [jobId]);
+  for (const skill of requiredSkills) {
+    await connection.execute(
+      "INSERT INTO skills (name, category) VALUES (?, 'CareerForge skills') ON DUPLICATE KEY UPDATE name=VALUES(name)",
+      [skill],
+    );
+    const [skillRows] = await connection.execute("SELECT id FROM skills WHERE name=? LIMIT 1", [skill]);
+    await connection.execute(
+      "INSERT INTO job_skills (job_id, skill_id, weight, required_score) VALUES (?, ?, 1, 50)",
+      [jobId, skillRows[0].id],
+    );
+  }
 }
 
 function validateJob(payload) {
@@ -401,7 +419,7 @@ router.delete("/questions/:id", async (req, res, next) => {
 
 router.get("/jobs", async (_req, res, next) => {
   try {
-    await ensureJobSchema();
+    await Promise.all([ensureJobSchema(), ensureMatchingSchema()]);
     res.json(await query(
       `SELECT j.id, j.title, j.slug, j.description, j.responsibilities, j.requirements,
        j.category, j.employment_type, j.location, j.workplace_type,
@@ -414,6 +432,11 @@ router.get("/jobs", async (_req, res, next) => {
        COALESCE(application_totals.assessment_count, 0) assessment_count,
        COALESCE(application_totals.interview_count, 0) interview_count,
        COALESCE(application_totals.offer_count, 0) offer_count
+       ,COALESCE((
+         SELECT GROUP_CONCAT(s.name ORDER BY s.name SEPARATOR ', ')
+         FROM job_skills js JOIN skills s ON s.id=js.skill_id
+         WHERE js.job_id=j.id
+       ), '') required_skills
        FROM jobs j
        JOIN companies c ON c.id=j.company_id
        LEFT JOIN (
@@ -438,7 +461,7 @@ async function saveManagedJob(req, res, next, jobId = null) {
   const validationError = validateJob(payload);
   if (validationError) return res.status(400).json({ error: validationError });
 
-  await ensureJobSchema();
+  await Promise.all([ensureJobSchema(), ensureMatchingSchema()]);
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -528,6 +551,8 @@ async function saveManagedJob(req, res, next, jobId = null) {
       );
       savedJobId = jobResult.insertId;
     }
+
+    await syncJobSkills(connection, savedJobId, payload.requiredSkills);
 
     await connection.commit();
     res.status(jobId ? 200 : 201).json({

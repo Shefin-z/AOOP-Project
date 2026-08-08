@@ -2,9 +2,97 @@ const express = require("express");
 const { query } = require("../config/db");
 const { authenticate } = require("../middleware/auth");
 const { ensureJobSchema } = require("../services/job-schema");
+const { ensureMatchingSchema } = require("../services/matching-schema");
 const { getPlatformSettings } = require("../services/platform-settings");
+const {
+  profileForMatching,
+  missingProfileFields,
+  buildLocalMatch,
+  profileSignature,
+  jobSignature,
+  geminiMatchingConfigured,
+  generateGeminiInsights,
+} = require("../services/job-matching");
 
 const router = express.Router();
+const aiGenerationWindows = new Map();
+
+function parseArray(value) {
+  if (Array.isArray(value)) return value;
+  try { return JSON.parse(value || "[]"); } catch { return []; }
+}
+
+function consumeAiGeneration(userId) {
+  const now = Date.now();
+  const current = aiGenerationWindows.get(userId) || [];
+  const active = current.filter((time) => now - time < 10 * 60 * 1000);
+  if (active.length >= 3) {
+    aiGenerationWindows.set(userId, active);
+    return false;
+  }
+  active.push(now);
+  aiGenerationWindows.set(userId, active);
+  return true;
+}
+
+async function fetchCachedInsights(userId, profileFingerprint, matches) {
+  if (!matches.length) return new Map();
+  const jobIds = matches.map((job) => Number(job.id));
+  const placeholders = jobIds.map(() => "?").join(",");
+  const rows = await query(
+    `SELECT job_id, job_signature, reasons, skill_gaps, generated_model
+     FROM job_match_insights
+     WHERE user_id=? AND profile_signature=? AND expires_at>NOW()
+       AND job_id IN (${placeholders})`,
+    [userId, profileFingerprint, ...jobIds],
+  );
+  const expected = new Map(matches.map((job) => [Number(job.id), jobSignature(job)]));
+  const cache = new Map();
+  for (const row of rows) {
+    if (expected.get(Number(row.job_id)) !== row.job_signature) continue;
+    const reasons = parseArray(row.reasons).filter((item) => typeof item === "string").slice(0, 3);
+    const skillGaps = parseArray(row.skill_gaps).filter((item) => typeof item === "string").slice(0, 4);
+    if (reasons.length) cache.set(Number(row.job_id), { reasons, skillGaps, model: row.generated_model });
+  }
+  return cache;
+}
+
+async function cacheInsights(userId, profileFingerprint, insights, matchingJobs, model) {
+  const jobs = new Map(matchingJobs.map((job) => [Number(job.id), job]));
+  for (const insight of insights) {
+    const job = jobs.get(Number(insight.jobId));
+    if (!job) continue;
+    await query(
+      `INSERT INTO job_match_insights
+       (user_id, job_id, profile_signature, job_signature, reasons, skill_gaps, generated_model, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))
+       ON DUPLICATE KEY UPDATE
+        reasons=VALUES(reasons), skill_gaps=VALUES(skill_gaps), generated_model=VALUES(generated_model),
+        created_at=NOW(), expires_at=DATE_ADD(NOW(), INTERVAL 24 HOUR)`,
+      [
+        userId,
+        Number(insight.jobId),
+        profileFingerprint,
+        jobSignature(job),
+        JSON.stringify(insight.reasons),
+        JSON.stringify(insight.skillGaps),
+        model,
+      ],
+    );
+  }
+}
+
+function mergeInsight(match, insight) {
+  if (!insight?.reasons?.length) return match;
+  const validGaps = (insight.skillGaps || []).filter((gap) => match.skill_gaps
+    .some((actual) => actual.toLowerCase() === String(gap).toLowerCase()));
+  return {
+    ...match,
+    reasons: insight.reasons,
+    skill_gaps: validGaps.length ? validGaps : match.skill_gaps,
+    ai_explained: true,
+  };
+}
 
 router.get("/", authenticate, async (req, res, next) => {
   try {
@@ -33,27 +121,82 @@ router.get("/", authenticate, async (req, res, next) => {
 router.get("/recommendations", authenticate, async (req, res, next) => {
   try {
     const settings = await getPlatformSettings();
-    if (!settings.ai.jobRecommendationsEnabled) return res.json([]);
-    await ensureJobSchema();
-    const [profile] = await query("SELECT target_role, readiness_score FROM student_profiles WHERE user_id = ?", [req.user.id]);
-    const skills = await query("SELECT s.name, us.score FROM user_skills us JOIN skills s ON s.id=us.skill_id WHERE us.user_id=?", [req.user.id]);
+    if (req.user.role !== "student") return res.status(403).json({ error: "Student account required" });
+    await Promise.all([ensureJobSchema(), ensureMatchingSchema()]);
+    const [profile] = await query(
+      `SELECT degree, target_role, career_interests, location
+       FROM student_profiles WHERE user_id=? LIMIT 1`,
+      [req.user.id],
+    );
+    const skills = await query(
+      `SELECT s.name, us.score, us.source
+       FROM user_skills us JOIN skills s ON s.id=us.skill_id WHERE us.user_id=?`,
+      [req.user.id],
+    );
     const jobs = await query(
-      `SELECT j.id, j.title, j.description, j.category, c.name company
+      `SELECT j.*, c.name company, c.description company_description,
+        c.website company_website, c.logo_url, c.employee_rating,
+        EXISTS(
+          SELECT 1 FROM applications a
+          WHERE a.job_id=j.id AND a.user_id=? AND a.status<>'withdrawn'
+        ) already_applied,
+        COALESCE((
+          SELECT GROUP_CONCAT(s.name ORDER BY s.name SEPARATOR ', ')
+          FROM job_skills js JOIN skills s ON s.id=js.skill_id
+          WHERE js.job_id=j.id
+        ), '') required_skills
        FROM jobs j JOIN companies c ON c.id=j.company_id
        WHERE j.created_by IS NOT NULL AND j.status='live' AND j.expires_at>NOW()
-       ORDER BY j.created_at DESC LIMIT 50`,
+       ORDER BY j.created_at DESC LIMIT 100`,
+      [req.user.id],
     );
-    try {
-      const response = await fetch(`${process.env.AI_SERVICE_URL || "http://localhost:8000"}/recommend/jobs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile: profile || {}, skills, jobs }),
+    const matchProfile = profileForMatching(profile || {}, skills);
+    const missingFields = missingProfileFields(matchProfile);
+    const matchingEnabled = Boolean(settings.ai.jobRecommendationsEnabled);
+    let matches = matchingEnabled
+      ? jobs.map((job) => buildLocalMatch(matchProfile, job))
+      : jobs.map((job) => ({ ...job, match_percentage: null, reasons: [], skill_gaps: [], matched_skills: [] }));
+
+    matches.sort((left, right) => {
+      const scoreDifference = Number(right.match_percentage ?? -1) - Number(left.match_percentage ?? -1);
+      if (scoreDifference) return scoreDifference;
+      return new Date(right.created_at || 0) - new Date(left.created_at || 0);
+    });
+
+    let aiExplained = 0;
+    if (matchingEnabled && missingFields.length === 0 && geminiMatchingConfigured() && matches.length) {
+      const topMatches = matches.slice(0, 8);
+      const fingerprint = profileSignature(matchProfile);
+      const cachedInsights = await fetchCachedInsights(req.user.id, fingerprint, topMatches);
+      const uncached = topMatches.filter((job) => !cachedInsights.has(Number(job.id)));
+      if (uncached.length && consumeAiGeneration(req.user.id)) {
+        const generated = await generateGeminiInsights(matchProfile, uncached);
+        if (generated.insights.length) {
+          await cacheInsights(req.user.id, fingerprint, generated.insights, uncached, generated.model);
+          for (const insight of generated.insights) {
+            cachedInsights.set(Number(insight.jobId), {
+              reasons: insight.reasons,
+              skillGaps: insight.skillGaps,
+              model: generated.model,
+            });
+          }
+        }
+      }
+      matches = matches.map((job) => {
+        const merged = mergeInsight(job, cachedInsights.get(Number(job.id)));
+        if (merged.ai_explained) aiExplained += 1;
+        return merged;
       });
-      if (!response.ok) throw new Error("AI service unavailable");
-      return res.json(await response.json());
-    } catch {
-      return res.json(jobs.slice(0, 12).map((job) => ({ ...job, match_percentage: null, reasons: [] })));
     }
+    res.json({
+      items: matches,
+      matchingEnabled,
+      profileReady: missingFields.length === 0,
+      missingFields,
+      aiConfigured: geminiMatchingConfigured(),
+      aiExplained,
+      generatedAt: new Date().toISOString(),
+    });
   } catch (error) { next(error); }
 });
 

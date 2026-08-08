@@ -29,6 +29,7 @@ assert.equal(calculateProfileCompletion({
   target_role: "Software Engineer",
   location: "Dhaka",
   career_interests: JSON.stringify(["Technology"]),
+  skills: ["JavaScript"],
 }), 100);
 
 const workspaceSource = fs.readFileSync(

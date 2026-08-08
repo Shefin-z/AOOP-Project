@@ -1113,6 +1113,7 @@ function JobEditorModal({ record, onClose, onSubmit }) {
     description: record?.description || "",
     responsibilities: record?.responsibilities || "",
     requirements: record?.requirements || "",
+    requiredSkills: String(record?.required_skills || "").split(/[,\n;]+/).map((skill) => skill.trim()).filter(Boolean),
     category: record?.category || "",
     employmentType: record?.employment_type || "Full-time",
     location: record?.location || "",
@@ -1152,6 +1153,7 @@ function JobEditorModal({ record, onClose, onSubmit }) {
           <AdminEditorField label="Job description" className="sm:col-span-2"><textarea required className="input min-h-28 resize-y py-3" value={values.description} onChange={(event) => update("description", event.target.value)} placeholder="Describe the opportunity and team." /></AdminEditorField>
           <AdminEditorField label="Responsibilities" className="sm:col-span-2"><textarea className="input min-h-24 resize-y py-3" value={values.responsibilities} onChange={(event) => update("responsibilities", event.target.value)} placeholder="One responsibility per line" /></AdminEditorField>
           <AdminEditorField label="Candidate requirements" className="sm:col-span-2"><textarea required className="input min-h-28 resize-y py-3" value={values.requirements} onChange={(event) => update("requirements", event.target.value)} placeholder={"One requirement per line\ne.g. React and JavaScript\nStrong communication"} /></AdminEditorField>
+          <AdminEditorField label="Required skills for AI matching" className="sm:col-span-2"><input className="input" value={values.requiredSkills.join(", ")} onChange={(event) => update("requiredSkills", event.target.value.split(/[,\n;]+/).map((skill) => skill.trim()).filter(Boolean))} placeholder="e.g. React, JavaScript, SQL, Communication" /><p className="mt-1 text-[10px] leading-4 text-muted">Enter skills separated by commas. These are weighted against the student’s saved skills; they are more reliable than free-text requirements.</p></AdminEditorField>
           <AdminEditorField label="Employment type"><select className="select" value={values.employmentType} onChange={(event) => update("employmentType", event.target.value)}>{["Full-time", "Part-time", "Internship", "Contract"].map((item) => <option key={item}>{item}</option>)}</select></AdminEditorField>
           <AdminEditorField label="Workplace type"><select className="select" value={values.workplaceType} onChange={(event) => update("workplaceType", event.target.value)}>{["On-site", "Hybrid", "Remote"].map((item) => <option key={item}>{item}</option>)}</select></AdminEditorField>
           <AdminEditorField label="Location"><input required className="input" value={values.location} onChange={(event) => update("location", event.target.value)} placeholder="e.g. Dhaka" /></AdminEditorField>
