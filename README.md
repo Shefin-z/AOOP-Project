@@ -66,6 +66,23 @@ GEMINI_MODEL=gemini-3.6-flash
 
 Never use a `VITE_` prefix for this key or commit it to the repository.
 
+## External Bangladesh job feed
+
+CareerForge can also show real listings fetched server-side from Jooble and rank
+them with the same privacy-preserving job-match score used for administrator
+jobs. Students apply on the original provider page, so those applications are
+not recorded as CareerForge applications.
+
+Create a Jooble API key and set this server-only variable:
+
+```bash
+JOOBLE_API_KEY=your-private-jooble-key
+```
+
+The feed is cached for 15 minutes and preserves the last safe cached result if
+the provider is temporarily unavailable. Never use a `VITE_` prefix or commit
+the key.
+
 ### Student email verification
 
 Student signup uses a two-step email verification flow. The server sends a

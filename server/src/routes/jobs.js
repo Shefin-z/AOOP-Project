@@ -3,6 +3,8 @@ const { query } = require("../config/db");
 const { authenticate } = require("../middleware/auth");
 const { ensureJobSchema } = require("../services/job-schema");
 const { ensureMatchingSchema } = require("../services/matching-schema");
+const { ensureExternalJobsSchema } = require("../services/external-jobs-schema");
+const { syncJoobleJobs } = require("../services/external-jobs");
 const { getPlatformSettings } = require("../services/platform-settings");
 const {
   profileForMatching,
@@ -35,49 +37,68 @@ function consumeAiGeneration(userId) {
   return true;
 }
 
+function matchingId(job) {
+  return Number(job.match_id ?? job.id);
+}
+
 async function fetchCachedInsights(userId, profileFingerprint, matches) {
   if (!matches.length) return new Map();
-  const jobIds = matches.map((job) => Number(job.id));
-  const placeholders = jobIds.map(() => "?").join(",");
-  const rows = await query(
-    `SELECT job_id, job_signature, reasons, skill_gaps, generated_model
-     FROM job_match_insights
-     WHERE user_id=? AND profile_signature=? AND expires_at>NOW()
-       AND job_id IN (${placeholders})`,
-    [userId, profileFingerprint, ...jobIds],
-  );
-  const expected = new Map(matches.map((job) => [Number(job.id), jobSignature(job)]));
+  const internalMatches = matches.filter((job) => !job.is_external);
+  const externalMatches = matches.filter((job) => job.is_external);
+  const expected = new Map(matches.map((job) => [matchingId(job), jobSignature(job)]));
   const cache = new Map();
-  for (const row of rows) {
-    if (expected.get(Number(row.job_id)) !== row.job_signature) continue;
-    const reasons = parseArray(row.reasons).filter((item) => typeof item === "string").slice(0, 3);
-    const skillGaps = parseArray(row.skill_gaps).filter((item) => typeof item === "string").slice(0, 4);
-    if (reasons.length) cache.set(Number(row.job_id), { reasons, skillGaps, model: row.generated_model });
+  const addRows = (rows, idForRow) => {
+    for (const row of rows) {
+      const id = idForRow(row);
+      if (expected.get(id) !== row.job_signature) continue;
+      const reasons = parseArray(row.reasons).filter((item) => typeof item === "string").slice(0, 3);
+      const skillGaps = parseArray(row.skill_gaps).filter((item) => typeof item === "string").slice(0, 4);
+      if (reasons.length) cache.set(id, { reasons, skillGaps, model: row.generated_model });
+    }
+  };
+  if (internalMatches.length) {
+    const jobIds = internalMatches.map((job) => Number(job.id));
+    const placeholders = jobIds.map(() => "?").join(",");
+    const rows = await query(
+      `SELECT job_id, job_signature, reasons, skill_gaps, generated_model
+       FROM job_match_insights
+       WHERE user_id=? AND profile_signature=? AND expires_at>NOW()
+         AND job_id IN (${placeholders})`,
+      [userId, profileFingerprint, ...jobIds],
+    );
+    addRows(rows, (row) => Number(row.job_id));
+  }
+  if (externalMatches.length) {
+    const jobIds = externalMatches.map((job) => Number(job.external_job_id));
+    const placeholders = jobIds.map(() => "?").join(",");
+    const rows = await query(
+      `SELECT external_job_id, job_signature, reasons, skill_gaps, generated_model
+       FROM external_job_match_insights
+       WHERE user_id=? AND profile_signature=? AND expires_at>NOW()
+         AND external_job_id IN (${placeholders})`,
+      [userId, profileFingerprint, ...jobIds],
+    );
+    addRows(rows, (row) => -Number(row.external_job_id));
   }
   return cache;
 }
 
 async function cacheInsights(userId, profileFingerprint, insights, matchingJobs, model) {
-  const jobs = new Map(matchingJobs.map((job) => [Number(job.id), job]));
+  const jobs = new Map(matchingJobs.map((job) => [matchingId(job), job]));
   for (const insight of insights) {
     const job = jobs.get(Number(insight.jobId));
     if (!job) continue;
+    const table = job.is_external ? "external_job_match_insights" : "job_match_insights";
+    const idColumn = job.is_external ? "external_job_id" : "job_id";
+    const sourceId = job.is_external ? Number(job.external_job_id) : Number(job.id);
     await query(
-      `INSERT INTO job_match_insights
-       (user_id, job_id, profile_signature, job_signature, reasons, skill_gaps, generated_model, expires_at)
+      `INSERT INTO ${table}
+       (user_id, ${idColumn}, profile_signature, job_signature, reasons, skill_gaps, generated_model, expires_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))
        ON DUPLICATE KEY UPDATE
         reasons=VALUES(reasons), skill_gaps=VALUES(skill_gaps), generated_model=VALUES(generated_model),
         created_at=NOW(), expires_at=DATE_ADD(NOW(), INTERVAL 24 HOUR)`,
-      [
-        userId,
-        Number(insight.jobId),
-        profileFingerprint,
-        jobSignature(job),
-        JSON.stringify(insight.reasons),
-        JSON.stringify(insight.skillGaps),
-        model,
-      ],
+      [userId, sourceId, profileFingerprint, jobSignature(job), JSON.stringify(insight.reasons), JSON.stringify(insight.skillGaps), model],
     );
   }
 }
@@ -122,7 +143,7 @@ router.get("/recommendations", authenticate, async (req, res, next) => {
   try {
     const settings = await getPlatformSettings();
     if (req.user.role !== "student") return res.status(403).json({ error: "Student account required" });
-    await Promise.all([ensureJobSchema(), ensureMatchingSchema()]);
+    await Promise.all([ensureJobSchema(), ensureMatchingSchema(), ensureExternalJobsSchema()]);
     const [profile] = await query(
       `SELECT degree, target_role, career_interests, location
        FROM student_profiles WHERE user_id=? LIMIT 1`,
@@ -151,11 +172,35 @@ router.get("/recommendations", authenticate, async (req, res, next) => {
       [req.user.id],
     );
     const matchProfile = profileForMatching(profile || {}, skills);
+    let externalFeed = { configured: false, status: "not_configured", jobs: [], source: "Jooble" };
+    try {
+      externalFeed = await syncJoobleJobs(matchProfile);
+    } catch {
+      // A third-party provider must never hide CareerForge-admin jobs.
+      externalFeed = { configured: true, status: "provider_error", jobs: [], source: "Jooble" };
+    }
     const missingFields = missingProfileFields(matchProfile);
     const matchingEnabled = Boolean(settings.ai.jobRecommendationsEnabled);
+    const externalJobs = externalFeed.jobs.map((job) => ({
+      ...job,
+      id: `external-${job.id}`,
+      match_id: -Number(job.id),
+      external_job_id: Number(job.id),
+      is_external: true,
+      source_name: "Jooble",
+      source_url: job.source_url,
+      expires_at: job.active_until,
+      created_at: job.source_updated_at || job.created_at,
+      already_applied: false,
+      required_skills: "",
+    }));
+    const matchingJobs = [
+      ...jobs.map((job) => ({ ...job, match_id: Number(job.id), is_external: false, source_name: "CareerForge" })),
+      ...externalJobs,
+    ];
     let matches = matchingEnabled
-      ? jobs.map((job) => buildLocalMatch(matchProfile, job))
-      : jobs.map((job) => ({ ...job, match_percentage: null, reasons: [], skill_gaps: [], matched_skills: [] }));
+      ? matchingJobs.map((job) => buildLocalMatch(matchProfile, job))
+      : matchingJobs.map((job) => ({ ...job, match_percentage: null, reasons: [], skill_gaps: [], matched_skills: [] }));
 
     matches.sort((left, right) => {
       const scoreDifference = Number(right.match_percentage ?? -1) - Number(left.match_percentage ?? -1);
@@ -168,7 +213,7 @@ router.get("/recommendations", authenticate, async (req, res, next) => {
       const topMatches = matches.slice(0, 8);
       const fingerprint = profileSignature(matchProfile);
       const cachedInsights = await fetchCachedInsights(req.user.id, fingerprint, topMatches);
-      const uncached = topMatches.filter((job) => !cachedInsights.has(Number(job.id)));
+      const uncached = topMatches.filter((job) => !cachedInsights.has(matchingId(job)));
       if (uncached.length && consumeAiGeneration(req.user.id)) {
         const generated = await generateGeminiInsights(matchProfile, uncached);
         if (generated.insights.length) {
@@ -183,7 +228,7 @@ router.get("/recommendations", authenticate, async (req, res, next) => {
         }
       }
       matches = matches.map((job) => {
-        const merged = mergeInsight(job, cachedInsights.get(Number(job.id)));
+        const merged = mergeInsight(job, cachedInsights.get(matchingId(job)));
         if (merged.ai_explained) aiExplained += 1;
         return merged;
       });
@@ -195,6 +240,12 @@ router.get("/recommendations", authenticate, async (req, res, next) => {
       missingFields,
       aiConfigured: geminiMatchingConfigured(),
       aiExplained,
+      externalFeed: {
+        configured: externalFeed.configured,
+        source: externalFeed.source,
+        status: externalFeed.status,
+        count: externalJobs.length,
+      },
       generatedAt: new Date().toISOString(),
     });
   } catch (error) { next(error); }

@@ -232,7 +232,7 @@ function profileSignature(profile) {
 
 function jobSignature(job) {
   return signature({
-    id: Number(job.id),
+    id: job.match_id ?? job.id,
     title: cleanText(job.title, 180),
     category: cleanText(job.category, 100),
     description: cleanText(job.description, 1500),
@@ -263,7 +263,7 @@ function buildInsightPrompt(profile, jobs) {
     `Skills: ${profile.skills.join(", ") || "Not provided"}`,
     "Jobs:",
     JSON.stringify(jobs.map((job) => ({
-      jobId: Number(job.id),
+      jobId: Number(job.match_id ?? job.id),
       title: cleanText(job.title, 180),
       category: cleanText(job.category, 100),
       requiredSkills: jobSkillNames(job),
@@ -275,7 +275,7 @@ function buildInsightPrompt(profile, jobs) {
 }
 
 function normaliseInsightPayload(payload, allowedJobs) {
-  const allowed = new Set(allowedJobs.map((job) => Number(job.id)));
+  const allowed = new Set(allowedJobs.map((job) => Number(job.match_id ?? job.id)));
   const seen = new Set();
   return (Array.isArray(payload?.matches) ? payload.matches : [])
     .filter((item) => allowed.has(Number(item?.jobId)) && !seen.has(Number(item?.jobId)))

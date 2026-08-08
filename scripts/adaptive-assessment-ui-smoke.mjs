@@ -78,6 +78,7 @@ const fetchMock = async (url, options = {}) => {
       },
     }, 201);
   }
+  if (target.endsWith("/api/jobs/recommendations")) return response({ items: [], matchingEnabled: true, profileReady: true, missingFields: [], aiConfigured: true, aiExplained: 0, externalFeed: { configured: false, source: "Jooble", status: "not_configured", count: 0 } });
   if (target.endsWith("/api/jobs") || target.endsWith("/api/jobs/applications/mine") || target.endsWith("/api/community/posts")) return response([]);
   if (target.endsWith("/api/community/posting-status")) return response({ canPost: true, nextPostAt: null, cooldownHours: 12 });
   return response({ error: `Unexpected test URL: ${target}` }, 404);

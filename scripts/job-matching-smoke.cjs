@@ -42,7 +42,8 @@ assert.ok(match.skill_gaps.includes("CSS"));
 assert.ok(match.reasons.length > 0);
 
 const prompt = buildInsightPrompt(profile, [{
-  id: 31,
+  id: "external-31",
+  match_id: -31,
   title: "Junior Frontend Software Engineer",
   category: "Engineering",
   description: "Build product interfaces.",
@@ -50,6 +51,7 @@ const prompt = buildInsightPrompt(profile, [{
   required_skills: "React, JavaScript",
 }]);
 assert.doesNotMatch(prompt, /Private Student Name|private\.student@example\.com/);
+assert.match(prompt, /"jobId":-31/);
 assert.notEqual(profileSignature(profile), profileSignature({ ...profile, skills: ["Python"] }));
 
 console.log("Job matching smoke test passed.");
