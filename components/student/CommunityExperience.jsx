@@ -89,6 +89,7 @@ function PostCard({ post, viewer, onUpdate, onRemove, notify }) {
   const [busyAction, setBusyAction] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const tags = jsonList(post.tags);
+  const awaitingReview = post.status === "pending_review";
 
   const loadComments = async () => {
     setCommentsLoading(true);
@@ -220,6 +221,12 @@ function PostCard({ post, viewer, onUpdate, onRemove, notify }) {
       </header>
 
       <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-7 text-ink/80 dark:text-white/75">{post.content}</p>
+      {awaitingReview && (
+        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-500/20 bg-amber-400/10 p-3 text-xs leading-5 text-amber-800 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 shrink-0" size={15} />
+          <span><b>Awaiting administrator review.</b> Only you and CareerForge administrators can see this post until it is approved.</span>
+        </div>
+      )}
       {!!post.link_url && (
         <a href={post.link_url} target="_blank" rel="noreferrer" className="mt-4 flex items-center gap-3 rounded-2xl border border-ink/10 bg-white/45 p-4 transition hover:-translate-y-0.5 hover:bg-white/70 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cobalt/10 text-cobalt"><Link2 size={18} /></span>
@@ -230,14 +237,16 @@ function PostCard({ post, viewer, onUpdate, onRemove, notify }) {
       {!!tags.length && <div className="mt-4 flex flex-wrap gap-2">{tags.map((tag) => <span className="tag" key={tag}>{tag}</span>)}</div>}
 
       <footer className="mt-5 flex flex-wrap items-center gap-2 border-t border-ink/[0.07] pt-4">
+        {awaitingReview ? <span className="text-xs font-bold text-muted">Community actions will be available after approval.</span> : <>
         <button disabled={busyAction === "like"} onClick={toggleLike} className={`btn-ghost min-h-9 ${Number(post.liked) === 1 ? "!bg-coral/10 !text-coral" : ""}`}>
           <Heart size={15} fill={Number(post.liked) === 1 ? "currentColor" : "none"} /> {Number(post.likes || 0)}
         </button>
         <button onClick={toggleComments} className={`btn-ghost min-h-9 ${commentsOpen ? "!bg-cobalt/10 !text-cobalt" : ""}`}><MessageCircle size={15} /> {Number(post.comments || 0)}</button>
         <button disabled={busyAction === "share"} onClick={sharePost} className="btn-ghost ml-auto min-h-9"><Share2 size={15} /> {Number(post.share_count || 0) ? Number(post.share_count) : "Share"}</button>
+        </>}
       </footer>
 
-      {commentsOpen && (
+      {!awaitingReview && commentsOpen && (
         <section className="mt-4 rounded-2xl bg-ink/[0.025] p-3 dark:bg-white/[0.035]">
           <div className="flex gap-2">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cobalt text-[10px] font-extrabold text-white">{initials(viewer?.name)}</span>

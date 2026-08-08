@@ -631,8 +631,15 @@ export default function StudentWorkspace() {
         method: "POST",
         body: JSON.stringify(payload),
       });
+      if (result.post) {
+        setPosts((current) => [result.post, ...current.filter((post) => Number(post.id) !== Number(result.post.id))]);
+      }
+      setPostingStatus((current) => ({
+        ...current,
+        canPost: !result.nextPostAt,
+        nextPostAt: result.nextPostAt || null,
+      }));
       setModal(null);
-      await loadCommunity({ silent: true });
       notify(result.message);
     } catch (error) {
       notify(error.message);

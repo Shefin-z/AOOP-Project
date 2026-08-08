@@ -20,6 +20,7 @@
     "test:adaptive-ui": "node scripts/adaptive-assessment-ui-smoke.mjs",
     "test:student-overview": "node scripts/student-overview-smoke.cjs",
     "test:job-matching": "node scripts/job-matching-smoke.cjs",
+    "test:community-posts": "node scripts/community-posts-smoke.cjs",
     "test:email-verification": "node scripts/email-verification-smoke.cjs",
     "preview": "vite preview",
     "start:api": "node server/src/app.js",

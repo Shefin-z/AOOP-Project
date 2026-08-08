@@ -65,7 +65,7 @@ router.get("/posts", async (req, res, next) => {
   try {
     await ensureCommunitySchema();
     const rows = await query(
-      `SELECT p.id, p.user_id, p.content, p.media_url, p.link_url, p.tags, p.share_count,
+      `SELECT p.id, p.user_id, p.content, p.media_url, p.link_url, p.tags, p.share_count, p.status,
               p.created_at, u.name author, u.role author_role, sp.university, sp.avatar_url,
               (SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) likes,
               (SELECT COUNT(*) FROM comments c WHERE c.post_id=p.id AND c.status='visible') comments,
@@ -74,10 +74,10 @@ router.get("/posts", async (req, res, next) => {
        FROM community_posts p
        JOIN users u ON u.id=p.user_id
        LEFT JOIN student_profiles sp ON sp.user_id=u.id
-       WHERE p.status='visible'
+       WHERE p.status='visible' OR (p.user_id=? AND p.status='pending_review')
        ORDER BY p.created_at DESC
        LIMIT 100`,
-      [req.user.id, req.user.id],
+      [req.user.id, req.user.id, req.user.id],
     );
     res.json(rows);
   } catch (error) { next(error); }
@@ -140,10 +140,21 @@ router.post("/posts", async (req, res, next) => {
         moderation.reasons.length ? JSON.stringify(moderation.reasons) : null,
       ],
     );
+    const [createdRows] = await connection.execute(
+      `SELECT p.id, p.user_id, p.content, p.media_url, p.link_url, p.tags, p.share_count, p.status,
+              p.created_at, u.name author, u.role author_role, sp.university, sp.avatar_url,
+              0 likes, 0 comments, 0 liked, 1 is_owner
+       FROM community_posts p
+       JOIN users u ON u.id=p.user_id
+       LEFT JOIN student_profiles sp ON sp.user_id=u.id
+       WHERE p.id=? LIMIT 1`,
+      [result.insertId],
+    );
     await connection.commit();
     res.status(201).json({
       id: result.insertId,
       status,
+      post: createdRows[0],
       nextPostAt: req.user.role === "admin" ? null : new Date(Date.now() + (12 * 60 * 60 * 1000)).toISOString(),
       risk: { score: moderation.score, label: moderation.label, reasons: moderation.reasons },
       message: status === "visible" ? "Post published" : "Post submitted for administrator review",
