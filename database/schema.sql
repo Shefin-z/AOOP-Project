@@ -108,6 +108,9 @@ CREATE TABLE IF NOT EXISTS jobs (
   status ENUM('draft', 'pending', 'live', 'closed') NOT NULL DEFAULT 'draft',
   expires_at DATETIME NULL,
   created_by BIGINT UNSIGNED NULL,
+  application_mode ENUM('careerforge', 'external') NOT NULL DEFAULT 'careerforge',
+  external_apply_url VARCHAR(1000) NULL,
+  source_label VARCHAR(120) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_jobs_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
@@ -116,6 +119,15 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 ALTER TABLE jobs
   ADD COLUMN IF NOT EXISTS created_by BIGINT UNSIGNED NULL AFTER expires_at;
+
+ALTER TABLE jobs
+  ADD COLUMN IF NOT EXISTS application_mode ENUM('careerforge', 'external') NOT NULL DEFAULT 'careerforge' AFTER created_by;
+
+ALTER TABLE jobs
+  ADD COLUMN IF NOT EXISTS external_apply_url VARCHAR(1000) NULL AFTER application_mode;
+
+ALTER TABLE jobs
+  ADD COLUMN IF NOT EXISTS source_label VARCHAR(120) NULL AFTER external_apply_url;
 
 CREATE TABLE IF NOT EXISTS job_skills (
   job_id BIGINT UNSIGNED NOT NULL,
@@ -451,58 +463,4 @@ CREATE TABLE IF NOT EXISTS platform_settings (
   setting_value JSON NOT NULL,
   updated_by BIGINT UNSIGNED NULL,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
--- Server-synchronized third-party job listings. Students apply on the provider's site;
--- CareerForge does not create a local application for these listings.
-CREATE TABLE IF NOT EXISTS external_jobs (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  source VARCHAR(40) NOT NULL,
-  source_job_id VARCHAR(190) NOT NULL,
-  title VARCHAR(255) NOT NULL,
-  company VARCHAR(255) NULL,
-  location VARCHAR(255) NULL,
-  workplace_type VARCHAR(40) NULL,
-  employment_type VARCHAR(80) NULL,
-  category VARCHAR(120) NULL,
-  description TEXT NULL,
-  requirements TEXT NULL,
-  salary_text VARCHAR(255) NULL,
-  source_url VARCHAR(1000) NOT NULL,
-  source_updated_at DATETIME NULL,
-  first_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  active_until DATETIME NOT NULL,
-  payload_hash CHAR(64) NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_external_jobs_source_id (source, source_job_id),
-  INDEX idx_external_jobs_active (source, active_until),
-  INDEX idx_external_jobs_updated (source_updated_at)
-);
-
-CREATE TABLE IF NOT EXISTS external_job_fetches (
-  source VARCHAR(40) NOT NULL,
-  request_key CHAR(64) NOT NULL,
-  last_attempt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  last_fetched_at DATETIME NULL,
-  total_count INT UNSIGNED NOT NULL DEFAULT 0,
-  last_error VARCHAR(500) NULL,
-  PRIMARY KEY (source, request_key)
-);
-
-CREATE TABLE IF NOT EXISTS external_job_match_insights (
-  user_id BIGINT UNSIGNED NOT NULL,
-  external_job_id BIGINT UNSIGNED NOT NULL,
-  profile_signature CHAR(64) NOT NULL,
-  job_signature CHAR(64) NOT NULL,
-  reasons JSON NOT NULL,
-  skill_gaps JSON NOT NULL,
-  generated_model VARCHAR(180) NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  expires_at DATETIME NOT NULL,
-  PRIMARY KEY (user_id, external_job_id, profile_signature, job_signature),
-  INDEX idx_external_match_insights_lookup (user_id, profile_signature, expires_at),
-  CONSTRAINT fk_external_match_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_external_match_job FOREIGN KEY (external_job_id) REFERENCES external_jobs(id) ON DELETE CASCADE
 );

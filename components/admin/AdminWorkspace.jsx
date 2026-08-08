@@ -726,11 +726,11 @@ function JobsAdmin({ records, loading, error, onRetry, onEdit, onStatus, onDelet
                   const expired = expiry.getTime() <= Date.now();
                   return (
                     <tr key={record.id} className="hover:bg-white/60">
-                      <td className="max-w-[280px] px-4 py-4"><b className="block">{record.title}</b><small className="line-clamp-1 text-muted">{record.requirements}</small></td>
+                      <td className="max-w-[280px] px-4 py-4"><b className="block">{record.title}</b>{record.application_mode === "external" && <span className="mt-1 inline-flex rounded-full bg-jade/10 px-2 py-0.5 text-[9px] font-extrabold text-jade">Verified source link</span>}<small className="mt-1 line-clamp-1 text-muted">{record.requirements}</small></td>
                       <td className="px-4 py-4 text-muted">{record.company_name}</td>
                       <td className="px-4 py-4 text-muted">{record.location} · {record.workplace_type}</td>
                       <td className="px-4 py-4 text-muted">{record.employment_type}</td>
-                      <td className="px-4 py-4"><b className="text-cobalt">{Number(record.application_count || 0)}</b>{Number(record.withdrawn_count || 0) > 0 && <small className="ml-2 text-muted">{Number(record.withdrawn_count)} cancelled</small>}</td>
+                      <td className="px-4 py-4">{record.application_mode === "external" ? <span className="text-[10px] font-bold text-muted">External · not tracked</span> : <><b className="text-cobalt">{Number(record.application_count || 0)}</b>{Number(record.withdrawn_count || 0) > 0 && <small className="ml-2 text-muted">{Number(record.withdrawn_count)} cancelled</small>}</>}</td>
                       <td className={`px-4 py-4 ${expired ? "font-bold text-coral" : "text-muted"}`}>{Number.isNaN(expiry.getTime()) ? "—" : expiry.toLocaleDateString()}</td>
                       <td className="px-4 py-4"><ContentStatus value={expired && record.status === "live" ? "expired" : record.status} /></td>
                       <td className="px-4 py-4"><div className="flex gap-1"><button onClick={() => onEdit(record)} className="btn-ghost min-h-8" aria-label="Edit job"><Pencil size={14} /></button><button onClick={() => onStatus(record, record.status === "live" ? "draft" : "live")} className={`btn-ghost min-h-8 gap-1 ${record.status === "live" ? "text-coral" : "text-jade"}`} aria-label={record.status === "live" ? "Hide job" : "Publish job"}>{record.status === "live" ? <><LockKeyhole size={14} /> Hide</> : <><Eye size={14} /> Publish</>}</button><button onClick={() => onDelete(record)} className="btn-ghost min-h-8 text-coral" aria-label="Delete job"><Trash2 size={14} /></button></div></td>
@@ -1123,6 +1123,9 @@ function JobEditorModal({ record, onClose, onSubmit }) {
     currency: record?.currency || "BDT",
     expiresAt: expiryValue,
     status: record?.status || "draft",
+    applicationMode: record?.application_mode || "careerforge",
+    externalApplyUrl: record?.external_apply_url || "",
+    sourceLabel: record?.source_label || "Verified company source",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -1161,11 +1164,13 @@ function JobEditorModal({ record, onClose, onSubmit }) {
           <AdminEditorField label="Minimum salary"><input min="0" type="number" className="input" value={values.salaryMin} onChange={(event) => update("salaryMin", event.target.value)} placeholder="Optional" /></AdminEditorField>
           <AdminEditorField label="Maximum salary"><input min="0" type="number" className="input" value={values.salaryMax} onChange={(event) => update("salaryMax", event.target.value)} placeholder="Optional" /></AdminEditorField>
           <AdminEditorField label="Currency"><input required maxLength="3" className="input uppercase" value={values.currency} onChange={(event) => update("currency", event.target.value.toUpperCase())} /></AdminEditorField>
+          <AdminEditorField label="Application route"><select className="select" value={values.applicationMode} onChange={(event) => update("applicationMode", event.target.value)}><option value="careerforge">Apply with CareerForge · tracked</option><option value="external">Official source link · verified external job</option></select></AdminEditorField>
+          {values.applicationMode === "external" && <><AdminEditorField label="Official application URL" className="sm:col-span-2"><input required type="url" className="input" value={values.externalApplyUrl} onChange={(event) => update("externalApplyUrl", event.target.value)} placeholder="https://company.com/careers/job-id" /><p className="mt-1 text-[10px] leading-4 text-muted">Use only the employer's official career page or an authorized partner link. CareerForge will not collect an internal application for this listing.</p></AdminEditorField><AdminEditorField label="Source label" className="sm:col-span-2"><input className="input" value={values.sourceLabel} onChange={(event) => update("sourceLabel", event.target.value)} placeholder="e.g. Official bKash careers page" /></AdminEditorField></>}
           <AdminEditorField label="Student portal visibility"><select className="select" value={values.status} onChange={(event) => update("status", event.target.value)}><option value="live">Publish now · visible to students</option><option value="draft">Save as draft · hidden</option><option value="pending">Pending review · hidden</option><option value="closed">Closed · hidden</option></select></AdminEditorField>
         </div>
         <div className={`mt-4 rounded-2xl border p-4 text-xs leading-5 ${values.status === "live" ? "border-jade/20 bg-jade/10 text-jade" : "border-ink/10 bg-ink/[0.035] text-muted"}`}>
           <b className="block">{values.status === "live" ? "This job will appear in Available jobs." : "This job will remain hidden from students."}</b>
-          {values.status === "live" ? "Students can open the listing and submit one authenticated application before the expiry date." : "You can publish it later from the Job management table."}
+          {values.status === "live" ? values.applicationMode === "external" ? "Students will see the verified listing and apply on the official source page. External applications are not counted inside CareerForge." : "Students can open the listing and submit one authenticated application before the expiry date." : "You can publish it later from the Job management table."}
         </div>
         {error && <p className="mt-4 rounded-xl bg-coral/10 px-3 py-2 text-xs font-bold text-coral">{error}</p>}
         <div className="mt-7 flex justify-end gap-3"><button type="button" onClick={onClose} className="btn-secondary">Cancel</button><button disabled={saving} className="btn-primary !bg-plum disabled:opacity-50">{saving ? "Saving..." : record ? "Save job" : "Create job"} <ArrowRight size={15} /></button></div>

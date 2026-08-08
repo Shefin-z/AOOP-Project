@@ -4,6 +4,9 @@ let schemaPromise;
 
 async function buildJobSchema() {
   await query("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS created_by BIGINT UNSIGNED NULL AFTER expires_at");
+  await query("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS application_mode ENUM('careerforge', 'external') NOT NULL DEFAULT 'careerforge' AFTER created_by");
+  await query("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS external_apply_url VARCHAR(1000) NULL AFTER application_mode");
+  await query("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_label VARCHAR(120) NULL AFTER external_apply_url");
   await query("ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_snapshot JSON NULL AFTER resume_url");
   await query("ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_file_name VARCHAR(255) NULL AFTER resume_snapshot");
   await query("ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_file_type VARCHAR(100) NULL AFTER resume_file_name");

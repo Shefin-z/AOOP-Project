@@ -222,7 +222,6 @@ const createItemId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 
 const jobTones = ["bg-coral", "bg-cobalt", "bg-plum", "bg-jade", "bg-ink"];
 
 const formatJobSalary = (job) => {
-  if (job.salary_text) return job.salary_text;
   const minimum = job.salary_min == null ? null : Number(job.salary_min);
   const maximum = job.salary_max == null ? null : Number(job.salary_max);
   if (minimum == null && maximum == null) return "Salary not disclosed";
@@ -275,7 +274,7 @@ export default function StudentWorkspace() {
     missingFields: [],
     aiConfigured: false,
     aiExplained: 0,
-    externalFeed: { configured: false, source: "Jooble", status: "not_configured", count: 0 },
+    verifiedSourceJobs: 0,
   });
   const [savedJobs, setSavedJobs] = useState([]);
   const [events, setEvents] = useState(seedEvents);
@@ -435,7 +434,7 @@ export default function StudentWorkspace() {
           missingFields: Array.isArray(recommendations.missingFields) ? recommendations.missingFields : [],
           aiConfigured: Boolean(recommendations.aiConfigured),
           aiExplained: Number(recommendations.aiExplained || 0),
-          externalFeed: recommendations.externalFeed || { configured: false, source: "Jooble", status: "not_configured", count: 0 },
+          verifiedSourceJobs: Number(recommendations.verifiedSourceJobs || 0),
         });
       }
       setApplications(nextApplications.map(normalizeApplication));
@@ -992,7 +991,7 @@ function JobsPage({ jobs: availableJobs, recommendations, loading, error, onRetr
               <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-[18px] text-base font-extrabold text-white ${job.tone}`}>{job.logo}</span>
               <div className="min-w-0 flex-1">
                 <div className="flex justify-between gap-3">
-                  <div><h3 className="truncate text-base font-extrabold">{job.title}</h3><p className="mt-0.5 text-xs font-semibold text-muted">{job.company}</p><div className="mt-2 flex flex-wrap gap-1.5">{job.match_percentage != null && <span className="inline-flex rounded-full bg-cobalt/10 px-2 py-1 text-[10px] font-extrabold text-cobalt">{job.match_percentage}% AI match</span>}{job.is_external && <span className="inline-flex rounded-full bg-jade/10 px-2 py-1 text-[10px] font-extrabold text-jade">Via {job.source_name || "external source"}</span>}</div></div>
+                  <div><h3 className="truncate text-base font-extrabold">{job.title}</h3><p className="mt-0.5 text-xs font-semibold text-muted">{job.company}</p><div className="mt-2 flex flex-wrap gap-1.5">{job.match_percentage != null && <span className="inline-flex rounded-full bg-cobalt/10 px-2 py-1 text-[10px] font-extrabold text-cobalt">{job.match_percentage}% AI match</span>}{job.application_mode === "external" && <span className="inline-flex rounded-full bg-jade/10 px-2 py-1 text-[10px] font-extrabold text-jade">Via {job.source_name || "verified source"}</span>}</div></div>
                   <button onClick={() => onSave(job.id)} className={`grid h-9 w-9 place-items-center rounded-xl border border-ink/[0.08] ${saved.includes(job.id) ? "bg-cobalt text-white" : "bg-white/60 text-muted"}`}><Bookmark size={16} fill={saved.includes(job.id) ? "currentColor" : "none"} /></button>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted"><span><MapPin className="mr-1 inline" size={12} />{job.displayLocation}</span><span><Clock3 className="mr-1 inline" size={12} />{job.type}</span></div>
@@ -1003,8 +1002,8 @@ function JobsPage({ jobs: availableJobs, recommendations, loading, error, onRetr
             <div className="mt-4 flex flex-wrap gap-1.5">{job.requirementsList.slice(0, 4).map((requirement) => <span className="tag" key={requirement}>{requirement}</span>)}</div>
             {job.matched_skills?.length > 0 && <p className="mt-3 text-[11px] font-bold text-jade">Matches: {job.matched_skills.join(", ")}</p>}
             <div className="mt-5 flex items-center justify-between">
-              <span><b className="block text-sm">{job.salary}</b><small className="text-[10px] text-muted">{job.is_external ? `Source refreshed ${new Date(job.created_at || job.updated_at).toLocaleDateString()}` : `Apply by ${new Date(job.expires_at).toLocaleDateString()}`}</small></span>
-              <button onClick={() => onOpen(job)} className={`min-h-10 px-4 ${job.already_applied ? "btn-secondary !text-jade" : "btn-primary"}`}>{job.is_external ? "View source" : job.already_applied ? "Application sent" : "View & apply"} <ArrowRight size={15} /></button>
+              <span><b className="block text-sm">{job.salary}</b><small className="text-[10px] text-muted">{job.application_mode === "external" ? "Apply on the official source" : `Apply by ${new Date(job.expires_at).toLocaleDateString()}`}</small></span>
+              <button onClick={() => onOpen(job)} className={`min-h-10 px-4 ${job.already_applied ? "btn-secondary !text-jade" : "btn-primary"}`}>{job.application_mode === "external" ? "View source" : job.already_applied ? "Application sent" : "View & apply"} <ArrowRight size={15} /></button>
             </div>
           </article>
         ))}
@@ -1805,16 +1804,17 @@ function ProfilePage({ user, onSave, notify }) {
 }
 
 function JobModal({ job, applied, onClose, onApply }) {
-  const isExternal = Boolean(job.is_external);
+  const isExternal = job.application_mode === "external";
+  const externalApplyUrl = job.external_apply_url;
   const openExternalJob = () => {
-    if (job.source_url) window.open(job.source_url, "_blank", "noopener,noreferrer");
+    if (externalApplyUrl) window.open(externalApplyUrl, "_blank", "noopener,noreferrer");
   };
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-card max-h-[92vh] max-w-3xl overflow-y-auto" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start gap-4"><span className={`grid h-14 w-14 shrink-0 place-items-center rounded-[20px] text-lg font-extrabold text-white ${job.tone}`}>{job.logo}</span><div className="flex-1"><h2 className="text-xl font-extrabold">{job.title}</h2><p className="mt-1 text-sm text-muted">{job.company} · {job.displayLocation}</p></div><button onClick={onClose} className="btn-ghost min-h-9"><X size={18} /></button></div>
-        <div className="mt-6 flex flex-wrap gap-2"><span className="tag">{job.type || "Role"}</span>{job.category && <span className="tag">{job.category}</span>}<span className="tag">{job.salary}</span><span className="tag !bg-coral/10 !text-coral"><Clock3 size={12} /> {isExternal ? `Via ${job.source_name || "external source"}` : `Apply by ${new Date(job.expires_at).toLocaleDateString()}`}</span>{applied && <span className="tag !bg-jade/10 !text-jade"><CheckCircle2 size={12} /> Already applied</span>}</div>
-        {isExternal && <p className="mt-4 rounded-xl border border-jade/20 bg-jade/5 p-3 text-xs leading-5 text-muted">This is a real listing from {job.source_name || "an external source"}. Applying opens the original provider page, so CareerForge cannot track its final application status.</p>}
+        <div className="mt-6 flex flex-wrap gap-2"><span className="tag">{job.type || "Role"}</span>{job.category && <span className="tag">{job.category}</span>}<span className="tag">{job.salary}</span><span className="tag !bg-coral/10 !text-coral"><Clock3 size={12} /> {isExternal ? `Via ${job.source_name || "verified company source"}` : `Apply by ${new Date(job.expires_at).toLocaleDateString()}`}</span>{applied && <span className="tag !bg-jade/10 !text-jade"><CheckCircle2 size={12} /> Already applied</span>}</div>
+        {isExternal && <p className="mt-4 rounded-xl border border-jade/20 bg-jade/5 p-3 text-xs leading-5 text-muted">This verified job links to {job.source_name || "the company’s official application source"}. Applying opens that site, so CareerForge does not track the final application status.</p>}
         <div className="my-6 h-px bg-ink/[0.08]" />
         <h3 className="text-sm font-extrabold">About the opportunity</h3>
         <p className="mt-2 whitespace-pre-line text-sm leading-7 text-muted">{job.description}</p>

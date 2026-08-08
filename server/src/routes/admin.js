@@ -147,9 +147,22 @@ const jobStatuses = new Set(["draft", "pending", "live", "closed"]);
 const applicationStatuses = new Set(["applied", "in_review", "assessment", "interview", "offer", "rejected"]);
 const employmentTypes = new Set(["Full-time", "Part-time", "Internship", "Contract"]);
 const workplaceTypes = new Set(["On-site", "Hybrid", "Remote"]);
+const applicationModes = new Set(["careerforge", "external"]);
 
 function cleanText(value, maxLength = 5000) {
   return String(value || "").trim().slice(0, maxLength);
+}
+
+function cleanExternalApplyUrl(value) {
+  const raw = cleanText(value, 1000);
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (!["http:", "https:"].includes(url.protocol) || !url.hostname || url.username || url.password) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 function assessmentPayload(body) {
@@ -201,6 +214,7 @@ function jobPayload(body) {
   const expiresAt = rawExpiry
     ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(rawExpiry) ? `${rawExpiry}T23:59:59.999Z` : rawExpiry)
     : null;
+  const applicationMode = applicationModes.has(body.applicationMode) ? body.applicationMode : "careerforge";
   return {
     companyName: cleanText(body.companyName, 160),
     companyDescription: cleanText(body.companyDescription, 5000) || null,
@@ -219,6 +233,9 @@ function jobPayload(body) {
     currency: cleanText(body.currency, 3).toUpperCase() || "BDT",
     status: jobStatuses.has(body.status) ? body.status : "live",
     expiresAt: expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null,
+    applicationMode,
+    externalApplyUrl: applicationMode === "external" ? cleanExternalApplyUrl(body.externalApplyUrl) : null,
+    sourceLabel: applicationMode === "external" ? cleanText(body.sourceLabel, 120) || "Verified company source" : null,
   };
 }
 
@@ -245,6 +262,9 @@ function validateJob(payload) {
   if (payload.expiresAt.getTime() <= Date.now()) return "Expiry date must be in the future";
   if (payload.salaryMin !== null && payload.salaryMax !== null && payload.salaryMin > payload.salaryMax) {
     return "Maximum salary must be greater than or equal to minimum salary";
+  }
+  if (payload.applicationMode === "external" && !payload.externalApplyUrl) {
+    return "Add a valid official application URL for this verified external job";
   }
   return null;
 }
@@ -424,6 +444,7 @@ router.get("/jobs", async (_req, res, next) => {
       `SELECT j.id, j.title, j.slug, j.description, j.responsibilities, j.requirements,
        j.category, j.employment_type, j.location, j.workplace_type,
        j.salary_min, j.salary_max, j.currency, j.status, j.expires_at,
+       j.application_mode, j.external_apply_url, j.source_label,
        j.created_at, j.updated_at, c.name company_name, c.description company_description,
        c.website company_website, c.logo_url company_logo,
        COALESCE(application_totals.application_count, 0) application_count,
@@ -512,6 +533,9 @@ async function saveManagedJob(req, res, next, jobId = null) {
       payload.currency,
       payload.status,
       payload.expiresAt,
+      payload.applicationMode,
+      payload.externalApplyUrl,
+      payload.sourceLabel,
     ];
 
     let savedJobId = jobId;
@@ -519,7 +543,8 @@ async function saveManagedJob(req, res, next, jobId = null) {
       await connection.execute(
         `UPDATE jobs SET company_id=?, title=?, description=?, responsibilities=?,
          requirements=?, category=?, employment_type=?, location=?, workplace_type=?,
-         salary_min=?, salary_max=?, currency=?, status=?, expires_at=?
+         salary_min=?, salary_max=?, currency=?, status=?, expires_at=?, application_mode=?,
+         external_apply_url=?, source_label=?
          WHERE id=? AND created_by IS NOT NULL`,
         [...values, jobId],
       );
@@ -528,8 +553,8 @@ async function saveManagedJob(req, res, next, jobId = null) {
         `INSERT INTO jobs
          (company_id, title, slug, description, responsibilities, requirements, category,
           employment_type, location, workplace_type, salary_min, salary_max, currency,
-          status, expires_at, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          status, expires_at, application_mode, external_apply_url, source_label, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           companyId,
           payload.title,
@@ -546,6 +571,9 @@ async function saveManagedJob(req, res, next, jobId = null) {
           payload.currency,
           payload.status,
           payload.expiresAt,
+          payload.applicationMode,
+          payload.externalApplyUrl,
+          payload.sourceLabel,
           req.user.id,
         ],
       );
