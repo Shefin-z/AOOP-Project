@@ -59,7 +59,6 @@ import Toast from "../Toast";
 import { CommunityPage, CommunityPostCooldown, CommunityPostModal } from "./CommunityExperience";
 import {
   achievements as seedAchievements,
-  events as seedEvents,
   performanceSeries,
   resources,
 } from "../../lib/mockData";
@@ -277,7 +276,10 @@ export default function StudentWorkspace() {
     verifiedSourceJobs: 0,
   });
   const [savedJobs, setSavedJobs] = useState([]);
-  const [events, setEvents] = useState(seedEvents);
+  const [events, setEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState("");
+  const [reservingEventId, setReservingEventId] = useState(null);
   const [posts, setPosts] = useState([]);
   const [communityLoading, setCommunityLoading] = useState(true);
   const [communityError, setCommunityError] = useState("");
@@ -462,6 +464,38 @@ export default function StudentWorkspace() {
     };
   }, []);
 
+  const loadEvents = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setEventsLoading(true);
+      setEventsError("");
+    }
+    try {
+      const records = await apiRequest("/events");
+      setEvents(Array.isArray(records) ? records : []);
+      setEventsError("");
+    } catch (error) {
+      if (!silent) setEventsError(error.message);
+    } finally {
+      if (!silent) setEventsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEvents();
+    const refresh = () => loadEvents({ silent: true });
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const interval = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
+
   const loadCommunity = async ({ silent = false } = {}) => {
     if (!silent) {
       setCommunityLoading(true);
@@ -627,6 +661,26 @@ export default function StudentWorkspace() {
     }
   };
 
+  const reserveEvent = async (event) => {
+    if (reservingEventId) return;
+    setReservingEventId(event.id);
+    try {
+      const result = await apiRequest(`/events/${event.id}/register`, { method: "POST" });
+      setEvents((current) => current.map((item) => Number(item.id) === Number(event.id) ? {
+        ...item,
+        registered: true,
+        registration_count: Number(result.registrationCount ?? item.registration_count ?? 0),
+        seats_remaining: result.seatsRemaining ?? item.seats_remaining,
+      } : item));
+      notify(result.message);
+    } catch (error) {
+      notify(error.message);
+      await loadEvents({ silent: true });
+    } finally {
+      setReservingEventId(null);
+    }
+  };
+
   const publishCommunityPost = async (payload) => {
     try {
       const result = await apiRequest("/community/posts", {
@@ -662,7 +716,7 @@ export default function StudentWorkspace() {
       </div>
     ),
     events: (
-      <button className="btn-secondary"><CalendarDays size={16} /> Sync calendar</button>
+      <button onClick={() => loadEvents()} className="btn-secondary"><RefreshCw size={16} /> Refresh events</button>
     ),
   };
 
@@ -733,7 +787,7 @@ export default function StudentWorkspace() {
         {active === "analytics" && <AnalyticsPage notify={notify} />}
         {active === "learning" && <LearningPage notify={notify} />}
         {active === "community" && <CommunityPage posts={posts} setPosts={setPosts} loading={communityLoading} error={communityError} onRetry={loadCommunity} notify={notify} viewer={currentUser} onNewPost={() => setModal({ type: "post" })} postingStatus={postingStatus} />}
-        {active === "events" && <EventsPage events={events} onRegister={(id) => { setEvents((current) => current.map((event) => event.id === id ? { ...event, registered: !event.registered } : event)); notify("Event registration updated."); }} />}
+        {active === "events" && <EventsPage events={events} loading={eventsLoading} error={eventsError} onRetry={loadEvents} reservingEventId={reservingEventId} onRegister={reserveEvent} />}
         {active === "achievements" && <AchievementsPage />}
         {active === "profile" && <ProfilePage notify={notify} user={currentUser} onSave={saveProfile} />}
       </DashboardShell>
@@ -1621,7 +1675,37 @@ function LegacyCommunityPage({ posts, setPosts, notify, viewer, onNewPost }) {
   );
 }
 
-function EventsPage({ events, onRegister }) {
+function EventsPage({ events, loading, error, onRetry, onRegister, reservingEventId }) {
+  const [view, setView] = useState("list");
+  const [month, setMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
+  const moveMonth = (offset) => setMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+  if (loading) return <div className="grid min-h-64 place-items-center text-center"><RefreshCw className="animate-spin text-cobalt" size={28} /><p className="mt-3 text-xs font-bold text-muted">Loading published events...</p></div>;
+  if (error) return <div className="grid min-h-64 place-items-center text-center"><div><AlertTriangle className="mx-auto text-coral" size={30} /><h2 className="mt-3 font-extrabold">Could not load events</h2><p className="mt-1 text-xs text-muted">{error}</p><button onClick={onRetry} className="btn-secondary mt-5"><RefreshCw size={14} /> Try again</button></div></div>;
+  return <div className="space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex rounded-xl bg-ink/[0.05] p-1">{["list", "calendar"].map((item) => <button onClick={() => setView(item)} key={item} className={`min-h-9 rounded-lg px-3 text-xs font-bold capitalize ${view === item ? "bg-white shadow-sm" : "text-muted"}`}>{item}</button>)}</div><p className="text-xs font-semibold text-muted">{events.length} published upcoming event{events.length === 1 ? "" : "s"}</p></div>
+    {!events.length ? <section className="panel grid min-h-72 place-items-center p-8 text-center"><div><CalendarDays className="mx-auto text-muted" size={34} /><h2 className="mt-4 text-lg font-extrabold">No upcoming events yet</h2><p className="mt-2 max-w-md text-sm leading-6 text-muted">Your CareerForge administrator has not published an event yet. New workshops and sessions will appear here automatically.</p></div></section> : view === "list" ? <section className="grid gap-4 lg:grid-cols-2">{events.map((event) => {
+      const start = new Date(event.starts_at);
+      const end = new Date(event.ends_at);
+      const full = event.capacity != null && Number(event.seats_remaining) <= 0 && !event.registered;
+      const reserving = Number(reservingEventId) === Number(event.id);
+      return <article className="panel flex gap-4 p-5" key={event.id}><div className="grid h-16 w-16 shrink-0 place-items-center rounded-[20px] bg-ink text-center text-white"><span><b className="block text-xl leading-none">{start.getDate()}</b><small className="text-[9px] font-bold uppercase text-white/60">{start.toLocaleDateString([], { month: "short" })}</small></span></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><span className="tag">{event.event_type}</span>{event.registered && <span className="tag !bg-jade/10 !text-jade"><Check size={12} /> Reserved</span>}</div><h3 className="mt-2 text-sm font-extrabold leading-5">{event.title}</h3>{event.description && <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted">{event.description}</p>}<p className="mt-3 text-[11px] text-muted"><Clock3 className="mr-1 inline" size={12} />{start.toLocaleDateString()} · {start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}{!Number.isNaN(end.getTime()) && ` – ${end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}</p><p className="mt-1 text-[11px] text-muted">{event.host}{event.location ? ` · ${event.location}` : ""}</p><div className="mt-4 flex flex-wrap items-center gap-2"><button disabled={event.registered || full || reserving} onClick={() => onRegister(event)} className={`min-h-9 ${event.registered ? "btn-secondary !text-jade" : full ? "btn-secondary" : "btn-primary"}`}>{event.registered ? <><Check size={14} /> Seat reserved</> : full ? "Fully reserved" : reserving ? "Reserving..." : "Reserve a seat"}</button>{event.event_url && <a href={event.event_url} target="_blank" rel="noreferrer" className="btn-secondary min-h-9"><ExternalLink size={14} /> Event link</a>}<small className="text-[10px] font-bold text-muted">{event.capacity == null ? `${event.registration_count} reserved` : `${event.seats_remaining} seat${Number(event.seats_remaining) === 1 ? "" : "s"} left`}</small></div></div></article>;
+    })}</section> : <EventCalendar events={events} month={month} onPrevious={() => moveMonth(-1)} onNext={() => moveMonth(1)} />}
+  </div>;
+}
+
+function EventCalendar({ events, month, onPrevious, onNext }) {
+  const year = month.getFullYear();
+  const monthIndex = month.getMonth();
+  const firstDay = new Date(year, monthIndex, 1).getDay();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const cells = Array.from({ length: Math.ceil((firstDay + daysInMonth) / 7) * 7 }, (_, index) => index - firstDay + 1);
+  return <section className="panel overflow-hidden p-5"><div className="mb-5 flex items-center justify-between"><button onClick={onPrevious} className="btn-ghost" aria-label="Previous month"><ChevronLeft size={16} /></button><h2 className="font-extrabold">{month.toLocaleDateString([], { month: "long", year: "numeric" })}</h2><button onClick={onNext} className="btn-ghost" aria-label="Next month"><ChevronRight size={16} /></button></div><div className="calendar-grid border-l border-t border-ink/[0.07]">{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => <div key={day} className="border-b border-r border-ink/[0.07] p-2 text-center text-[9px] font-extrabold text-muted">{day}</div>)}{cells.map((day, index) => { const dayEvents = day > 0 && day <= daysInMonth ? events.filter((event) => { const start = new Date(event.starts_at); return start.getFullYear() === year && start.getMonth() === monthIndex && start.getDate() === day; }) : []; return <div key={index} className="relative min-h-24 border-b border-r border-ink/[0.07] p-2 text-xs font-semibold text-muted">{day > 0 && day <= daysInMonth ? day : ""}{dayEvents.slice(0, 2).map((event) => <span key={event.id} title={event.title} className="mt-1 block truncate rounded-lg bg-cobalt px-1.5 py-1 text-[8px] font-bold text-white">{event.title}</span>)}</div>; })}</div></section>;
+}
+
+function LegacyEventsPage({ events, onRegister }) {
   const [view, setView] = useState("list");
   return (
     <div className="space-y-5">
@@ -1630,12 +1714,12 @@ function EventsPage({ events, onRegister }) {
         <section className="grid gap-4 lg:grid-cols-2">
           {events.map((event) => <article className="panel flex gap-4 p-5" key={event.id}><div className="grid h-16 w-16 shrink-0 place-items-center rounded-[20px] bg-ink text-center text-white"><span><b className="block text-xl leading-none">{event.day}</b><small className="text-[9px] font-bold text-white/60">{event.month}</small></span></div><div className="min-w-0 flex-1"><span className="tag mb-2">{event.type}</span><h3 className="text-sm font-extrabold leading-5">{event.title}</h3><p className="mt-2 text-[11px] text-muted"><Clock3 className="mr-1 inline" size={12} />{event.time} · {event.host}</p><button onClick={() => onRegister(event.id)} className={`mt-4 min-h-9 ${event.registered ? "btn-secondary !text-jade" : "btn-primary"}`}>{event.registered ? <><Check size={14} /> Registered</> : "Reserve a seat"}</button></div></article>)}
         </section>
-      ) : <Calendar events={events} />}
+      ) : <LegacyEventCalendar events={events} />}
     </div>
   );
 }
 
-function Calendar({ events }) {
+function LegacyEventCalendar({ events }) {
   return <section className="panel overflow-hidden p-5"><div className="mb-5 flex items-center justify-between"><button className="btn-ghost"><ChevronLeft size={16} /></button><h2 className="font-extrabold">August 2026</h2><button className="btn-ghost"><ChevronRight size={16} /></button></div><div className="calendar-grid border-l border-t border-ink/[0.07]">{["SUN","MON","TUE","WED","THU","FRI","SAT"].map((day) => <div key={day} className="border-b border-r border-ink/[0.07] p-2 text-center text-[9px] font-extrabold text-muted">{day}</div>)}{Array.from({ length: 35 }, (_, i) => i - 1).map((day, index) => <div key={index} className="relative min-h-20 border-b border-r border-ink/[0.07] p-2 text-xs font-semibold text-muted">{day > 0 && day <= 31 ? day : ""}{events.some((e) => Number(e.day) === day) && <span className="absolute bottom-2 left-2 right-2 rounded-lg bg-cobalt px-1.5 py-1 text-[8px] font-bold text-white">Career event</span>}</div>)}</div></section>;
 }
 

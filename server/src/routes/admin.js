@@ -5,6 +5,7 @@ const { authenticate, adminOnly } = require("../middleware/auth");
 const { ensureJobSchema } = require("../services/job-schema");
 const { ensureProfileSchema } = require("../services/profile-schema");
 const { ensureMatchingSchema } = require("../services/matching-schema");
+const { ensureEventSchema } = require("../services/event-schema");
 const { sanitizeSkillNames } = require("../services/job-matching");
 const { ensureCommunitySchema } = require("../services/community-schema");
 const { analyseContent } = require("../services/content-moderation");
@@ -148,6 +149,7 @@ const applicationStatuses = new Set(["applied", "in_review", "assessment", "inte
 const employmentTypes = new Set(["Full-time", "Part-time", "Internship", "Contract"]);
 const workplaceTypes = new Set(["On-site", "Hybrid", "Remote"]);
 const applicationModes = new Set(["careerforge", "external"]);
+const eventStatuses = new Set(["draft", "published", "cancelled"]);
 
 function cleanText(value, maxLength = 5000) {
   return String(value || "").trim().slice(0, maxLength);
@@ -163,6 +165,54 @@ function cleanExternalApplyUrl(value) {
   } catch {
     return null;
   }
+}
+
+function cleanEventUrl(value) {
+  const raw = cleanText(value, 500);
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (!["http:", "https:"].includes(url.protocol) || !url.hostname || url.username || url.password) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function eventDate(value) {
+  const raw = cleanText(value, 60);
+  if (!raw) return null;
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function eventPayload(body) {
+  const rawCapacity = body.capacity === "" || body.capacity === null || body.capacity === undefined
+    ? null
+    : Number(body.capacity);
+  return {
+    title: cleanText(body.title, 220),
+    description: cleanText(body.description, 10000) || null,
+    eventType: cleanText(body.eventType, 100),
+    host: cleanText(body.host, 180),
+    location: cleanText(body.location, 220) || null,
+    eventUrl: cleanEventUrl(body.eventUrl),
+    startsAt: eventDate(body.startsAt),
+    endsAt: eventDate(body.endsAt),
+    capacity: rawCapacity === null ? null : (Number.isInteger(rawCapacity) && rawCapacity > 0 && rawCapacity <= 100000 ? rawCapacity : Number.NaN),
+    status: eventStatuses.has(body.status) ? body.status : "draft",
+  };
+}
+
+function validateEvent(payload, body) {
+  if (!payload.title || !payload.eventType || !payload.host || !payload.startsAt || !payload.endsAt) {
+    return "Title, type, host, start time and end time are required";
+  }
+  if (payload.endsAt.getTime() <= payload.startsAt.getTime()) return "End time must be after the start time";
+  if (payload.status === "published" && payload.startsAt.getTime() <= Date.now()) return "Published events must start in the future";
+  if (Number.isNaN(payload.capacity)) return "Capacity must be a whole number between 1 and 100000";
+  if (cleanText(body.eventUrl, 500) && !payload.eventUrl) return "Event URL must be a valid http or https link";
+  return null;
 }
 
 function assessmentPayload(body) {
@@ -434,6 +484,95 @@ router.delete("/questions/:id", async (req, res, next) => {
     );
     if (!result.affectedRows) return res.status(404).json({ error: "Question not found" });
     res.json({ message: "Question deleted" });
+  } catch (error) { next(error); }
+});
+
+router.get("/events", async (_req, res, next) => {
+  try {
+    await ensureEventSchema();
+    res.json(await query(
+      `SELECT e.id, e.title, e.description, e.event_type, e.host, e.location, e.event_url,
+              e.starts_at, e.ends_at, e.capacity, e.status, e.created_at, e.updated_at,
+              COALESCE((SELECT COUNT(*) FROM event_registrations er WHERE er.event_id=e.id), 0) registration_count
+       FROM events e
+       WHERE e.created_by IS NOT NULL
+       ORDER BY e.starts_at DESC`,
+    ));
+  } catch (error) { next(error); }
+});
+
+async function saveManagedEvent(req, res, next, eventId = null) {
+  const payload = eventPayload(req.body || {});
+  const validationError = validateEvent(payload, req.body || {});
+  if (validationError) return res.status(400).json({ error: validationError });
+  try {
+    await ensureEventSchema();
+    if (eventId) {
+      const [existing] = await query(
+        `SELECT e.starts_at,
+                (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id=e.id) registration_count
+         FROM events e WHERE e.id=? AND e.created_by IS NOT NULL`,
+        [eventId],
+      );
+      if (!existing) return res.status(404).json({ error: "Event not found" });
+      if (payload.capacity != null && Number(existing.registration_count || 0) > payload.capacity) {
+        return res.status(400).json({ error: "Capacity cannot be lower than the current reservation count" });
+      }
+      const result = await query(
+        `UPDATE events SET title=?, description=?, event_type=?, host=?, location=?, event_url=?,
+         starts_at=?, ends_at=?, capacity=?, status=?
+         WHERE id=? AND created_by IS NOT NULL`,
+        [
+          payload.title, payload.description, payload.eventType, payload.host, payload.location, payload.eventUrl,
+          payload.startsAt, payload.endsAt, payload.capacity, payload.status, eventId,
+        ],
+      );
+      if (!result.affectedRows) return res.status(404).json({ error: "Event not found" });
+    } else {
+      await query(
+        `INSERT INTO events
+         (title, description, event_type, host, location, event_url, starts_at, ends_at, capacity, status, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          payload.title, payload.description, payload.eventType, payload.host, payload.location, payload.eventUrl,
+          payload.startsAt, payload.endsAt, payload.capacity, payload.status, req.user.id,
+        ],
+      );
+    }
+    res.status(eventId ? 200 : 201).json({ message: eventId ? "Event updated" : "Event created" });
+  } catch (error) { next(error); }
+}
+
+router.post("/events", (req, res, next) => saveManagedEvent(req, res, next));
+router.patch("/events/:id", (req, res, next) => saveManagedEvent(req, res, next, Number(req.params.id)));
+
+router.patch("/events/:id/status", async (req, res, next) => {
+  try {
+    await ensureEventSchema();
+    const status = eventStatuses.has(req.body.status) ? req.body.status : null;
+    if (!status) return res.status(400).json({ error: "Invalid event status" });
+    const [event] = await query(
+      "SELECT starts_at FROM events WHERE id=? AND created_by IS NOT NULL",
+      [req.params.id],
+    );
+    if (!event) return res.status(404).json({ error: "Event not found" });
+    if (status === "published" && new Date(event.starts_at).getTime() <= Date.now()) {
+      return res.status(400).json({ error: "Past events cannot be published" });
+    }
+    const result = await query(
+      "UPDATE events SET status=? WHERE id=? AND created_by IS NOT NULL",
+      [status, req.params.id],
+    );
+    res.json({ message: status === "published" ? "Event is visible to students" : "Event is hidden from the student portal" });
+  } catch (error) { next(error); }
+});
+
+router.delete("/events/:id", async (req, res, next) => {
+  try {
+    await ensureEventSchema();
+    const result = await query("DELETE FROM events WHERE id=? AND created_by IS NOT NULL", [req.params.id]);
+    if (!result.affectedRows) return res.status(404).json({ error: "Event not found" });
+    res.json({ message: "Event deleted" });
   } catch (error) { next(error); }
 });
 

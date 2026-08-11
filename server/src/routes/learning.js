@@ -1,6 +1,7 @@
 const express = require("express");
-const { query } = require("../config/db");
+const { pool, query } = require("../config/db");
 const { authenticate } = require("../middleware/auth");
+const { ensureEventSchema } = require("../services/event-schema");
 
 const router = express.Router();
 
@@ -95,20 +96,69 @@ router.get("/resources", authenticate, async (req, res, next) => {
 
 router.get("/events", authenticate, async (req, res, next) => {
   try {
+    await ensureEventSchema();
+    if (req.user.role !== "student") return res.status(403).json({ error: "Student account required" });
     const rows = await query(
-      `SELECT e.*, EXISTS(SELECT 1 FROM event_registrations er WHERE er.event_id=e.id AND er.user_id=?) registered
-       FROM events e WHERE e.status='published' AND e.starts_at>=NOW() ORDER BY e.starts_at`,
+      `SELECT e.id, e.title, e.description, e.event_type, e.host, e.location, e.event_url,
+              e.starts_at, e.ends_at, e.capacity, e.status, e.created_at, e.updated_at,
+              EXISTS(SELECT 1 FROM event_registrations er WHERE er.event_id=e.id AND er.user_id=?) registered,
+              (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id=e.id) registration_count
+       FROM events e
+       WHERE e.created_by IS NOT NULL AND e.status='published' AND e.starts_at>=NOW()
+       ORDER BY e.starts_at`,
       [req.user.id],
     );
-    res.json(rows);
+    res.json(rows.map((event) => ({
+      ...event,
+      registration_count: Number(event.registration_count || 0),
+      seats_remaining: event.capacity == null ? null : Math.max(0, Number(event.capacity) - Number(event.registration_count || 0)),
+    })));
   } catch (error) { next(error); }
 });
 
 router.post("/events/:id/register", authenticate, async (req, res, next) => {
+  let connection;
   try {
-    await query("INSERT IGNORE INTO event_registrations (event_id, user_id) VALUES (?, ?)", [req.params.id, req.user.id]);
-    res.status(201).json({ message: "Registration confirmed" });
-  } catch (error) { next(error); }
+    await ensureEventSchema();
+    if (req.user.role !== "student") return res.status(403).json({ error: "Only students can reserve event seats" });
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const [events] = await connection.execute(
+      `SELECT e.id, e.capacity,
+              EXISTS(SELECT 1 FROM event_registrations er WHERE er.event_id=e.id AND er.user_id=?) registered,
+              (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id=e.id) registration_count
+       FROM events e
+       WHERE e.id=? AND e.created_by IS NOT NULL AND e.status='published' AND e.starts_at>=NOW()
+       FOR UPDATE`,
+      [req.user.id, req.params.id],
+    );
+    const event = events[0];
+    if (!event) {
+      await connection.rollback();
+      return res.status(404).json({ error: "This event is no longer available" });
+    }
+    const registrationCount = Number(event.registration_count || 0);
+    if (!event.registered && event.capacity != null && registrationCount >= Number(event.capacity)) {
+      await connection.rollback();
+      return res.status(409).json({ error: "This event is fully reserved" });
+    }
+    if (!event.registered) {
+      await connection.execute("INSERT INTO event_registrations (event_id, user_id) VALUES (?, ?)", [event.id, req.user.id]);
+    }
+    await connection.commit();
+    const nextCount = registrationCount + (event.registered ? 0 : 1);
+    res.status(event.registered ? 200 : 201).json({
+      message: event.registered ? "Your seat is already reserved" : "Seat reserved successfully",
+      registered: true,
+      registrationCount: nextCount,
+      seatsRemaining: event.capacity == null ? null : Math.max(0, Number(event.capacity) - nextCount),
+    });
+  } catch (error) {
+    if (connection) await connection.rollback();
+    next(error);
+  } finally {
+    connection?.release();
+  }
 });
 
 module.exports = router;

@@ -27,10 +27,8 @@ INSERT INTO learning_resources (title, description, category, difficulty, resour
   ('Interview Stories that Stick', 'Build a reusable bank of structured stories.', 'Communication', 'Intermediate', 'course', '/resources/interview-stories', 80, FALSE, 'published'),
   ('Product Analytics Field Guide', 'A downloadable analytics reference.', 'Data & Analytics', 'Advanced', 'pdf', '/downloads/product-analytics.pdf', 45, TRUE, 'published');
 
-INSERT INTO events (title, description, event_type, host, location, event_url, starts_at, ends_at, capacity, status) VALUES
-  ('Designing your first 90-day career plan', 'Build a focused plan for the next phase of your career.', 'Workshop', 'CareerForge', 'Online', '/events/90-day-plan', DATE_ADD(NOW(), INTERVAL 7 DAY), DATE_ADD(NOW(), INTERVAL 7 DAY) + INTERVAL 90 MINUTE, 300, 'published'),
-  ('Dhaka Graduate Career Fair 2026', 'Meet employers recruiting graduate talent.', 'Career fair', 'NSU Career Center', 'NSU Auditorium', '/events/dhaka-career-fair', DATE_ADD(NOW(), INTERVAL 12 DAY), DATE_ADD(NOW(), INTERVAL 12 DAY) + INTERVAL 6 HOUR, 1000, 'published'),
-  ('Live resume teardown with recruiters', 'See how recruiters evaluate real resumes.', 'Live session', 'Talent Circle', 'Online', '/events/resume-teardown', DATE_ADD(NOW(), INTERVAL 16 DAY), DATE_ADD(NOW(), INTERVAL 16 DAY) + INTERVAL 75 MINUTE, 400, 'published');
+-- Events are intentionally not seeded. Administrators create and publish real
+-- events from the control center; only those events are shown to students.
 
 INSERT INTO achievements (code, title, description, icon, xp_reward, criteria) VALUES
   ('profile_pioneer', 'Profile Pioneer', 'Complete every profile section.', 'user', 80, JSON_OBJECT('profile_completion', 100)),

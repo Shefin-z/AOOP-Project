@@ -49,7 +49,7 @@ import DashboardShell from "../DashboardShell";
 import Toast from "../Toast";
 import AdminApplications from "./AdminApplications";
 import AdminCommunity from "./AdminCommunity";
-import { events as seedEvents, resources as seedResources } from "../../lib/mockData";
+import { resources as seedResources } from "../../lib/mockData";
 import { apiRequest } from "../../lib/api";
 
 const navItems = [
@@ -97,6 +97,9 @@ export default function AdminWorkspace() {
   const [jobRecords, setJobRecords] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [jobsError, setJobsError] = useState("");
+  const [eventRecords, setEventRecords] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState("");
   const [applicationRecords, setApplicationRecords] = useState([]);
   const [applicationsLoading, setApplicationsLoading] = useState(true);
   const [applicationsError, setApplicationsError] = useState("");
@@ -196,6 +199,37 @@ export default function AdminWorkspace() {
       if (document.visibilityState === "visible") refresh();
     };
     const interval = window.setInterval(refresh, 10000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
+
+  const loadEvents = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setEventsLoading(true);
+      setEventsError("");
+    }
+    try {
+      setEventRecords(await apiRequest("/admin/events"));
+      setEventsError("");
+    } catch (error) {
+      if (!silent) setEventsError(error.message);
+    } finally {
+      if (!silent) setEventsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEvents();
+    const refresh = () => loadEvents({ silent: true });
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const interval = window.setInterval(refresh, 15000);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
@@ -313,6 +347,40 @@ export default function AdminWorkspace() {
     }
   };
 
+  const saveEvent = async (values, record) => {
+    await apiRequest(`/admin/events${record?.id ? `/${record.id}` : ""}`, {
+      method: record?.id ? "PATCH" : "POST",
+      body: JSON.stringify(values),
+    });
+    setModal(null);
+    await loadEvents();
+    notify(`Event ${record?.id ? "updated" : "created"} successfully.`);
+  };
+
+  const changeEventStatus = async (record, status) => {
+    try {
+      await apiRequest(`/admin/events/${record.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      await loadEvents();
+      notify(status === "published" ? "Event is now visible to students." : "Event hidden from the student portal.");
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
+  const deleteEvent = async (record) => {
+    if (!window.confirm(`Delete “${record.title}”? All event reservations will also be removed.`)) return;
+    try {
+      await apiRequest(`/admin/events/${record.id}`, { method: "DELETE" });
+      await loadEvents();
+      notify("Event deleted.");
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
   const moderateCommunityPost = async (post, action) => {
     const actionLabel = action === "remove" ? "remove" : action === "restore" ? "restore" : action;
     if (["remove", "restore", "approve"].includes(action) && !window.confirm(`${actionLabel[0].toUpperCase()}${actionLabel.slice(1)} this community post?`)) return;
@@ -332,6 +400,7 @@ export default function AdminWorkspace() {
     if (item.id === "users") return { ...item, badge: users.length ? String(users.length) : undefined };
     if (item.id === "questions") return { ...item, badge: questionRecords.length ? String(questionRecords.length) : undefined };
     if (item.id === "jobs") return { ...item, badge: jobRecords.length ? String(jobRecords.length) : undefined };
+    if (item.id === "events") return { ...item, badge: eventRecords.length ? String(eventRecords.length) : undefined };
     if (item.id === "community") {
       const attention = Number(communityData.stats?.pending || 0) + Number(communityData.stats?.openReports || 0);
       return { ...item, badge: attention ? String(attention) : undefined };
@@ -367,7 +436,7 @@ export default function AdminWorkspace() {
         {active === "assessments" && <AssessmentAdmin records={assessmentRecords} loading={contentLoading} error={contentError} onRetry={loadAssessmentContent} onEdit={(record) => setModal({ type: "edit", entity: "assessments", record })} onDelete={(record) => deleteAssessmentContent("assessments", record)} />}
         {active === "questions" && <QuestionsAdmin records={questionRecords} loading={contentLoading} error={contentError} onRetry={loadAssessmentContent} onEdit={(record) => setModal({ type: "edit", entity: "questions", record })} onDelete={(record) => deleteAssessmentContent("questions", record)} />}
         {active === "resources" && <ResourcesAdmin notify={notify} />}
-        {active === "events" && <EventsAdmin notify={notify} />}
+        {active === "events" && <EventsAdmin records={eventRecords} loading={eventsLoading} error={eventsError} onRetry={loadEvents} onEdit={(record) => setModal({ type: "edit", entity: "events", record })} onStatus={changeEventStatus} onDelete={deleteEvent} />}
         {active === "jobs" && <JobsAdmin records={jobRecords} loading={jobsLoading} error={jobsError} onRetry={loadJobs} onEdit={(record) => setModal({ type: "edit", entity: "jobs", record })} onStatus={changeJobStatus} onDelete={deleteJob} />}
         {active === "community" && <AdminCommunity data={communityData} setData={setCommunityData} loading={communityLoading} error={communityError} onRetry={loadCommunity} onModerate={moderateCommunityPost} notify={notify} />}
         {active === "applications" && <AdminApplications records={applicationRecords} loading={applicationsLoading} error={applicationsError} onRetry={loadApplications} notify={notify} />}
@@ -384,7 +453,10 @@ export default function AdminWorkspace() {
       {(modal?.type === "create" || modal?.type === "edit") && modal.entity === "jobs" && (
         <JobEditorModal record={modal.record} onClose={() => setModal(null)} onSubmit={(values) => saveJob(values, modal.record)} />
       )}
-      {modal?.type === "create" && !["assessments", "questions", "jobs"].includes(modal.entity) && <CreateEntityModal entity={modal.entity} onClose={() => setModal(null)} onSubmit={() => { setModal(null); notify(`New ${modal.entity.replace(/s$/, "")} created successfully.`); }} />}
+      {(modal?.type === "create" || modal?.type === "edit") && modal.entity === "events" && (
+        <EventEditorModal record={modal.record} onClose={() => setModal(null)} onSubmit={(values) => saveEvent(values, modal.record)} />
+      )}
+      {modal?.type === "create" && !["assessments", "questions", "jobs", "events"].includes(modal.entity) && <CreateEntityModal entity={modal.entity} onClose={() => setModal(null)} onSubmit={() => { setModal(null); notify(`New ${modal.entity.replace(/s$/, "")} created successfully.`); }} />}
     </>
   );
 }
@@ -693,8 +765,50 @@ function ResourcesAdmin({ notify }) {
   return <DataGrid title="68 learning resources" subtitle="9.8k downloads this month" columns={["Resource", "Category", "Level", "Format", "Downloads", "Completion", "Status", ""]} rows={seedResources.map((item, index) => [item.title, item.category, item.level, item.category.includes("PDF") ? "PDF" : "Course", 320 + index * 114, `${34 + index * 7}%`, index === 5 ? "Draft" : "Published"])} notify={notify} />;
 }
 
-function EventsAdmin({ notify }) {
-  return <DataGrid title="12 upcoming events" subtitle="1,846 total registrations" columns={["Event", "Type", "Date", "Time", "Host", "Registrations", "Status", ""]} rows={seedEvents.map((item, index) => [item.title, item.type, `${item.day} ${item.month}`, item.time, item.host, 84 + index * 43, index === 3 ? "Draft" : "Published"])} notify={notify} />;
+function EventsAdmin({ records, loading, error, onRetry, onEdit, onStatus, onDelete }) {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const filtered = records.filter((record) => {
+    const matchesSearch = `${record.title} ${record.event_type} ${record.host} ${record.location || ""}`.toLowerCase().includes(search.toLowerCase());
+    return matchesSearch && (status === "all" || record.status === status);
+  });
+  const visibleCount = records.filter((record) => record.status === "published" && new Date(record.starts_at).getTime() > Date.now()).length;
+  const reservations = records.reduce((sum, record) => sum + Number(record.registration_count || 0), 0);
+
+  return (
+    <div className="space-y-5">
+      <section className="glass flex flex-col gap-3 rounded-[24px] p-3 sm:flex-row">
+        <label className="relative flex-1"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} className="input pl-11" placeholder="Search title, type, host or location..." /></label>
+        <select value={status} onChange={(event) => setStatus(event.target.value)} className="select sm:w-40"><option value="all">All statuses</option><option value="published">Published</option><option value="draft">Draft</option><option value="cancelled">Cancelled</option></select>
+        <button onClick={onRetry} className="btn-secondary"><RefreshCw size={15} /> Refresh</button>
+      </section>
+      <section className="panel p-5">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-lg font-extrabold">{records.length} managed events</h2><p className="text-xs text-muted">{visibleCount} visible to students · {reservations} actual reservations</p></div><span className="tag !bg-jade/10 !text-jade">Database-backed</span></div>
+        <ContentState loading={loading} error={error} empty={!filtered.length} emptyTitle="No managed events yet" emptyCopy="Use “Create event” to publish the first real workshop, fair or live session." onRetry={onRetry}>
+          <div className="table-shell overflow-x-auto">
+            <table className="w-full min-w-[1050px] text-left text-xs">
+              <thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.09em] text-muted"><tr>{["Event", "Type", "Starts", "Host / location", "Reservations", "Status", "Actions"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr></thead>
+              <tbody className="divide-y divide-ink/[0.06]">
+                {filtered.map((record) => {
+                  const start = new Date(record.starts_at);
+                  const started = start.getTime() <= Date.now();
+                  return <tr key={record.id} className="hover:bg-white/60">
+                    <td className="max-w-[300px] px-4 py-4"><b className="block">{record.title}</b>{record.description && <small className="mt-1 block line-clamp-1 text-muted">{record.description}</small>}</td>
+                    <td className="px-4 py-4 text-muted">{record.event_type}</td>
+                    <td className={`px-4 py-4 ${started ? "font-bold text-coral" : "text-muted"}`}>{Number.isNaN(start.getTime()) ? "—" : <><b className="block text-ink">{start.toLocaleDateString()}</b><small>{start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</small></>}</td>
+                    <td className="px-4 py-4 text-muted"><b className="block text-ink">{record.host}</b><small>{record.location || "Online"}</small></td>
+                    <td className="px-4 py-4"><b className="text-cobalt">{Number(record.registration_count || 0)}</b><small className="ml-2 text-muted">{record.capacity == null ? "unlimited" : `/ ${record.capacity}`}</small></td>
+                    <td className="px-4 py-4"><ContentStatus value={record.status} /></td>
+                    <td className="px-4 py-4"><div className="flex gap-1"><button onClick={() => onEdit(record)} className="btn-ghost min-h-8" aria-label="Edit event"><Pencil size={14} /></button><button onClick={() => onStatus(record, record.status === "published" ? "draft" : "published")} className={`btn-ghost min-h-8 gap-1 ${record.status === "published" ? "text-coral" : "text-jade"}`} aria-label={record.status === "published" ? "Hide event" : "Publish event"}>{record.status === "published" ? <><LockKeyhole size={14} /> Hide</> : <><Eye size={14} /> Publish</>}</button><button onClick={() => onDelete(record)} className="btn-ghost min-h-8 text-coral" aria-label="Delete event"><Trash2 size={14} /></button></div></td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
+        </ContentState>
+      </section>
+    </div>
+  );
 }
 
 function JobsAdmin({ records, loading, error, onRetry, onEdit, onStatus, onDelete }) {
@@ -1181,6 +1295,47 @@ function JobEditorModal({ record, onClose, onSubmit }) {
 
 function AdminEditorField({ label, className = "", children }) {
   return <label className={`block ${className}`}><span className="mb-1.5 block text-xs font-bold">{label}</span>{children}</label>;
+}
+
+function toDateTimeInput(value) {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function EventEditorModal({ record, onClose, onSubmit }) {
+  const [values, setValues] = useState({
+    title: record?.title || "",
+    description: record?.description || "",
+    eventType: record?.event_type || "Workshop",
+    host: record?.host || "",
+    location: record?.location || "",
+    eventUrl: record?.event_url || "",
+    startsAt: toDateTimeInput(record?.starts_at),
+    endsAt: toDateTimeInput(record?.ends_at),
+    capacity: record?.capacity ?? "",
+    status: record?.status || "draft",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const update = (key, value) => setValues((current) => ({ ...current, [key]: value }));
+  const submit = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      await onSubmit({
+        ...values,
+        startsAt: new Date(values.startsAt).toISOString(),
+        endsAt: new Date(values.endsAt).toISOString(),
+      });
+    } catch (submitError) {
+      setError(submitError.message);
+      setSaving(false);
+    }
+  };
+  return <div className="modal-backdrop" onClick={onClose}><form onSubmit={submit} className="modal-card max-h-[92vh] max-w-3xl overflow-y-auto" onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between"><div><span className="eyebrow">Event operations</span><h2 className="mt-2 text-xl font-extrabold">{record ? "Edit event" : "Create event"}</h2><p className="mt-1 text-xs text-muted">Only published events are visible to students.</p></div><button type="button" onClick={onClose} className="btn-ghost"><X size={18} /></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2"><AdminEditorField label="Event title" className="sm:col-span-2"><input required maxLength="220" className="input" value={values.title} onChange={(event) => update("title", event.target.value)} placeholder="e.g. Career readiness workshop" /></AdminEditorField><AdminEditorField label="Description" className="sm:col-span-2"><textarea className="input min-h-28 resize-y" maxLength="10000" value={values.description} onChange={(event) => update("description", event.target.value)} placeholder="What will students learn or experience?" /></AdminEditorField><AdminEditorField label="Event type"><input required maxLength="100" className="input" value={values.eventType} onChange={(event) => update("eventType", event.target.value)} placeholder="Workshop, career fair, live session..." /></AdminEditorField><AdminEditorField label="Host / organizer"><input required maxLength="180" className="input" value={values.host} onChange={(event) => update("host", event.target.value)} placeholder="CareerForge or organization name" /></AdminEditorField><AdminEditorField label="Location"><input maxLength="220" className="input" value={values.location} onChange={(event) => update("location", event.target.value)} placeholder="Online, Dhaka, UIU..." /></AdminEditorField><AdminEditorField label="Event URL"><input type="url" className="input" value={values.eventUrl} onChange={(event) => update("eventUrl", event.target.value)} placeholder="https://... (optional)" /></AdminEditorField><AdminEditorField label="Starts at"><input required type="datetime-local" className="input" value={values.startsAt} onChange={(event) => update("startsAt", event.target.value)} /></AdminEditorField><AdminEditorField label="Ends at"><input required type="datetime-local" className="input" value={values.endsAt} onChange={(event) => update("endsAt", event.target.value)} /></AdminEditorField><AdminEditorField label="Capacity"><input min="1" max="100000" type="number" className="input" value={values.capacity} onChange={(event) => update("capacity", event.target.value)} placeholder="Optional — unlimited" /></AdminEditorField><AdminEditorField label="Student portal visibility"><select className="select" value={values.status} onChange={(event) => update("status", event.target.value)}><option value="draft">Draft · hidden</option><option value="published">Published · visible to students</option><option value="cancelled">Cancelled · hidden</option></select></AdminEditorField></div>{error && <p className="mt-4 rounded-xl bg-coral/10 px-3 py-2 text-xs font-bold text-coral">{error}</p>}<div className="mt-7 flex justify-end gap-3"><button type="button" onClick={onClose} className="btn-secondary">Cancel</button><button disabled={saving} className="btn-primary !bg-plum disabled:opacity-50">{saving ? "Saving..." : record ? "Save event" : "Create event"} <ArrowRight size={15} /></button></div></form></div>;
 }
 
 function CreateEntityModal({ entity, onClose, onSubmit }) {
