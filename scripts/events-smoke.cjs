@@ -22,8 +22,12 @@ assert.match(admin, /registration_count/);
 assert.match(learning, /WHERE e\.created_by IS NOT NULL AND e\.status='published'/);
 assert.match(learning, /FOR UPDATE/);
 assert.match(learning, /Only students can reserve event seats/);
+assert.match(learning, /router\.delete\("\/events\/:id\/register"/);
+assert.match(learning, /Reservation cancelled/);
 assert.match(student, /apiRequest\("\/events"\)/);
 assert.match(student, /Reserve a seat/);
+assert.match(student, /Cancel reservation/);
+assert.match(student, /method: "DELETE"/);
 assert.match(adminUi, /Create event/);
 assert.match(adminUi, /Database-backed/);
 

@@ -161,4 +161,50 @@ router.post("/events/:id/register", authenticate, async (req, res, next) => {
   }
 });
 
+router.delete("/events/:id/register", authenticate, async (req, res, next) => {
+  let connection;
+  try {
+    await ensureEventSchema();
+    if (req.user.role !== "student") return res.status(403).json({ error: "Only students can cancel event reservations" });
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const [events] = await connection.execute(
+      `SELECT e.id, e.capacity,
+              (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id=e.id) registration_count
+       FROM events e
+       WHERE e.id=? AND e.created_by IS NOT NULL AND e.starts_at>=NOW()
+       FOR UPDATE`,
+      [req.params.id],
+    );
+    const event = events[0];
+    if (!event) {
+      await connection.rollback();
+      return res.status(404).json({ error: "This event can no longer be cancelled" });
+    }
+
+    const [result] = await connection.execute(
+      "DELETE FROM event_registrations WHERE event_id=? AND user_id=?",
+      [event.id, req.user.id],
+    );
+    if (!result.affectedRows) {
+      await connection.rollback();
+      return res.status(404).json({ error: "You do not have an active reservation for this event" });
+    }
+
+    await connection.commit();
+    const nextCount = Math.max(0, Number(event.registration_count || 0) - 1);
+    res.json({
+      message: "Reservation cancelled. Your seat is available again.",
+      registered: false,
+      registrationCount: nextCount,
+      seatsRemaining: event.capacity == null ? null : Math.max(0, Number(event.capacity) - nextCount),
+    });
+  } catch (error) {
+    if (connection) await connection.rollback();
+    next(error);
+  } finally {
+    connection?.release();
+  }
+});
+
 module.exports = router;

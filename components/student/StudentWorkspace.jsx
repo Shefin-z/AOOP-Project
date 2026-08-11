@@ -280,6 +280,7 @@ export default function StudentWorkspace() {
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState("");
   const [reservingEventId, setReservingEventId] = useState(null);
+  const [cancellingEventId, setCancellingEventId] = useState(null);
   const [posts, setPosts] = useState([]);
   const [communityLoading, setCommunityLoading] = useState(true);
   const [communityError, setCommunityError] = useState("");
@@ -662,7 +663,7 @@ export default function StudentWorkspace() {
   };
 
   const reserveEvent = async (event) => {
-    if (reservingEventId) return;
+    if (reservingEventId || cancellingEventId) return;
     setReservingEventId(event.id);
     try {
       const result = await apiRequest(`/events/${event.id}/register`, { method: "POST" });
@@ -678,6 +679,27 @@ export default function StudentWorkspace() {
       await loadEvents({ silent: true });
     } finally {
       setReservingEventId(null);
+    }
+  };
+
+  const cancelEventReservation = async (event) => {
+    if (reservingEventId || cancellingEventId) return;
+    if (!window.confirm(`Cancel your seat reservation for ${event.title}?`)) return;
+    setCancellingEventId(event.id);
+    try {
+      const result = await apiRequest(`/events/${event.id}/register`, { method: "DELETE" });
+      setEvents((current) => current.map((item) => Number(item.id) === Number(event.id) ? {
+        ...item,
+        registered: false,
+        registration_count: Number(result.registrationCount ?? item.registration_count ?? 0),
+        seats_remaining: result.seatsRemaining ?? item.seats_remaining,
+      } : item));
+      notify(result.message);
+    } catch (error) {
+      notify(error.message);
+      await loadEvents({ silent: true });
+    } finally {
+      setCancellingEventId(null);
     }
   };
 
@@ -787,7 +809,7 @@ export default function StudentWorkspace() {
         {active === "analytics" && <AnalyticsPage notify={notify} />}
         {active === "learning" && <LearningPage notify={notify} />}
         {active === "community" && <CommunityPage posts={posts} setPosts={setPosts} loading={communityLoading} error={communityError} onRetry={loadCommunity} notify={notify} viewer={currentUser} onNewPost={() => setModal({ type: "post" })} postingStatus={postingStatus} />}
-        {active === "events" && <EventsPage events={events} loading={eventsLoading} error={eventsError} onRetry={loadEvents} reservingEventId={reservingEventId} onRegister={reserveEvent} />}
+        {active === "events" && <EventsPage events={events} loading={eventsLoading} error={eventsError} onRetry={loadEvents} reservingEventId={reservingEventId} cancellingEventId={cancellingEventId} onRegister={reserveEvent} onCancelReservation={cancelEventReservation} />}
         {active === "achievements" && <AchievementsPage />}
         {active === "profile" && <ProfilePage notify={notify} user={currentUser} onSave={saveProfile} />}
       </DashboardShell>
@@ -1675,7 +1697,7 @@ function LegacyCommunityPage({ posts, setPosts, notify, viewer, onNewPost }) {
   );
 }
 
-function EventsPage({ events, loading, error, onRetry, onRegister, reservingEventId }) {
+function LegacyServerEventsPage({ events, loading, error, onRetry, onRegister, onCancelReservation, reservingEventId, cancellingEventId }) {
   const [view, setView] = useState("list");
   const [month, setMonth] = useState(() => {
     const today = new Date();
@@ -1692,6 +1714,57 @@ function EventsPage({ events, loading, error, onRetry, onRegister, reservingEven
       const full = event.capacity != null && Number(event.seats_remaining) <= 0 && !event.registered;
       const reserving = Number(reservingEventId) === Number(event.id);
       return <article className="panel flex gap-4 p-5" key={event.id}><div className="grid h-16 w-16 shrink-0 place-items-center rounded-[20px] bg-ink text-center text-white"><span><b className="block text-xl leading-none">{start.getDate()}</b><small className="text-[9px] font-bold uppercase text-white/60">{start.toLocaleDateString([], { month: "short" })}</small></span></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><span className="tag">{event.event_type}</span>{event.registered && <span className="tag !bg-jade/10 !text-jade"><Check size={12} /> Reserved</span>}</div><h3 className="mt-2 text-sm font-extrabold leading-5">{event.title}</h3>{event.description && <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted">{event.description}</p>}<p className="mt-3 text-[11px] text-muted"><Clock3 className="mr-1 inline" size={12} />{start.toLocaleDateString()} · {start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}{!Number.isNaN(end.getTime()) && ` – ${end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}</p><p className="mt-1 text-[11px] text-muted">{event.host}{event.location ? ` · ${event.location}` : ""}</p><div className="mt-4 flex flex-wrap items-center gap-2"><button disabled={event.registered || full || reserving} onClick={() => onRegister(event)} className={`min-h-9 ${event.registered ? "btn-secondary !text-jade" : full ? "btn-secondary" : "btn-primary"}`}>{event.registered ? <><Check size={14} /> Seat reserved</> : full ? "Fully reserved" : reserving ? "Reserving..." : "Reserve a seat"}</button>{event.event_url && <a href={event.event_url} target="_blank" rel="noreferrer" className="btn-secondary min-h-9"><ExternalLink size={14} /> Event link</a>}<small className="text-[10px] font-bold text-muted">{event.capacity == null ? `${event.registration_count} reserved` : `${event.seats_remaining} seat${Number(event.seats_remaining) === 1 ? "" : "s"} left`}</small></div></div></article>;
+    })}</section> : <EventCalendar events={events} month={month} onPrevious={() => moveMonth(-1)} onNext={() => moveMonth(1)} />}
+  </div>;
+}
+
+function EventsPage({ events, loading, error, onRetry, onRegister, onCancelReservation, reservingEventId, cancellingEventId }) {
+  const [view, setView] = useState("list");
+  const [month, setMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
+  const moveMonth = (offset) => setMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+
+  if (loading) {
+    return <div className="grid min-h-64 place-items-center text-center"><RefreshCw className="animate-spin text-cobalt" size={28} /><p className="mt-3 text-xs font-bold text-muted">Loading published events...</p></div>;
+  }
+  if (error) {
+    return <div className="grid min-h-64 place-items-center text-center"><div><AlertTriangle className="mx-auto text-coral" size={30} /><h2 className="mt-3 font-extrabold">Could not load events</h2><p className="mt-1 text-xs text-muted">{error}</p><button onClick={onRetry} className="btn-secondary mt-5"><RefreshCw size={14} /> Try again</button></div></div>;
+  }
+
+  return <div className="space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex rounded-xl bg-ink/[0.05] p-1">
+        {["list", "calendar"].map((item) => <button type="button" onClick={() => setView(item)} key={item} className={`min-h-9 rounded-lg px-3 text-xs font-bold capitalize ${view === item ? "bg-white shadow-sm" : "text-muted"}`}>{item}</button>)}
+      </div>
+      <p className="text-xs font-semibold text-muted">{events.length} published upcoming event{events.length === 1 ? "" : "s"}</p>
+    </div>
+
+    {!events.length ? <section className="panel grid min-h-72 place-items-center p-8 text-center"><div><CalendarDays className="mx-auto text-muted" size={34} /><h2 className="mt-4 text-lg font-extrabold">No upcoming events yet</h2><p className="mt-2 max-w-md text-sm leading-6 text-muted">Your CareerForge administrator has not published an event yet. New workshops and sessions will appear here automatically.</p></div></section> : view === "list" ? <section className="grid gap-4 lg:grid-cols-2">{events.map((event) => {
+      const start = new Date(event.starts_at);
+      const end = new Date(event.ends_at);
+      const reserved = Boolean(event.registered);
+      const full = event.capacity != null && Number(event.seats_remaining) <= 0 && !reserved;
+      const reserving = Number(reservingEventId) === Number(event.id);
+      const cancelling = Number(cancellingEventId) === Number(event.id);
+      const seatText = event.capacity == null ? `${event.registration_count} reserved` : `${event.seats_remaining} seat${Number(event.seats_remaining) === 1 ? "" : "s"} left`;
+
+      return <article className="panel flex gap-4 p-5" key={event.id}>
+        <div className="grid h-16 w-16 shrink-0 place-items-center rounded-[20px] bg-ink text-center text-white"><span><b className="block text-xl leading-none">{start.getDate()}</b><small className="text-[9px] font-bold uppercase text-white/60">{start.toLocaleDateString([], { month: "short" })}</small></span></div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2"><span className="tag">{event.event_type}</span>{reserved && <span className="tag !bg-jade/10 !text-jade"><Check size={12} /> Reserved</span>}</div>
+          <h3 className="mt-2 text-sm font-extrabold leading-5">{event.title}</h3>
+          {event.description && <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted">{event.description}</p>}
+          <p className="mt-3 text-[11px] text-muted"><Clock3 className="mr-1 inline" size={12} />{start.toLocaleDateString()} - {start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}{!Number.isNaN(end.getTime()) && ` - ${end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}</p>
+          <p className="mt-1 text-[11px] text-muted">{event.host}{event.location ? ` - ${event.location}` : ""}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {reserved ? <button type="button" disabled={cancelling} onClick={() => onCancelReservation(event)} className="btn-secondary min-h-9 !text-coral disabled:cursor-not-allowed disabled:opacity-60">{cancelling ? "Cancelling..." : "Cancel reservation"}</button> : <button type="button" disabled={full || reserving} onClick={() => onRegister(event)} className={`min-h-9 ${full ? "btn-secondary" : "btn-primary"}`}>{full ? "Fully reserved" : reserving ? "Reserving..." : "Reserve a seat"}</button>}
+            {event.event_url && <a href={event.event_url} target="_blank" rel="noreferrer" className="btn-secondary min-h-9"><ExternalLink size={14} /> Event link</a>}
+            <small className="text-[10px] font-bold text-muted">{seatText}</small>
+          </div>
+        </div>
+      </article>;
     })}</section> : <EventCalendar events={events} month={month} onPrevious={() => moveMonth(-1)} onNext={() => moveMonth(1)} />}
   </div>;
 }
