@@ -207,7 +207,7 @@ if (scenario === "public") {
   await clickAndAssert("/login/admin", "/login/admin", "Admin access.");
   assertCredentialsAreBlank();
   await clickAndAssert("/login/student", "/login/student", "Welcome back.");
-  await clickAndAssert("/", "/", "Career clarity, engineered", "Back home");
+  await clickAndAssert("/", "/", "Career growth, made tangible", "Back home");
   await clickAndAssert("/login/student?mode=register", "/login/student", "Start your journey.");
 } else if (scenario === "student") {
   await clickButtonAndAssert("Available jobs", "/student", "Available jobs");

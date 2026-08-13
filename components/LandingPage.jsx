@@ -19,90 +19,113 @@ import AdaptiveHeroImage from "./AdaptiveHeroImage";
 import { PublicFooter, PublicHeader } from "./public/PublicChrome";
 import UniversityMarquee from "./public/UniversityMarquee";
 
-const features = [
+const featureCards = [
   {
     icon: Target,
-    tone: "bg-cobalt text-white",
-    title: "AI job matching",
-    copy: "See why a role fits, which skills matter, and the smartest next step—before you apply.",
-    stat: "Explainable matches",
+    tone: "clay-cobalt",
+    number: "01",
+    title: "Find your fit",
+    copy: "Turn your career interests, target role and skills into explainable job matches.",
+    label: "Role signal",
   },
   {
     icon: BarChart3,
-    tone: "bg-jade text-white",
-    title: "Skill intelligence",
-    copy: "Benchmark your strengths with timed assessments and get a living readiness score.",
-    stat: "10 adaptive levels",
+    tone: "clay-jade",
+    number: "02",
+    title: "Build proof",
+    copy: "Practice with adaptive assessments that give every skill a measurable next step.",
+    label: "Skill signal",
   },
   {
     icon: FileText,
-    tone: "bg-coral text-white",
-    title: "Career Vault",
-    copy: "Turn your profile into an ATS-ready resume and tailored cover letter in minutes.",
-    stat: "PDF-ready export",
-  },
-  {
-    icon: Users,
-    tone: "bg-plum text-white",
-    title: "Community momentum",
-    copy: "Learn from peers, share wins, discover events, and keep moving with accountability.",
-    stat: "Real student network",
+    tone: "clay-coral",
+    number: "03",
+    title: "Tell your story",
+    copy: "Shape your evolving profile into a resume that is ready for a real opportunity.",
+    label: "Career Vault",
   },
 ];
 
-const steps = [
-  ["01", "Build your signal", "Add your skills, goals and experience. CareerForge turns them into a clear professional profile."],
-  ["02", "Close the right gaps", "Take focused assessments and follow a learning plan built around the roles you actually want."],
-  ["03", "Apply with confidence", "Match with relevant jobs, tailor your story and track every application in one place."],
+const journey = [
+  ["01", "Give your goals a home", "Add the skills, degree, interests and role you are moving toward."],
+  ["02", "Make progress visible", "Assessments, projects and applications turn effort into a career signal."],
+  ["03", "Take the next right move", "CareerForge surfaces practical actions instead of another generic checklist."],
 ];
+
+const orbitItems = ["Profile", "Assess", "Match", "Apply"];
 
 export default function LandingPage() {
   return (
     <main className="noise min-h-screen overflow-hidden">
       <PublicHeader />
 
-      <section className="landing-hero-section page-shell relative pb-20 pt-10 sm:pt-16 lg:pb-28 lg:pt-20">
-        <div className="landing-aurora landing-aurora-coral" aria-hidden="true" />
-        <div className="landing-aurora landing-aurora-cobalt" aria-hidden="true" />
-        <div className="grid items-center gap-12 lg:grid-cols-[0.88fr_1.12fr] lg:gap-5">
+      <section className="landing-clay-hero page-shell relative pb-14 pt-8 sm:pb-20 sm:pt-12 lg:pb-24">
+        <div className="clay-orb clay-orb-one" aria-hidden="true" />
+        <div className="clay-orb clay-orb-two" aria-hidden="true" />
+        <div className="clay-grid-pattern" aria-hidden="true" />
+
+        <div className="grid items-center gap-10 lg:grid-cols-[.83fr_1.17fr] lg:gap-8">
           <div className="relative z-10">
-            <div className="eyebrow mb-6">
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-cobalt text-white"><Sparkles size={14} /></span>
-              Career clarity, engineered
+            <div className="clay-eyebrow">
+              <span className="clay-eyebrow-icon"><Sparkles size={14} /></span>
+              Career growth, made tangible
             </div>
-            <h1 className="display-title max-w-[700px]">
-              Your ambition,
-              <span className="block italic text-cobalt">made actionable.</span>
+
+            <h1 className="landing-clay-title mt-7">
+              Make your next
+              <span className="block text-cobalt">move feel real.</span>
             </h1>
-            <p className="mt-7 max-w-xl text-base leading-7 text-muted sm:text-lg">
-              CareerForge connects your skills, goals and progress into one intelligent career system—so every next move feels deliberate.
+
+            <p className="mt-6 max-w-xl text-base leading-7 text-muted sm:text-lg">
+              CareerForge gives ambitious students one calm, connected space to understand their strengths, follow the right signal and act with confidence.
             </p>
+
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link to="/login/student?mode=register" className="btn-accent landing-primary-cta px-6">
-                Start forging your path
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-white/15"><ArrowRight size={15} /></span>
+              <Link to="/login/student?mode=register" className="clay-primary-cta">
+                Start your workspace <ArrowRight size={17} />
               </Link>
-              <a href="#journey" className="btn-secondary px-5">
-                <Play size={16} fill="currentColor" /> See how it works
+              <a href="#journey" className="clay-secondary-cta">
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-ink text-white"><Play size={12} fill="currentColor" /></span>
+                Explore the flow
               </a>
             </div>
-            <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs font-semibold text-muted">
-              {["Free student account", "No credit card", "Progress saved"].map((item) => (
-                <span key={item} className="flex items-center gap-2">
-                  <span className="grid h-5 w-5 place-items-center rounded-full bg-jade/15 text-jade"><Check size={12} /></span>
-                  {item}
-                </span>
+
+            <div className="mt-9 flex flex-wrap gap-3">
+              {[
+                ["Personalized", "around your goals"],
+                ["Actionable", "not overwhelming"],
+                ["One workspace", "from skill to job"],
+              ].map(([title, copy]) => (
+                <div key={title} className="clay-proof-chip">
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-jade/15 text-jade"><Check size={13} /></span>
+                  <span><b>{title}</b><small>{copy}</small></span>
+                </div>
               ))}
             </div>
           </div>
 
-          <div className="landing-hero-frame relative lg:-mr-20">
-            <div className="hero-stage overflow-hidden rounded-[32px] border-[7px] border-white/50 shadow-lift sm:rounded-[40px]">
+          <div className="landing-clay-visual relative">
+            <div className="clay-hero-shell">
               <AdaptiveHeroImage
-                alt="Two students exploring their AI-guided career path together"
-                className="aspect-[1.55/1] w-full lg:aspect-[1.45/1]"
+                alt="Two university students exploring an AI-guided career path together"
+                className="aspect-[1.25/1] w-full sm:aspect-[1.4/1]"
                 imageClassName="object-cover object-center"
               />
+            </div>
+
+            <div className="clay-floating-card clay-floating-match" aria-hidden="true">
+              <span className="clay-floating-icon bg-cobalt"><Target size={17} /></span>
+              <span><small>Role alignment</small><b>94% match</b></span>
+              <span className="clay-mini-ring"><i /></span>
+            </div>
+
+            <div className="clay-floating-card clay-floating-progress" aria-hidden="true">
+              <span className="clay-floating-icon bg-coral"><BarChart3 size={17} /></span>
+              <span><small>Growth this month</small><b>+3 stronger signals</b></span>
+            </div>
+
+            <div className="clay-floating-path" aria-hidden="true">
+              {orbitItems.map((item, index) => <span key={item} className={index === 3 ? "is-active" : ""}>{item}</span>)}
             </div>
           </div>
         </div>
@@ -111,110 +134,115 @@ export default function LandingPage() {
       <UniversityMarquee />
 
       <section id="platform" className="page-shell py-20 sm:py-28">
-        <div className="grid gap-8 lg:grid-cols-[.8fr_1.2fr] lg:items-end">
+        <div className="grid gap-8 lg:grid-cols-[.9fr_1.1fr] lg:items-end">
           <div>
-            <div className="eyebrow mb-5"><Zap size={14} /> One connected platform</div>
-            <h2 className="section-title max-w-xl">Less guessing.<br /><i className="text-coral">More becoming.</i></h2>
+            <span className="clay-section-mark"><Zap size={15} /> Your work, connected</span>
+            <h2 className="landing-section-title mt-5">A career system that feels <i>human.</i></h2>
           </div>
-          <p className="max-w-2xl text-base leading-7 text-muted lg:justify-self-end">
-            Most career tools solve one isolated problem. CareerForge connects the entire journey, translating what you do today into stronger opportunities tomorrow.
+          <p className="max-w-xl text-base leading-7 text-muted lg:justify-self-end">
+            The platform is built to make progress visible. Each feature adds context to the next, so your profile does not sit in one place while your opportunities sit somewhere else.
           </p>
         </div>
 
-        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {features.map(({ icon: Icon, tone, title, copy, stat }, index) => (
-            <article key={title} className={`landing-feature-card panel group min-h-[310px] p-5 transition duration-300 hover:-translate-y-1 hover:shadow-lift ${index === 1 ? "lg:translate-y-7" : ""}`}>
+        <div className="mt-12 grid gap-5 lg:grid-cols-3">
+          {featureCards.map(({ icon: Icon, tone, number, title, copy, label }) => (
+            <article key={title} className="clay-feature-card group">
               <div className="flex items-start justify-between">
-                <div className={`grid h-12 w-12 place-items-center rounded-[18px] ${tone}`}><Icon size={20} /></div>
-                <span className="font-display text-2xl italic text-ink/20">0{index + 1}</span>
+                <span className={`clay-feature-icon ${tone}`}><Icon size={22} /></span>
+                <span className="font-display text-3xl italic text-ink/25">{number}</span>
               </div>
-              <h3 className="mt-8 text-xl font-extrabold tracking-[-0.035em]">{title}</h3>
+              <p className="mt-10 text-[10px] font-extrabold uppercase tracking-[.17em] text-muted">{label}</p>
+              <h3 className="mt-3 text-2xl font-extrabold tracking-[-.045em]">{title}</h3>
               <p className="mt-3 text-sm leading-6 text-muted">{copy}</p>
-              <div className="mt-7 flex items-center justify-between border-t border-ink/[0.08] pt-4">
-                <span className="text-xs font-bold text-muted">{stat}</span>
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-ink/[0.06] transition group-hover:bg-ink group-hover:text-white"><ChevronRight size={15} /></span>
+              <div className="mt-8 flex items-center justify-between border-t border-ink/[.08] pt-4">
+                <span className="text-xs font-bold text-muted">Open your signal</span>
+                <span className="clay-arrow"><ChevronRight size={16} /></span>
               </div>
             </article>
           ))}
         </div>
       </section>
 
-      <section id="journey" className="bg-ink py-20 text-white sm:py-28">
-        <div className="page-shell">
-          <div className="grid gap-10 lg:grid-cols-[.75fr_1.25fr]">
-            <div className="lg:sticky lg:top-10 lg:self-start">
-              <div className="eyebrow mb-5 !text-[#9cb1ff]"><Sparkles size={14} /> Your CareerForge journey</div>
-              <h2 className="section-title">A system that<br /><i className="text-[#E59779]">moves with you.</i></h2>
-              <p className="mt-6 max-w-md text-sm leading-6 text-white/60">
-                Start wherever you are. The platform keeps learning from every assessment, application and milestone.
-              </p>
+      <section id="journey" className="landing-flow-section py-20 sm:py-28">
+        <div className="page-shell grid gap-10 lg:grid-cols-[.85fr_1.15fr]">
+          <div className="lg:sticky lg:top-24 lg:self-start">
+            <span className="clay-section-mark"><Sparkles size={15} /> A clearer rhythm</span>
+            <h2 className="landing-section-title mt-5">No generic path.<br /><i>A path that reacts.</i></h2>
+            <p className="mt-6 max-w-md leading-7 text-muted">
+              CareerForge starts from the details you give it, then keeps becoming more useful as you build evidence of what you can do.
+            </p>
+            <div className="clay-path-orbit mt-9" aria-hidden="true">
+              <span className="clay-path-core"><Sparkles size={20} /></span>
+              <span className="clay-path-dot dot-one" />
+              <span className="clay-path-dot dot-two" />
+              <span className="clay-path-dot dot-three" />
+              <span className="clay-path-line" />
             </div>
-            <div>
-              {steps.map(([number, title, copy]) => (
-                <article key={number} className="landing-journey-step grid gap-5 border-b border-white/10 py-8 first:pt-0 sm:grid-cols-[70px_1fr]">
-                  <span className="font-display text-4xl italic text-[#E59779]">{number}</span>
-                  <div>
-                    <h3 className="text-2xl font-bold tracking-[-0.035em]">{title}</h3>
-                    <p className="mt-3 max-w-xl leading-7 text-white/60">{copy}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
+          </div>
+
+          <div className="space-y-4">
+            {journey.map(([number, title, copy], index) => (
+              <article key={number} className={`clay-journey-card ${index === 1 ? "clay-journey-card-featured" : ""}`}>
+                <span className="clay-journey-number">{number}</span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-2xl font-extrabold tracking-[-.04em]">{title}</h3>
+                  <p className="mt-2 max-w-lg text-sm leading-6 text-muted">{copy}</p>
+                </div>
+                <span className="clay-arrow shrink-0"><ArrowRight size={16} /></span>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
       <section id="community" className="page-shell py-20 sm:py-28">
-        <div className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
-          <div className="panel relative overflow-hidden bg-[#DED2BE] p-7 sm:p-10">
-            <div className="relative z-10 max-w-lg">
-              <div className="eyebrow mb-5 !text-ink"><MessageCircle size={14} /> Powered by peers</div>
-              <h2 className="section-title">Progress feels better <i>together.</i></h2>
-              <p className="mt-5 leading-7 text-ink/65">Ask questions, share breakthroughs, find accountability and meet people building toward the same future.</p>
-              <Link to="/community" className="btn-primary mt-7">Explore the community <ArrowRight size={16} /></Link>
+        <div className="grid gap-5 lg:grid-cols-[1.08fr_.92fr]">
+          <article className="clay-community-card">
+            <div className="relative z-10 max-w-xl">
+              <span className="clay-section-mark !text-ink"><MessageCircle size={15} /> Made for momentum</span>
+              <h2 className="landing-section-title mt-5">Bring people into the <i>progress.</i></h2>
+              <p className="mt-5 max-w-lg leading-7 text-ink/65">Ask a useful question, share an assessment win or find students who are building toward the same role.</p>
+              <Link to="/community" className="clay-dark-cta mt-8">Enter the community <ArrowRight size={16} /></Link>
             </div>
-            <div className="absolute -bottom-14 -right-12 h-64 w-64 rounded-full border-[45px] border-coral/70" />
-            <div className="absolute -right-3 top-5 hidden h-28 w-28 rotate-12 rounded-[34px] bg-white/35 sm:grid sm:place-items-center" aria-hidden="true">
-              <Users size={38} className="text-ink/45" />
+            <div className="clay-community-bubbles" aria-hidden="true">
+              <span className="bubble-a">+</span><span className="bubble-b"><Users size={24} /></span><span className="bubble-c"><Sparkles size={21} /></span>
             </div>
-          </div>
+          </article>
 
           <div id="resources" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-1">
-            <Link to="/resources" className="panel landing-resource-link flex items-center gap-5 p-6">
-              <span className="icon-tile !bg-cobalt"><BookOpen size={20} /></span>
-              <div className="min-w-0 flex-1"><b className="block text-base">Curated learning vault</b><p className="mt-1 text-sm text-muted">Resources matched to your current skill gaps.</p></div>
-              <ArrowRight className="landing-resource-arrow text-muted" size={17} />
+            <Link to="/resources" className="clay-resource-card group">
+              <span className="clay-resource-icon bg-cobalt"><BookOpen size={20} /></span>
+              <span className="min-w-0 flex-1"><b>Useful on your actual path</b><small>Resources that support your current focus.</small></span>
+              <ChevronRight className="text-muted transition group-hover:translate-x-1 group-hover:text-cobalt" size={18} />
             </Link>
-            <Link to="/resources" className="panel landing-resource-link flex items-center gap-5 p-6">
-              <span className="icon-tile !bg-coral"><CalendarDays size={20} /></span>
-              <div className="min-w-0 flex-1"><b className="block text-base">Career events that matter</b><p className="mt-1 text-sm text-muted">Workshops, career fairs and live mentor sessions.</p></div>
-              <ArrowRight className="landing-resource-arrow text-muted" size={17} />
+            <Link to="/resources" className="clay-resource-card group">
+              <span className="clay-resource-icon bg-coral"><CalendarDays size={20} /></span>
+              <span className="min-w-0 flex-1"><b>Events worth showing up for</b><small>Reserve a seat for workshops and career sessions.</small></span>
+              <ChevronRight className="text-muted transition group-hover:translate-x-1 group-hover:text-coral" size={18} />
             </Link>
-            <Link to="/login/student?mode=register" className="panel landing-resource-link flex items-center gap-5 p-6">
-              <span className="icon-tile !bg-jade"><BarChart3 size={20} /></span>
-              <div className="min-w-0 flex-1"><b className="block text-base">Progress you can prove</b><p className="mt-1 text-sm text-muted">Weekly insights and achievement milestones.</p></div>
-              <ArrowRight className="landing-resource-arrow text-muted" size={17} />
+            <Link to="/login/student?mode=register" className="clay-resource-card group">
+              <span className="clay-resource-icon bg-jade"><ShieldCheck size={20} /></span>
+              <span className="min-w-0 flex-1"><b>One profile, more proof</b><small>Keep your professional story ready to use.</small></span>
+              <ChevronRight className="text-muted transition group-hover:translate-x-1 group-hover:text-jade" size={18} />
             </Link>
           </div>
         </div>
       </section>
 
-      <section className="page-shell pb-20">
-        <div className="relative overflow-hidden rounded-[38px] bg-cobalt px-7 py-12 text-white shadow-lift sm:px-12 sm:py-16">
+      <section className="page-shell pb-20 sm:pb-28">
+        <div className="landing-clay-cta">
           <div className="relative z-10 max-w-2xl">
-            <span className="text-xs font-extrabold uppercase tracking-[0.18em] text-white/65">Your next chapter is waiting</span>
-            <h2 className="mt-4 font-display text-5xl leading-[1] tracking-[-0.05em] sm:text-6xl">Stop planning around potential. <i>Build it.</i></h2>
+            <span className="text-[11px] font-extrabold uppercase tracking-[.18em] text-white/65">Your next chapter is practical</span>
+            <h2 className="mt-4 font-display text-5xl leading-[.95] tracking-[-.055em] text-white sm:text-6xl">Turn direction into <i>movement.</i></h2>
+            <p className="mt-5 max-w-xl text-sm leading-6 text-white/65">Create a student account, build your signal and make your next application feel much less like a guess.</p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/login/student?mode=register" className="btn-primary !bg-white !text-ink">Create free account <ArrowRight size={17} /></Link>
-              <Link to="/login/admin" className="btn-secondary !border-white/20 !bg-white/10 !text-white hover:!bg-white/20">Administrator portal</Link>
-            </div>
-            <div className="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold text-white/70">
-              <span className="flex items-center gap-2"><ShieldCheck size={14} /> Verified student accounts</span>
-              <span className="flex items-center gap-2"><Zap size={14} /> Personalized next steps</span>
+              <Link to="/login/student?mode=register" className="clay-light-cta">Create free account <ArrowRight size={17} /></Link>
+              <Link to="/login/admin" className="clay-outline-cta">Administrator portal</Link>
             </div>
           </div>
-          <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full border-[70px] border-white/10" />
-          <div className="absolute -bottom-36 right-56 h-72 w-72 rotate-12 rounded-[70px] bg-coral/85" />
+          <div className="clay-cta-sphere sphere-one" aria-hidden="true" />
+          <div className="clay-cta-sphere sphere-two" aria-hidden="true" />
+          <div className="clay-cta-tile" aria-hidden="true"><Target size={36} /></div>
         </div>
       </section>
 
