@@ -2,5 +2,6 @@
 .env.*
 !.env.example
 *.log
+.landing*.png
 dist
 node_modules
