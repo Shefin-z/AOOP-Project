@@ -147,14 +147,20 @@ router.get("/connections", async (req, res, next) => {
       query(
         `SELECT c.id connection_id, c.created_at, c.accepted_at,
                 ${studentFields()},
-                (SELECT m.body FROM student_messages m WHERE m.connection_id=c.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) last_message,
-                (SELECT m.created_at FROM student_messages m WHERE m.connection_id=c.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) last_message_at,
-                (SELECT COUNT(*) FROM student_messages m WHERE m.connection_id=c.id AND m.recipient_id=? AND m.read_at IS NULL) unread_count
+                latest_message.body last_message, message_summary.last_message_at,
+                COALESCE(message_summary.unread_count, 0) unread_count
          FROM student_connections c
          JOIN users u ON u.id=CASE WHEN c.user_a_id=? THEN c.user_b_id ELSE c.user_a_id END
          LEFT JOIN student_profiles sp ON sp.user_id=u.id
+         LEFT JOIN (
+           SELECT connection_id, MAX(id) latest_message_id, MAX(created_at) last_message_at,
+                  SUM(CASE WHEN recipient_id=? AND read_at IS NULL THEN 1 ELSE 0 END) unread_count
+           FROM student_messages
+           GROUP BY connection_id
+         ) message_summary ON message_summary.connection_id=c.id
+         LEFT JOIN student_messages latest_message ON latest_message.id=message_summary.latest_message_id
          WHERE c.status='accepted' AND (c.user_a_id=? OR c.user_b_id=?)
-         ORDER BY COALESCE((SELECT MAX(m.created_at) FROM student_messages m WHERE m.connection_id=c.id), c.accepted_at, c.created_at) DESC`,
+         ORDER BY COALESCE(message_summary.last_message_at, c.accepted_at, c.created_at) DESC`,
         [req.user.id, req.user.id, req.user.id, req.user.id],
       ),
       query(
