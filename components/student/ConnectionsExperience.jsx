@@ -33,6 +33,8 @@ const displayTime = (value, withDate = false) => {
     : date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 };
 
+const sameConnection = (left, right) => String(left || "") === String(right || "");
+
 function Avatar({ student, size = "h-10 w-10" }) {
   return (
     <span className={`grid shrink-0 place-items-center overflow-hidden rounded-2xl bg-cobalt text-xs font-extrabold text-white ${size}`}>
@@ -43,7 +45,7 @@ function Avatar({ student, size = "h-10 w-10" }) {
 
 function PersonResult({ student, onConnect, onAccept, onCancel, onMessage, busyId }) {
   const status = student.connection_status || "none";
-  const isBusy = Number(busyId) === Number(student.student_id) || Number(busyId) === Number(student.connection_id);
+  const isBusy = Number(busyId) === Number(student.student_id) || sameConnection(busyId, student.connection_id);
   return (
     <article className="flex items-center gap-3 rounded-2xl border border-ink/[0.07] bg-white/45 p-3 dark:bg-white/[0.035]">
       <Avatar student={student} />
@@ -77,7 +79,7 @@ export default function ConnectionsPage({ search, setSearch, currentUser, notify
   const messageEndRef = useRef(null);
 
   const selectedConnection = useMemo(
-    () => network.connections.find((connection) => Number(connection.connection_id) === Number(selectedConnectionId)) || null,
+    () => network.connections.find((connection) => sameConnection(connection.connection_id, selectedConnectionId)) || null,
     [network.connections, selectedConnectionId],
   );
   const trimmedSearch = String(search || "").trim();
@@ -97,7 +99,7 @@ export default function ConnectionsPage({ search, setSearch, currentUser, notify
         unreadCount: Number(nextNetwork.unreadCount || 0),
       });
       setSelectedConnectionId((current) => {
-        if (connections.some((item) => Number(item.connection_id) === Number(current))) return current;
+        if (connections.some((item) => sameConnection(item.connection_id, current))) return current;
         return connections[0]?.connection_id || null;
       });
       setNetworkError("");
@@ -277,9 +279,9 @@ export default function ConnectionsPage({ search, setSearch, currentUser, notify
             <div className="mt-4 space-y-3">{searchResults.map((student) => <PersonResult key={student.student_id} student={student} onConnect={sendRequest} onAccept={(id) => respondToRequest(id, "accept")} onCancel={cancelRequest} onMessage={setSelectedConnectionId} busyId={busyStudentId || busyRequestId} />)}</div>
           </div>
 
-          {!networkLoading && network.incomingRequests.length > 0 && <div className="panel p-5"><div className="flex items-center justify-between"><h2 className="font-extrabold">Connection requests</h2><span className="tag !text-coral">{network.incomingRequests.length} new</span></div><div className="mt-4 space-y-3">{network.incomingRequests.map((student) => <article key={student.connection_id} className="rounded-2xl bg-ink/[0.035] p-3 dark:bg-white/[0.04]"><div className="flex items-center gap-3"><Avatar student={student} /><div className="min-w-0 flex-1"><b className="block truncate text-sm">{student.name}</b><p className="truncate text-xs text-muted">{profileLine(student)} · ID {student.student_id}</p></div></div><div className="mt-3 flex gap-2"><button disabled={Number(busyRequestId) === Number(student.connection_id)} onClick={() => respondToRequest(student.connection_id, "accept")} className="btn-accent min-h-9 flex-1 text-xs disabled:opacity-50"><Check size={14} /> Accept</button><button disabled={Number(busyRequestId) === Number(student.connection_id)} onClick={() => respondToRequest(student.connection_id, "decline")} className="btn-secondary min-h-9 px-3 text-xs disabled:opacity-50"><X size={14} /> Ignore</button></div></article>)}</div></div>}
+          {!networkLoading && network.incomingRequests.length > 0 && <div className="panel p-5"><div className="flex items-center justify-between"><h2 className="font-extrabold">Connection requests</h2><span className="tag !text-coral">{network.incomingRequests.length} new</span></div><div className="mt-4 space-y-3">{network.incomingRequests.map((student) => <article key={student.connection_id} className="rounded-2xl bg-ink/[0.035] p-3 dark:bg-white/[0.04]"><div className="flex items-center gap-3"><Avatar student={student} /><div className="min-w-0 flex-1"><b className="block truncate text-sm">{student.name}</b><p className="truncate text-xs text-muted">{profileLine(student)} · ID {student.student_id}</p></div></div><div className="mt-3 flex gap-2"><button disabled={sameConnection(busyRequestId, student.connection_id)} onClick={() => respondToRequest(student.connection_id, "accept")} className="btn-accent min-h-9 flex-1 text-xs disabled:opacity-50"><Check size={14} /> Accept</button><button disabled={sameConnection(busyRequestId, student.connection_id)} onClick={() => respondToRequest(student.connection_id, "decline")} className="btn-secondary min-h-9 px-3 text-xs disabled:opacity-50"><X size={14} /> Ignore</button></div></article>)}</div></div>}
 
-          <div className="panel p-5"><div className="flex items-center justify-between"><h2 className="font-extrabold">Your connections</h2><span className="tag !text-jade">{network.connections.length}</span></div>{networkLoading && <p className="mt-4 flex items-center gap-2 text-xs text-muted"><LoaderCircle className="animate-spin" size={15} /> Loading your inbox...</p>}{networkError && <div className="mt-4 rounded-2xl bg-coral/10 p-3 text-xs text-coral"><AlertTriangle className="mb-2" size={16} />{networkError}<button onClick={() => loadNetwork()} className="mt-2 block font-extrabold underline">Try again</button></div>}{!networkLoading && !networkError && !network.connections.length && <p className="mt-4 text-xs leading-5 text-muted">Your accepted connections will appear here. Search for a student to send the first request.</p>}<div className="mt-4 space-y-1">{network.connections.map((connection) => <button key={connection.connection_id} onClick={() => setSelectedConnectionId(connection.connection_id)} className={`flex w-full items-center gap-3 rounded-2xl p-3 text-left transition ${Number(selectedConnectionId) === Number(connection.connection_id) ? "bg-cobalt text-white shadow-lg" : "hover:bg-ink/[0.045] dark:hover:bg-white/[0.05]"}`}><Avatar student={connection} /><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><b className="truncate text-sm">{connection.name}</b>{Number(connection.unread_count || 0) > 0 && <span className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] font-extrabold ${Number(selectedConnectionId) === Number(connection.connection_id) ? "bg-white text-cobalt" : "bg-coral text-white"}`}>{connection.unread_count}</span>}</span><small className={`mt-0.5 block truncate ${Number(selectedConnectionId) === Number(connection.connection_id) ? "text-white/65" : "text-muted"}`}>{connection.last_message || profileLine(connection)}</small></span></button>)}</div></div>
+          <div className="panel p-5"><div className="flex items-center justify-between"><h2 className="font-extrabold">Your connections</h2><span className="tag !text-jade">{network.connections.length}</span></div>{networkLoading && <p className="mt-4 flex items-center gap-2 text-xs text-muted"><LoaderCircle className="animate-spin" size={15} /> Loading your inbox...</p>}{networkError && <div className="mt-4 rounded-2xl bg-coral/10 p-3 text-xs text-coral"><AlertTriangle className="mb-2" size={16} />{networkError}<button onClick={() => loadNetwork()} className="mt-2 block font-extrabold underline">Try again</button></div>}{!networkLoading && !networkError && !network.connections.length && <p className="mt-4 text-xs leading-5 text-muted">Your accepted connections will appear here. Search for a student to send the first request.</p>}<div className="mt-4 space-y-1">{network.connections.map((connection) => <button key={connection.connection_id} onClick={() => setSelectedConnectionId(connection.connection_id)} className={`flex w-full items-center gap-3 rounded-2xl p-3 text-left transition ${sameConnection(selectedConnectionId, connection.connection_id) ? "bg-cobalt text-white shadow-lg" : "hover:bg-ink/[0.045] dark:hover:bg-white/[0.05]"}`}><Avatar student={connection} /><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><b className="truncate text-sm">{connection.name}</b>{Number(connection.unread_count || 0) > 0 && <span className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] font-extrabold ${sameConnection(selectedConnectionId, connection.connection_id) ? "bg-white text-cobalt" : "bg-coral text-white"}`}>{connection.unread_count}</span>}</span><small className={`mt-0.5 block truncate ${sameConnection(selectedConnectionId, connection.connection_id) ? "text-white/65" : "text-muted"}`}>{connection.last_message || profileLine(connection)}</small></span></button>)}</div></div>
         </aside>
 
         <section className="panel flex min-h-[620px] flex-col overflow-hidden p-0">

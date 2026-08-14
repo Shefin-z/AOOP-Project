@@ -25,24 +25,21 @@ async function buildStudentNetworkSchema() {
   await query(
     `CREATE TABLE IF NOT EXISTS student_messages (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      connection_id BIGINT UNSIGNED NOT NULL,
+      connection_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+      connection_key VARCHAR(64) NOT NULL,
       sender_id BIGINT UNSIGNED NOT NULL,
       recipient_id BIGINT UNSIGNED NOT NULL,
       body VARCHAR(2000) NOT NULL,
       read_at DATETIME NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      INDEX idx_student_messages_connection (connection_id, created_at),
+      INDEX idx_student_messages_connection (connection_key, created_at),
       INDEX idx_student_messages_recipient_unread (recipient_id, read_at),
-      CONSTRAINT fk_student_messages_connection FOREIGN KEY (connection_id) REFERENCES student_connections(id) ON DELETE CASCADE,
       CONSTRAINT fk_student_messages_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
       CONSTRAINT fk_student_messages_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
     )`,
   );
   await query(
-    "ALTER TABLE student_connections ADD COLUMN IF NOT EXISTS id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE FIRST",
-  );
-  await query(
-    "ALTER TABLE student_messages ADD COLUMN IF NOT EXISTS id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE FIRST",
+    "ALTER TABLE student_messages ADD COLUMN IF NOT EXISTS connection_key VARCHAR(64) NULL",
   );
 }
 

@@ -18,17 +18,32 @@ function pairFor(firstId, secondId) {
   return firstId < secondId ? [firstId, secondId] : [secondId, firstId];
 }
 
+function connectionKeyFor(userAId, userBId) {
+  return `${userAId}-${userBId}`;
+}
+
+function parseConnectionKey(value) {
+  const match = String(value || "").match(/^(\d+)-(\d+)$/);
+  if (!match) return null;
+  const firstId = toId(match[1]);
+  const secondId = toId(match[2]);
+  if (!firstId || !secondId || firstId === secondId) return null;
+  return pairFor(firstId, secondId);
+}
+
 function studentFields(prefix = "") {
   return `${prefix}u.id student_id, u.name, sp.university, sp.degree, sp.target_role, sp.location,
           COALESCE(NULLIF(sp.avatar_data, ''), sp.avatar_url) avatar`;
 }
 
-async function getConnectionForStudent(connectionId, studentId, { acceptedOnly = false } = {}) {
-  const conditions = ["c.id=?", "(c.user_a_id=? OR c.user_b_id=?)"];
-  const values = [connectionId, studentId, studentId];
+async function getConnectionForStudent(connectionKey, studentId, { acceptedOnly = false } = {}) {
+  const pair = parseConnectionKey(connectionKey);
+  if (!pair) return null;
+  const conditions = ["c.user_a_id=?", "c.user_b_id=?", "(c.user_a_id=? OR c.user_b_id=?)"];
+  const values = [pair[0], pair[1], studentId, studentId];
   if (acceptedOnly) conditions.push("c.status='accepted'");
   const [connection] = await query(
-    `SELECT c.id, c.user_a_id, c.user_b_id, c.requested_by_id, c.status, c.created_at, c.accepted_at
+    `SELECT c.user_a_id, c.user_b_id, c.requested_by_id, c.status, c.created_at, c.accepted_at
      FROM student_connections c WHERE ${conditions.join(" AND ")} LIMIT 1`,
     values,
   );
@@ -59,9 +74,9 @@ router.get("/students", async (req, res, next) => {
       : "AND (u.name LIKE ? OR COALESCE(sp.university, '') LIKE ? OR COALESCE(sp.target_role, '') LIKE ?)";
     const searchValues = isStudentId ? [Number(term), like, like] : [like, like, like];
     const rows = await query(
-      `SELECT ${studentFields()}, c.id connection_id,
+      `SELECT ${studentFields()}, CONCAT(c.user_a_id, '-', c.user_b_id) connection_id,
               CASE
-                WHEN c.id IS NULL THEN 'none'
+                WHEN c.user_a_id IS NULL THEN 'none'
                 WHEN c.status='accepted' THEN 'connected'
                 WHEN c.requested_by_id=? THEN 'outgoing'
                 ELSE 'incoming'
@@ -78,7 +93,7 @@ router.get("/students", async (req, res, next) => {
     res.json(rows.map((student) => ({
       ...student,
       student_id: Number(student.student_id),
-      connection_id: student.connection_id == null ? null : Number(student.connection_id),
+      connection_id: student.connection_id || null,
     })));
   } catch (error) { next(error); }
 });
@@ -88,8 +103,9 @@ router.post("/connections", async (req, res, next) => {
   try {
     const targetId = toId(req.body.studentId);
     if (!targetId) return res.status(400).json({ error: "Choose a valid student" });
-    if (targetId === req.user.id) return res.status(400).json({ error: "You cannot add yourself" });
-    const [userAId, userBId] = pairFor(req.user.id, targetId);
+    if (targetId === Number(req.user.id)) return res.status(400).json({ error: "You cannot add yourself" });
+    const [userAId, userBId] = pairFor(Number(req.user.id), targetId);
+    const connectionKey = connectionKeyFor(userAId, userBId);
 
     connection = await pool.getConnection();
     await connection.beginTransaction();
@@ -102,7 +118,7 @@ router.post("/connections", async (req, res, next) => {
       return res.status(404).json({ error: "Student not found" });
     }
     const [existingRows] = await connection.execute(
-      "SELECT id, requested_by_id, status FROM student_connections WHERE user_a_id=? AND user_b_id=? FOR UPDATE",
+      "SELECT requested_by_id, status FROM student_connections WHERE user_a_id=? AND user_b_id=? FOR UPDATE",
       [userAId, userBId],
     );
     const existing = existingRows[0];
@@ -110,29 +126,25 @@ router.post("/connections", async (req, res, next) => {
       await connection.rollback();
       return res.status(409).json({ error: "You are already connected with this student" });
     }
-    if (existing?.requested_by_id === req.user.id) {
+    if (Number(existing?.requested_by_id) === Number(req.user.id)) {
       await connection.rollback();
       return res.status(409).json({ error: "Connection request already sent" });
     }
     if (existing) {
       await connection.execute(
-        "UPDATE student_connections SET status='accepted', accepted_at=NOW() WHERE id=?",
-        [existing.id],
+        "UPDATE student_connections SET status='accepted', accepted_at=NOW() WHERE user_a_id=? AND user_b_id=?",
+        [userAId, userBId],
       );
       await connection.commit();
-      return res.json({
-        id: Number(existing.id),
-        status: "accepted",
-        message: "You are now connected. Start a conversation anytime.",
-      });
+      return res.json({ id: connectionKey, status: "accepted", message: "You are now connected. Start a conversation anytime." });
     }
 
-    const [result] = await connection.execute(
+    await connection.execute(
       "INSERT INTO student_connections (user_a_id, user_b_id, requested_by_id, status) VALUES (?, ?, ?, 'pending')",
       [userAId, userBId, req.user.id],
     );
     await connection.commit();
-    res.status(201).json({ id: Number(result.insertId), status: "pending", message: "Connection request sent" });
+    res.status(201).json({ id: connectionKey, status: "pending", message: "Connection request sent" });
   } catch (error) {
     if (connection) await connection.rollback().catch(() => {});
     next(error);
@@ -145,26 +157,26 @@ router.get("/connections", async (req, res, next) => {
   try {
     const [connections, incomingRequests] = await Promise.all([
       query(
-        `SELECT c.id connection_id, c.created_at, c.accepted_at,
-                ${studentFields()},
-                latest_message.body last_message, message_summary.last_message_at,
+        `SELECT CONCAT(c.user_a_id, '-', c.user_b_id) connection_id, c.created_at, c.accepted_at,
+                ${studentFields()}, latest_message.body last_message, message_summary.last_message_at,
                 COALESCE(message_summary.unread_count, 0) unread_count
          FROM student_connections c
          JOIN users u ON u.id=CASE WHEN c.user_a_id=? THEN c.user_b_id ELSE c.user_a_id END
          LEFT JOIN student_profiles sp ON sp.user_id=u.id
          LEFT JOIN (
-           SELECT connection_id, MAX(id) latest_message_id, MAX(created_at) last_message_at,
+           SELECT connection_key, MAX(id) latest_message_id, MAX(created_at) last_message_at,
                   SUM(CASE WHEN recipient_id=? AND read_at IS NULL THEN 1 ELSE 0 END) unread_count
            FROM student_messages
-           GROUP BY connection_id
-         ) message_summary ON message_summary.connection_id=c.id
+           WHERE connection_key IS NOT NULL
+           GROUP BY connection_key
+         ) message_summary ON message_summary.connection_key=CONCAT(c.user_a_id, '-', c.user_b_id)
          LEFT JOIN student_messages latest_message ON latest_message.id=message_summary.latest_message_id
          WHERE c.status='accepted' AND (c.user_a_id=? OR c.user_b_id=?)
          ORDER BY COALESCE(message_summary.last_message_at, c.accepted_at, c.created_at) DESC`,
         [req.user.id, req.user.id, req.user.id, req.user.id],
       ),
       query(
-        `SELECT c.id connection_id, c.created_at, ${studentFields()}
+        `SELECT CONCAT(c.user_a_id, '-', c.user_b_id) connection_id, c.created_at, ${studentFields()}
          FROM student_connections c
          JOIN users u ON u.id=c.requested_by_id
          LEFT JOIN student_profiles sp ON sp.user_id=u.id
@@ -175,7 +187,7 @@ router.get("/connections", async (req, res, next) => {
     ]);
     const normalise = (record) => ({
       ...record,
-      connection_id: Number(record.connection_id),
+      connection_id: String(record.connection_id),
       student_id: Number(record.student_id),
       unread_count: Number(record.unread_count || 0),
     });
@@ -189,55 +201,57 @@ router.get("/connections", async (req, res, next) => {
 
 router.patch("/connections/:id", async (req, res, next) => {
   try {
-    const connectionId = toId(req.params.id);
+    const connectionKey = req.params.id;
+    const pair = parseConnectionKey(connectionKey);
     const action = cleanText(req.body.action, 20);
-    if (!connectionId || !["accept", "decline"].includes(action)) {
-      return res.status(400).json({ error: "Choose accept or decline" });
-    }
-    const connection = await getConnectionForStudent(connectionId, req.user.id);
+    if (!pair || !["accept", "decline"].includes(action)) return res.status(400).json({ error: "Choose accept or decline" });
+    const connection = await getConnectionForStudent(connectionKey, req.user.id);
     if (!connection) return res.status(404).json({ error: "Connection request not found" });
-    if (connection.status !== "pending" || Number(connection.requested_by_id) === req.user.id) {
+    if (connection.status !== "pending" || Number(connection.requested_by_id) === Number(req.user.id)) {
       return res.status(409).json({ error: "This request is no longer awaiting your response" });
     }
     if (action === "accept") {
-      await query("UPDATE student_connections SET status='accepted', accepted_at=NOW() WHERE id=?", [connectionId]);
-      return res.json({ id: connectionId, status: "accepted", message: "Connection accepted. You can now message each other." });
+      await query("UPDATE student_connections SET status='accepted', accepted_at=NOW() WHERE user_a_id=? AND user_b_id=?", pair);
+      return res.json({ id: connectionKeyFor(pair[0], pair[1]), status: "accepted", message: "Connection accepted. You can now message each other." });
     }
-    await query("DELETE FROM student_connections WHERE id=?", [connectionId]);
-    res.json({ id: connectionId, status: "declined", message: "Connection request declined" });
+    await query("DELETE FROM student_connections WHERE user_a_id=? AND user_b_id=?", pair);
+    res.json({ id: connectionKeyFor(pair[0], pair[1]), status: "declined", message: "Connection request declined" });
   } catch (error) { next(error); }
 });
 
 router.delete("/connections/:id", async (req, res, next) => {
   try {
-    const connectionId = toId(req.params.id);
-    if (!connectionId) return res.status(400).json({ error: "Choose a valid connection" });
-    const connection = await getConnectionForStudent(connectionId, req.user.id);
+    const connectionKey = req.params.id;
+    const pair = parseConnectionKey(connectionKey);
+    if (!pair) return res.status(400).json({ error: "Choose a valid connection" });
+    const connection = await getConnectionForStudent(connectionKey, req.user.id);
     if (!connection) return res.status(404).json({ error: "Connection not found" });
-    await query("DELETE FROM student_connections WHERE id=?", [connectionId]);
+    await query("DELETE FROM student_messages WHERE connection_key=?", [connectionKeyFor(pair[0], pair[1])]);
+    await query("DELETE FROM student_connections WHERE user_a_id=? AND user_b_id=?", pair);
     res.json({ message: connection.status === "accepted" ? "Connection removed" : "Connection request cancelled" });
   } catch (error) { next(error); }
 });
 
 router.get("/conversations/:connectionId/messages", async (req, res, next) => {
   try {
-    const connectionId = toId(req.params.connectionId);
-    if (!connectionId) return res.status(400).json({ error: "Choose a valid conversation" });
-    const connection = await getConnectionForStudent(connectionId, req.user.id, { acceptedOnly: true });
+    const connectionKey = req.params.connectionId;
+    const pair = parseConnectionKey(connectionKey);
+    if (!pair) return res.status(400).json({ error: "Choose a valid conversation" });
+    const connection = await getConnectionForStudent(connectionKey, req.user.id, { acceptedOnly: true });
     if (!connection) return res.status(404).json({ error: "Conversation not found" });
+    const canonicalKey = connectionKeyFor(pair[0], pair[1]);
     await query(
-      "UPDATE student_messages SET read_at=NOW() WHERE connection_id=? AND recipient_id=? AND read_at IS NULL",
-      [connectionId, req.user.id],
+      "UPDATE student_messages SET read_at=NOW() WHERE connection_key=? AND recipient_id=? AND read_at IS NULL",
+      [canonicalKey, req.user.id],
     );
     const messages = await query(
-      `SELECT id, connection_id, sender_id, recipient_id, body, read_at, created_at
-       FROM student_messages WHERE connection_id=? ORDER BY created_at ASC, id ASC LIMIT 200`,
-      [connectionId],
+      `SELECT id, connection_key, sender_id, recipient_id, body, read_at, created_at
+       FROM student_messages WHERE connection_key=? ORDER BY created_at ASC, id ASC LIMIT 200`,
+      [canonicalKey],
     );
     res.json(messages.map((message) => ({
       ...message,
       id: Number(message.id),
-      connection_id: Number(message.connection_id),
       sender_id: Number(message.sender_id),
       recipient_id: Number(message.recipient_id),
     })));
@@ -246,27 +260,28 @@ router.get("/conversations/:connectionId/messages", async (req, res, next) => {
 
 router.post("/conversations/:connectionId/messages", async (req, res, next) => {
   try {
-    const connectionId = toId(req.params.connectionId);
+    const connectionKey = req.params.connectionId;
+    const pair = parseConnectionKey(connectionKey);
     const body = cleanText(req.body.body, 2000);
-    if (!connectionId) return res.status(400).json({ error: "Choose a valid conversation" });
+    if (!pair) return res.status(400).json({ error: "Choose a valid conversation" });
     if (!body) return res.status(400).json({ error: "Write a message before sending" });
-    const connection = await getConnectionForStudent(connectionId, req.user.id, { acceptedOnly: true });
+    const connection = await getConnectionForStudent(connectionKey, req.user.id, { acceptedOnly: true });
     if (!connection) return res.status(404).json({ error: "Conversation not found" });
-    const recipientId = Number(connection.user_a_id) === req.user.id
+    const recipientId = Number(connection.user_a_id) === Number(req.user.id)
       ? Number(connection.user_b_id)
       : Number(connection.user_a_id);
+    const canonicalKey = connectionKeyFor(pair[0], pair[1]);
     const result = await query(
-      "INSERT INTO student_messages (connection_id, sender_id, recipient_id, body) VALUES (?, ?, ?, ?)",
-      [connectionId, req.user.id, recipientId, body],
+      "INSERT INTO student_messages (connection_id, connection_key, sender_id, recipient_id, body) VALUES (0, ?, ?, ?, ?)",
+      [canonicalKey, req.user.id, recipientId, body],
     );
     const [message] = await query(
-      "SELECT id, connection_id, sender_id, recipient_id, body, read_at, created_at FROM student_messages WHERE id=? LIMIT 1",
+      "SELECT id, connection_key, sender_id, recipient_id, body, read_at, created_at FROM student_messages WHERE id=? LIMIT 1",
       [result.insertId],
     );
     res.status(201).json({
       ...message,
       id: Number(message.id),
-      connection_id: Number(message.connection_id),
       sender_id: Number(message.sender_id),
       recipient_id: Number(message.recipient_id),
     });

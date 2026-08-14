@@ -419,26 +419,23 @@ CREATE TABLE IF NOT EXISTS student_connections (
 
 CREATE TABLE IF NOT EXISTS student_messages (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  connection_id BIGINT UNSIGNED NOT NULL,
+  connection_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  connection_key VARCHAR(64) NOT NULL,
   sender_id BIGINT UNSIGNED NOT NULL,
   recipient_id BIGINT UNSIGNED NOT NULL,
   body VARCHAR(2000) NOT NULL,
   read_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_student_messages_connection (connection_id, created_at),
+  INDEX idx_student_messages_connection (connection_key, created_at),
   INDEX idx_student_messages_recipient_unread (recipient_id, read_at),
-  CONSTRAINT fk_student_messages_connection FOREIGN KEY (connection_id) REFERENCES student_connections(id) ON DELETE CASCADE,
   CONSTRAINT fk_student_messages_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_student_messages_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Upgrade earlier connection/message table variants that used a composite key
--- without a surrogate record ID. The inbox API addresses records by this ID.
-ALTER TABLE student_connections
-  ADD COLUMN IF NOT EXISTS id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE FIRST;
-
+-- Earlier message table variants used a numeric connection ID. Keep the new
+-- stable pair key alongside it so both schema variants can be read safely.
 ALTER TABLE student_messages
-  ADD COLUMN IF NOT EXISTS id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE FIRST;
+  ADD COLUMN IF NOT EXISTS connection_key VARCHAR(64) NULL;
 
 CREATE TABLE IF NOT EXISTS events (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
