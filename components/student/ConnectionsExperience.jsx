@@ -33,7 +33,9 @@ const displayTime = (value, withDate = false) => {
     : date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 };
 
-const sameConnection = (left, right) => String(left || "") === String(right || "");
+const sameConnection = (left, right) => left !== null && left !== undefined && left !== ""
+  && right !== null && right !== undefined && right !== ""
+  && String(left) === String(right);
 
 function Avatar({ student, size = "h-10 w-10" }) {
   return (

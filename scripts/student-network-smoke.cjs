@@ -19,6 +19,7 @@ assert.match(route, /recipient_id=\? AND read_at IS NULL/, "Unread messages must
 assert.match(route, /connectionKeyFor/, "Connection APIs must work without relying on a legacy surrogate ID");
 assert.match(ui, /\/network\/students\?q=/, "The inbox UI must call the live student search API");
 assert.match(ui, /\/network\/conversations\//, "The inbox UI must load live conversations");
+assert.match(ui, /left !== null/, "Unconnected students must not be treated as a busy connection action");
 assert.match(workspace, /id: "connections", label: "Connections & inbox"/, "The student workspace needs an inbox section");
 assert.match(shell, /Search students by name or ID/, "The top bar must support student search");
 
