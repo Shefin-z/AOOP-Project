@@ -286,4 +286,33 @@ router.post("/conversations/:connectionId/messages", async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.delete("/conversations/:connectionId/messages/:messageId", async (req, res, next) => {
+  try {
+    const connectionKey = req.params.connectionId;
+    const pair = parseConnectionKey(connectionKey);
+    const messageId = toId(req.params.messageId);
+    if (!pair || !messageId) return res.status(400).json({ error: "Choose a valid message" });
+    const connection = await getConnectionForStudent(connectionKey, req.user.id, { acceptedOnly: true });
+    if (!connection) return res.status(404).json({ error: "Conversation not found" });
+    const result = await query(
+      "DELETE FROM student_messages WHERE id=? AND connection_id=? AND sender_id=?",
+      [messageId, connection.connection_record_id, req.user.id],
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: "Only messages you sent can be deleted" });
+    res.json({ message: "Message deleted" });
+  } catch (error) { next(error); }
+});
+
+router.delete("/conversations/:connectionId/messages", async (req, res, next) => {
+  try {
+    const connectionKey = req.params.connectionId;
+    const pair = parseConnectionKey(connectionKey);
+    if (!pair) return res.status(400).json({ error: "Choose a valid conversation" });
+    const connection = await getConnectionForStudent(connectionKey, req.user.id, { acceptedOnly: true });
+    if (!connection) return res.status(404).json({ error: "Conversation not found" });
+    await query("DELETE FROM student_messages WHERE connection_id=?", [connection.connection_record_id]);
+    res.json({ message: "Conversation history cleared" });
+  } catch (error) { next(error); }
+});
+
 module.exports = router;
