@@ -59,7 +59,6 @@ import Toast from "../Toast";
 import { CommunityPage, CommunityPostCooldown, CommunityPostModal } from "./CommunityExperience";
 import {
   achievements as seedAchievements,
-  performanceSeries,
   resources,
 } from "../../lib/mockData";
 import { apiRequest } from "../../lib/api";
@@ -806,7 +805,7 @@ export default function StudentWorkspace() {
             onCompleteProfile={() => setActive("profile")}
           />
         )}
-        {active === "analytics" && <AnalyticsPage notify={notify} />}
+        {active === "analytics" && <AnalyticsPage notify={notify} data={overviewData} onNavigate={setActive} />}
         {active === "learning" && <LearningPage notify={notify} />}
         {active === "community" && <CommunityPage posts={posts} setPosts={setPosts} loading={communityLoading} error={communityError} onRetry={loadCommunity} notify={notify} viewer={currentUser} onNewPost={() => setModal({ type: "post" })} postingStatus={postingStatus} />}
         {active === "events" && <EventsPage events={events} loading={eventsLoading} error={eventsError} onRetry={loadEvents} reservingEventId={reservingEventId} cancellingEventId={cancellingEventId} onRegister={reserveEvent} onCancelReservation={cancelEventReservation} />}
@@ -1607,43 +1606,82 @@ function LegacyAssessmentsPage({ assessments, loading, error, onRetry, onStart }
   );
 }
 
-function AnalyticsPage({ notify }) {
+const weeklyActivity = [
+  { day: "Mon", minutes: 46, detail: "2 learning activities", tone: "bg-cobalt" },
+  { day: "Tue", minutes: 72, detail: "Assessment practice", tone: "bg-cobalt" },
+  { day: "Wed", minutes: 38, detail: "Resource review", tone: "bg-jade" },
+  { day: "Thu", minutes: 84, detail: "Portfolio work", tone: "bg-cobalt" },
+  { day: "Fri", minutes: 58, detail: "Job research", tone: "bg-jade" },
+  { day: "Sat", minutes: 88, detail: "Learning sprint", tone: "bg-coral" },
+  { day: "Sun", minutes: 0, detail: "No activity yet", tone: "bg-ink/[0.1]" },
+];
+
+function getWeekRange() {
+  const today = new Date();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const month = new Intl.DateTimeFormat("en", { month: "short" });
+  const day = new Intl.DateTimeFormat("en", { day: "numeric" });
+  return month.format(monday) === month.format(sunday)
+    ? `${month.format(monday)} ${day.format(monday)} – ${day.format(sunday)}`
+    : `${month.format(monday)} ${day.format(monday)} – ${month.format(sunday)} ${day.format(sunday)}`;
+}
+
+function AnalyticsPage({ notify, data, onNavigate }) {
+  const [selectedDay, setSelectedDay] = useState(5);
+  const metrics = data?.metrics || {};
+  const calculation = data?.calculation || {};
+  const readinessScore = Math.round(Number(data?.readinessScore ?? 78));
+  const assessmentScore = Math.round(Number(calculation.assessmentPerformance ?? 83));
+  const learningProgress = Math.round(Number(calculation.learningProgress ?? 68));
+  const selected = weeklyActivity[selectedDay];
+  const maxMinutes = Math.max(...weeklyActivity.map((item) => item.minutes));
+  const totalMinutes = weeklyActivity.reduce((sum, item) => sum + item.minutes, 0);
+  const activeDays = weeklyActivity.filter((item) => item.minutes > 0).length;
+  const nextActions = data?.nextActions?.slice(0, 2) || [
+    { id: "learning", title: "Complete one analytics project", detail: "Turn your work into portfolio evidence", target: "learning", tone: "bg-coral" },
+    { id: "assessment", title: "Schedule your next assessment", detail: "Keep your strongest skills current", target: "assessments", tone: "bg-cobalt" },
+  ];
+  const weekRange = getWeekRange();
+
+  const printReport = () => {
+    const reportWindow = window.open("", "_blank", "width=820,height=760");
+    if (!reportWindow) {
+      notify("Allow pop-ups to save your weekly report as a PDF.");
+      return;
+    }
+    reportWindow.document.write(`<!doctype html><title>CareerForge weekly report</title><style>body{font-family:Arial,sans-serif;color:#1e2430;margin:48px;line-height:1.5}.eyebrow{color:#3155c6;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}.score{font-size:38px;font-weight:800}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:28px 0}.card{border:1px solid #e5e1d8;border-radius:16px;padding:16px}.action{border-top:1px solid #e5e1d8;padding:12px 0}.muted{color:#69717d}</style><main><div class="eyebrow">CareerForge · weekly performance report</div><h1>${weekRange}</h1><p class="muted">A summary of your saved progress and next actions.</p><div class="grid"><div class="card"><div class="score">${readinessScore}%</div>Career readiness</div><div class="card"><div class="score">${assessmentScore}%</div>Assessment performance</div><div class="card"><div class="score">${learningProgress}%</div>Learning progress</div></div><h2>Progress snapshot</h2><p>${Number(metrics.assessmentsCompleted || 0)} assessments completed · ${Number(metrics.resourcesCompleted || 0)} learning resources completed · ${Number(metrics.applicationsActive || 0)} active applications</p><h2>Focus next</h2>${nextActions.map((action) => `<div class="action"><b>${action.title}</b><br><span class="muted">${action.detail}</span></div>`).join("")}</main>`);
+    reportWindow.document.close();
+    reportWindow.focus();
+    window.setTimeout(() => reportWindow.print(), 200);
+    notify("Print dialog opened—choose Save as PDF to download your report.");
+  };
+
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric icon={Activity} label="Learning hours" value="14.8h" delta="+2.4h vs last week" tone="bg-cobalt" />
-        <Metric icon={ListChecks} label="Quiz accuracy" value="83%" delta="+5% this month" tone="bg-jade" />
-        <Metric icon={Target} label="Career readiness" value="78%" delta="Target: 85%" tone="bg-coral" />
-        <Metric icon={Flame} label="Weekly streak" value="6/7" delta="One day to a full week" tone="bg-plum" />
+        <Metric icon={Activity} label="Learning progress" value={`${learningProgress}%`} delta={`${Number(metrics.resourcesCompleted || 0)} resources completed`} tone="bg-cobalt" />
+        <Metric icon={ListChecks} label="Assessment score" value={`${assessmentScore}%`} delta={`${Number(metrics.assessmentsCompleted || 0)} verified results`} tone="bg-jade" />
+        <Metric icon={Target} label="Career readiness" value={`${readinessScore}%`} delta="Calculated from saved activity" tone="bg-coral" />
+        <Metric icon={Flame} label="Weekly streak" value={`${activeDays}/7`} delta="One day to a full week" tone="bg-plum" />
       </section>
-      <section className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
-        <div className="panel p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-extrabold">Readiness trend</h2><p className="text-xs text-muted">Seven-week progress toward Product Analyst</p></div><select className="select min-h-9 w-32 py-0 text-xs"><option>7 weeks</option><option>3 months</option></select></div>
-          <MiniLineChart />
-        </div>
-        <div className="panel p-6">
-          <h2 className="text-lg font-extrabold">Skill balance</h2><p className="text-xs text-muted">Targeted against your top role</p>
-          <div className="mt-6 space-y-4">{[["Communication", 91, 80, "bg-coral"], ["Technical fluency", 79, 84, "bg-cobalt"], ["Analysis", 76, 88, "bg-jade"], ["Business context", 68, 76, "bg-plum"]].map(([label, value, target, tone]) => <div key={label}><div className="mb-1.5 flex justify-between text-[11px]"><b>{label}</b><span className="text-muted">{value}% / {target}% target</span></div><div className="progress-track relative"><div className={`h-full rounded-full ${tone}`} style={{ width: `${value}%` }} /><span className="absolute inset-y-[-2px] w-0.5 bg-ink" style={{ left: `${target}%` }} /></div></div>)}</div>
-        </div>
-      </section>
-      <section className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
-        <div className="panel p-6"><h2 className="text-lg font-extrabold">Weekly consistency</h2><p className="text-xs text-muted">Learning and platform activity</p><div className="mt-8 flex h-40 items-end justify-between gap-2">{[35, 62, 48, 85, 72, 94, 20].map((value, index) => <div key={index} className="flex flex-1 flex-col items-center gap-2"><div className={`w-full max-w-8 rounded-t-lg ${index === 5 ? "bg-coral" : "bg-cobalt/80"}`} style={{ height: `${value}%` }} /><span className="text-[10px] font-bold text-muted">{["M", "T", "W", "T", "F", "S", "S"][index]}</span></div>)}</div></div>
-        <div className="panel p-6"><div className="flex justify-between"><div><h2 className="text-lg font-extrabold">Weekly performance report</h2><p className="text-xs text-muted">Jul 21 — Jul 27</p></div><button onClick={() => notify("Weekly report downloaded.")} className="btn-secondary min-h-9"><Download size={14} /> PDF</button></div><div className="mt-6 grid gap-3 sm:grid-cols-3">{[["Biggest win", "SQL score improved by 11 points", "bg-jade/10 text-jade"], ["Focus next", "Complete one analytics project", "bg-coral/10 text-coral"], ["Momentum", "6-day learning streak", "bg-cobalt/10 text-cobalt"]].map(([title, copy, tone]) => <div className={`rounded-2xl p-4 ${tone}`} key={title}><b className="text-xs">{title}</b><p className="mt-2 text-xs leading-5">{copy}</p></div>)}</div><div className="mt-5 flex items-center gap-3 rounded-2xl border border-ink/[0.07] bg-white/55 p-4"><Lightbulb className="text-coral" size={20} /><p className="text-xs leading-5 text-muted"><b className="text-ink">AI insight:</b> Your assessment scores improve most when you complete a related learning module within three days.</p></div></div>
-      </section>
-    </div>
-  );
-}
 
-function MiniLineChart() {
-  const points = performanceSeries.map((item, index) => `${index * 100 / (performanceSeries.length - 1)},${100 - item.value}`).join(" ");
-  return (
-    <div className="mt-7">
-      <svg viewBox="0 0 100 60" className="h-56 w-full overflow-visible" preserveAspectRatio="none" aria-label="Readiness chart">
-        {[15, 30, 45].map((y) => <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="rgba(30,36,48,.08)" strokeWidth=".35" />)}
-        <polyline points={points} fill="none" stroke="#3155C6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        {performanceSeries.map((item, index) => <circle key={item.label} cx={index * 100 / (performanceSeries.length - 1)} cy={100 - item.value} r="1.7" fill="#FBF9F4" stroke="#3155C6" strokeWidth=".8" vectorEffect="non-scaling-stroke" />)}
-      </svg>
-      <div className="flex justify-between">{performanceSeries.map((item) => <span className="text-[10px] font-bold text-muted" key={item.label}>{item.label}</span>)}</div>
+      <section className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
+        <div className="panel p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-extrabold">Weekly consistency</h2><p className="text-xs text-muted">Your focused work across the last seven days</p></div><span className="tag !bg-jade/10 !text-jade"><Flame size={12} /> {activeDays}/7 days active</span></div>
+          <div className="mt-7 grid grid-cols-7 gap-2 sm:gap-3">{weeklyActivity.map((item, index) => { const height = item.minutes ? Math.max(18, Math.round((item.minutes / maxMinutes) * 100)) : 8; const isSelected = selectedDay === index; return <button key={item.day} onClick={() => setSelectedDay(index)} aria-pressed={isSelected} className={`rounded-2xl border p-2 text-center transition sm:p-3 ${isSelected ? "border-cobalt/35 bg-cobalt/[0.08] shadow-sm" : "border-transparent hover:border-ink/[0.08] hover:bg-ink/[0.03]"}`}><span className={`block text-[10px] font-extrabold ${isSelected ? "text-cobalt" : "text-muted"}`}>{item.day}</span><span className="mt-3 flex h-28 items-end rounded-xl bg-ink/[0.045] p-1.5"><span className={`w-full rounded-lg transition-all duration-300 ${item.tone}`} style={{ height: `${height}%` }} /></span><b className="mt-2 block text-[10px]">{item.minutes ? `${item.minutes}m` : "Rest"}</b></button>; })}</div>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink/[0.07] bg-white/55 p-4"><div className="flex items-center gap-3"><span className={`grid h-9 w-9 place-items-center rounded-xl text-white ${selected.minutes ? selected.tone : "bg-ink/30"}`}><Clock3 size={16} /></span><span><b className="block text-sm">{selected.day}: {selected.minutes ? `${selected.minutes} minutes focused` : "Rest day"}</b><small className="text-xs text-muted">{selected.detail}</small></span></div><span className="text-xs font-extrabold text-muted">{Math.floor(totalMinutes / 60)}h {totalMinutes % 60}m this week</span></div>
+        </div>
+
+        <div className="panel p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-extrabold">Weekly performance report</h2><p className="text-xs text-muted">{weekRange}</p></div><button onClick={printReport} className="btn-secondary min-h-9"><Download size={14} /> PDF</button></div>
+          <div className="mt-6 grid gap-4 sm:grid-cols-[.78fr_1.22fr]"><div className="rounded-[22px] bg-ink p-5 text-white"><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-white/55">Weekly score</span><b className="mt-3 block text-4xl tracking-[-.06em]">{readinessScore}<small className="text-lg text-white/55">/100</small></b><p className="mt-3 text-xs leading-5 text-white/65">Your saved profile, assessments and learning progress are moving in the right direction.</p></div><div className="grid gap-3 sm:grid-cols-3">{[["Assessment", `${assessmentScore}%`, "bg-jade/10 text-jade"], ["Learning", `${learningProgress}%`, "bg-cobalt/10 text-cobalt"], ["Applications", metrics.applicationsActive || 0, "bg-coral/10 text-coral"]].map(([label, value, tone]) => <div key={label} className={`rounded-2xl p-4 ${tone}`}><span className="text-[10px] font-extrabold uppercase tracking-[.12em]">{label}</span><b className="mt-3 block text-2xl tracking-[-.04em]">{value}</b><small className="mt-1 block text-[10px] opacity-80">{label === "Applications" ? "active now" : "current signal"}</small></div>)}</div></div>
+          <div className="mt-5 rounded-2xl border border-ink/[0.07] bg-white/55 p-4"><div className="flex items-center justify-between gap-3"><div><b className="text-sm">Focus next</b><p className="mt-0.5 text-xs text-muted">Complete the small actions that strengthen your next application.</p></div><Target className="text-coral" size={19} /></div><div className="mt-3 space-y-2">{nextActions.map((action) => <button key={action.id} onClick={() => onNavigate(action.target)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-ink/[0.045]"><span className={`h-2.5 w-2.5 rounded-full ${action.tone}`} /><span className="min-w-0 flex-1"><b className="block text-xs">{action.title}</b><small className="text-[11px] text-muted">{action.detail}</small></span><ChevronRight className="text-muted" size={15} /></button>)}</div></div>
+          <div className="mt-5 flex items-center gap-3 rounded-2xl border border-ink/[0.07] bg-white/55 p-4"><Lightbulb className="text-coral" size={20} /><p className="text-xs leading-5 text-muted"><b className="text-ink">AI insight:</b> Pair one learning session with a related assessment this week to turn progress into a stronger career signal.</p></div>
+        </div>
+      </section>
     </div>
   );
 }
