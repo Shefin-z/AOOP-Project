@@ -17,6 +17,7 @@ assert.match(route, /status='accepted'/, "Messages must be gated by an accepted 
 assert.match(route, /router\.post\("\/conversations\/:connectionId\/messages"/, "Connected students must be able to send messages");
 assert.match(route, /recipient_id=\? AND read_at IS NULL/, "Unread messages must be tracked per recipient");
 assert.match(route, /connectionKeyFor/, "Connection APIs must work without relying on a legacy surrogate ID");
+assert.match(route, /connection_record_id/, "Messages must use the connection record required by the database foreign key");
 assert.match(ui, /\/network\/students\?q=/, "The inbox UI must call the live student search API");
 assert.match(ui, /\/network\/conversations\//, "The inbox UI must load live conversations");
 assert.match(ui, /left !== null/, "Unconnected students must not be treated as a busy connection action");

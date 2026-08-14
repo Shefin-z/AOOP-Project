@@ -43,7 +43,7 @@ async function getConnectionForStudent(connectionKey, studentId, { acceptedOnly 
   const values = [pair[0], pair[1], studentId, studentId];
   if (acceptedOnly) conditions.push("c.status='accepted'");
   const [connection] = await query(
-    `SELECT c.user_a_id, c.user_b_id, c.requested_by_id, c.status, c.created_at, c.accepted_at
+    `SELECT c.id connection_record_id, c.user_a_id, c.user_b_id, c.requested_by_id, c.status, c.created_at, c.accepted_at
      FROM student_connections c WHERE ${conditions.join(" AND ")} LIMIT 1`,
     values,
   );
@@ -164,12 +164,11 @@ router.get("/connections", async (req, res, next) => {
          JOIN users u ON u.id=CASE WHEN c.user_a_id=? THEN c.user_b_id ELSE c.user_a_id END
          LEFT JOIN student_profiles sp ON sp.user_id=u.id
          LEFT JOIN (
-           SELECT connection_key, MAX(id) latest_message_id, MAX(created_at) last_message_at,
+           SELECT connection_id, MAX(id) latest_message_id, MAX(created_at) last_message_at,
                   SUM(CASE WHEN recipient_id=? AND read_at IS NULL THEN 1 ELSE 0 END) unread_count
            FROM student_messages
-           WHERE connection_key IS NOT NULL
-           GROUP BY connection_key
-         ) message_summary ON message_summary.connection_key=CONCAT(c.user_a_id, '-', c.user_b_id)
+           GROUP BY connection_id
+         ) message_summary ON message_summary.connection_id=c.id
          LEFT JOIN student_messages latest_message ON latest_message.id=message_summary.latest_message_id
          WHERE c.status='accepted' AND (c.user_a_id=? OR c.user_b_id=?)
          ORDER BY COALESCE(message_summary.last_message_at, c.accepted_at, c.created_at) DESC`,
@@ -226,7 +225,7 @@ router.delete("/connections/:id", async (req, res, next) => {
     if (!pair) return res.status(400).json({ error: "Choose a valid connection" });
     const connection = await getConnectionForStudent(connectionKey, req.user.id);
     if (!connection) return res.status(404).json({ error: "Connection not found" });
-    await query("DELETE FROM student_messages WHERE connection_key=?", [connectionKeyFor(pair[0], pair[1])]);
+    await query("DELETE FROM student_messages WHERE connection_id=?", [connection.connection_record_id]);
     await query("DELETE FROM student_connections WHERE user_a_id=? AND user_b_id=?", pair);
     res.json({ message: connection.status === "accepted" ? "Connection removed" : "Connection request cancelled" });
   } catch (error) { next(error); }
@@ -239,15 +238,14 @@ router.get("/conversations/:connectionId/messages", async (req, res, next) => {
     if (!pair) return res.status(400).json({ error: "Choose a valid conversation" });
     const connection = await getConnectionForStudent(connectionKey, req.user.id, { acceptedOnly: true });
     if (!connection) return res.status(404).json({ error: "Conversation not found" });
-    const canonicalKey = connectionKeyFor(pair[0], pair[1]);
     await query(
-      "UPDATE student_messages SET read_at=NOW() WHERE connection_key=? AND recipient_id=? AND read_at IS NULL",
-      [canonicalKey, req.user.id],
+      "UPDATE student_messages SET read_at=NOW() WHERE connection_id=? AND recipient_id=? AND read_at IS NULL",
+      [connection.connection_record_id, req.user.id],
     );
     const messages = await query(
       `SELECT id, connection_key, sender_id, recipient_id, body, read_at, created_at
-       FROM student_messages WHERE connection_key=? ORDER BY created_at ASC, id ASC LIMIT 200`,
-      [canonicalKey],
+       FROM student_messages WHERE connection_id=? ORDER BY created_at ASC, id ASC LIMIT 200`,
+      [connection.connection_record_id],
     );
     res.json(messages.map((message) => ({
       ...message,
@@ -272,8 +270,8 @@ router.post("/conversations/:connectionId/messages", async (req, res, next) => {
       : Number(connection.user_a_id);
     const canonicalKey = connectionKeyFor(pair[0], pair[1]);
     const result = await query(
-      "INSERT INTO student_messages (connection_id, connection_key, sender_id, recipient_id, body) VALUES (0, ?, ?, ?, ?)",
-      [canonicalKey, req.user.id, recipientId, body],
+      "INSERT INTO student_messages (connection_id, connection_key, sender_id, recipient_id, body) VALUES (?, ?, ?, ?, ?)",
+      [connection.connection_record_id, canonicalKey, req.user.id, recipientId, body],
     );
     const [message] = await query(
       "SELECT id, connection_key, sender_id, recipient_id, body, read_at, created_at FROM student_messages WHERE id=? LIMIT 1",
