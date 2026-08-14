@@ -11,6 +11,7 @@ const communityRoutes = require("./routes/community");
 const adminRoutes = require("./routes/admin");
 const adaptiveAssessmentRoutes = require("./routes/adaptive-assessment");
 const studentRoutes = require("./routes/student");
+const studentNetworkRoutes = require("./routes/student-network");
 
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
@@ -59,6 +60,7 @@ app.use("/api/adaptive-assessment", adaptiveAssessmentRoutes);
 app.use("/api/community", communityRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/student", studentRoutes);
+app.use("/api/network", studentNetworkRoutes);
 
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((error, _req, res, _next) => {

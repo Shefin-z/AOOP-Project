@@ -57,6 +57,7 @@ import {
 import DashboardShell from "../DashboardShell";
 import Toast from "../Toast";
 import { CommunityPage, CommunityPostCooldown, CommunityPostModal } from "./CommunityExperience";
+import ConnectionsPage from "./ConnectionsExperience";
 import {
   achievements as seedAchievements,
   resources,
@@ -72,6 +73,7 @@ const navItems = [
   { id: "analytics", label: "Performance", icon: BarChart3 },
   { id: "learning", label: "Learning resources", icon: BookOpen },
   { id: "community", label: "Community", icon: Users, badge: "New", group: "Connect" },
+  { id: "connections", label: "Connections & inbox", icon: MessageCircle },
   { id: "events", label: "Events", icon: CalendarDays },
   { id: "achievements", label: "Achievements", icon: Trophy },
   { id: "profile", label: "Profile & settings", icon: Settings, group: "Account" },
@@ -86,6 +88,7 @@ const pageMeta = {
   analytics: ["Performance intelligence", "A clear view of your skills, consistency and readiness."],
   learning: ["Learning resources", "Focused material selected for the roles you want."],
   community: ["Career community", "Learn in public, ask better questions and celebrate progress."],
+  connections: ["Connections & inbox", "Find CareerForge students, build your network, and message privately."],
   events: ["Events & workshops", "Meet recruiters, mentors and students building alongside you."],
   achievements: ["Your milestones", "Proof that consistent effort is becoming real progress."],
   profile: ["Profile & preferences", "Keep your career signal accurate and your experience personal."],
@@ -286,6 +289,7 @@ export default function StudentWorkspace() {
   const [postingStatus, setPostingStatus] = useState({ canPost: true, nextPostAt: null, cooldownHours: 12 });
   const [jobSearch, setJobSearch] = useState("");
   const [jobType, setJobType] = useState("All types");
+  const [studentSearch, setStudentSearch] = useState("");
   const [quiz, setQuiz] = useState({ index: 0, answers: {}, finished: false, score: 0, submitting: false, result: null, startedAt: null });
   const [assessmentRecords, setAssessmentRecords] = useState([]);
   const [assessmentLoading, setAssessmentLoading] = useState(true);
@@ -747,16 +751,23 @@ export default function StudentWorkspace() {
     return item;
   });
 
+  const updateStudentSearch = (value) => {
+    setStudentSearch(value);
+    if (value.trim()) setActive("connections");
+  };
+
   return (
     <>
       <DashboardShell
         role="student"
         profileName={currentUser.name}
         profileAvatar={currentUser.avatar_data || currentUser.avatar_url}
-        readinessScore={overviewData?.readinessScore ?? currentUser.readiness_score ?? 0}
         navItems={studentNavItems}
         active={active}
         onNavigate={setActive}
+        searchValue={studentSearch}
+        onSearchChange={updateStudentSearch}
+        onSearchSubmit={() => setActive("connections")}
         title={active === "overview" ? `${greeting}, ${firstName}` : pageMeta[active][0]}
         subtitle={pageMeta[active][1]}
         actions={pageActions[active]}
@@ -808,6 +819,7 @@ export default function StudentWorkspace() {
         {active === "analytics" && <AnalyticsPage notify={notify} data={overviewData} onNavigate={setActive} />}
         {active === "learning" && <LearningPage notify={notify} />}
         {active === "community" && <CommunityPage posts={posts} setPosts={setPosts} loading={communityLoading} error={communityError} onRetry={loadCommunity} notify={notify} viewer={currentUser} onNewPost={() => setModal({ type: "post" })} postingStatus={postingStatus} />}
+        {active === "connections" && <ConnectionsPage search={studentSearch} setSearch={setStudentSearch} currentUser={currentUser} notify={notify} />}
         {active === "events" && <EventsPage events={events} loading={eventsLoading} error={eventsError} onRetry={loadEvents} reservingEventId={reservingEventId} cancellingEventId={cancellingEventId} onRegister={reserveEvent} onCancelReservation={cancelEventReservation} />}
         {active === "achievements" && <AchievementsPage />}
         {active === "profile" && <ProfilePage notify={notify} user={currentUser} onSave={saveProfile} />}

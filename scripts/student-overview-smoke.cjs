@@ -57,7 +57,8 @@ for (const demoText of [
   );
 }
 assert.equal(shellSource.includes('role === "admin" ? "Live" : "78%"'), false);
-assert.match(shellSource, /studentReadiness/);
+assert.equal(shellSource.includes("Career readiness"), false, "The removed student sidebar card must not return");
+assert.equal(shellSource.includes("studentReadiness"), false, "The removed sidebar score should not leave unused code behind");
 
 console.log(JSON.stringify({
   status: "passed",

@@ -23,6 +23,9 @@ export default function DashboardShell({
   actions,
   profileName,
   profileAvatar,
+  searchValue,
+  onSearchChange,
+  onSearchSubmit,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -100,10 +103,15 @@ export default function DashboardShell({
       <div className="min-h-screen md:pl-[250px]">
         <header className="sticky top-0 z-40 flex h-[78px] items-center gap-3 border-b border-white/80 bg-canvas/80 px-4 backdrop-blur-2xl sm:px-7">
           <button onClick={() => setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl bg-ink text-white md:hidden"><Menu size={18} /></button>
-          <label className="relative hidden max-w-sm flex-1 lg:block">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" size={16} />
-            <input className="input min-h-10 bg-white/55 pl-10" placeholder={role === "admin" ? "Search users, jobs, content..." : "Search jobs, resources, community..."} />
-          </label>
+          <form className="relative hidden max-w-sm flex-1 lg:block" onSubmit={(event) => { event.preventDefault(); onSearchSubmit?.(); }}>
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" size={16} />
+            <input
+              className="input min-h-10 bg-white/55 pl-10"
+              placeholder={onSearchChange ? "Search students by name or ID..." : role === "admin" ? "Search users, jobs, content..." : "Search jobs, resources, community..."}
+              aria-label={onSearchChange ? "Search students" : "Search workspace"}
+              {...(onSearchChange ? { value: searchValue || "", onChange: (event) => onSearchChange(event.target.value) } : {})}
+            />
+          </form>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
             <button className="relative grid h-10 w-10 place-items-center rounded-xl border border-ink/[0.08] bg-white/60 text-muted transition hover:bg-white hover:text-ink">
