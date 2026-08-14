@@ -432,6 +432,14 @@ CREATE TABLE IF NOT EXISTS student_messages (
   CONSTRAINT fk_student_messages_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Upgrade earlier connection/message table variants that used a composite key
+-- without a surrogate record ID. The inbox API addresses records by this ID.
+ALTER TABLE student_connections
+  ADD COLUMN IF NOT EXISTS id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE FIRST;
+
+ALTER TABLE student_messages
+  ADD COLUMN IF NOT EXISTS id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE FIRST;
+
 CREATE TABLE IF NOT EXISTS events (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(220) NOT NULL,

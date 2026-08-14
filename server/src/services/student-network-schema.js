@@ -38,6 +38,12 @@ async function buildStudentNetworkSchema() {
       CONSTRAINT fk_student_messages_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
     )`,
   );
+  await query(
+    "ALTER TABLE student_connections ADD COLUMN IF NOT EXISTS id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE FIRST",
+  );
+  await query(
+    "ALTER TABLE student_messages ADD COLUMN IF NOT EXISTS id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE FIRST",
+  );
 }
 
 async function ensureStudentNetworkSchema() {

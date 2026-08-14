@@ -10,6 +10,7 @@ const shell = fs.readFileSync("components/DashboardShell.jsx", "utf8");
 assert.match(schema, /CREATE TABLE IF NOT EXISTS student_connections/, "Connection records need a database table");
 assert.match(schema, /UNIQUE KEY uq_student_connection_pair/, "A pair of students should only have one connection record");
 assert.match(schema, /CREATE TABLE IF NOT EXISTS student_messages/, "Private messages need a database table");
+assert.match(schema, /ALTER TABLE student_connections\s+ADD COLUMN IF NOT EXISTS id/, "Legacy connection tables need an API-addressable ID migration");
 assert.match(route, /router\.get\("\/students"/, "Students must be searchable");
 assert.match(route, /router\.post\("\/connections"/, "Students must be able to send connection requests");
 assert.match(route, /status='accepted'/, "Messages must be gated by an accepted connection");
