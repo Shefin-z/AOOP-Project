@@ -16,7 +16,10 @@ const {
   generateVerificationCode,
   hashVerificationCode,
   matchesVerificationCode,
+  hashPasswordResetCode,
+  matchesPasswordResetCode,
   sendVerificationEmail,
+  sendPasswordResetEmail,
 } = require("../services/email-verification");
 
 const router = express.Router();
@@ -33,6 +36,20 @@ const registrationVerifyLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many verification attempts. Please try again later." },
+});
+const passwordResetEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many password reset emails requested. Please try again later." },
+});
+const passwordResetVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many password reset attempts. Please try again later." },
 });
 
 router.get("/config", async (_req, res, next) => {
@@ -319,6 +336,234 @@ router.post("/register/verify", registrationVerifyLimiter, async (req, res, next
       token,
       user,
     });
+  } catch (error) {
+    try { await connection?.rollback(); } catch {}
+    next(error);
+  } finally {
+    connection?.release();
+  }
+});
+
+router.post("/password/reset/request", passwordResetEmailLimiter, async (req, res, next) => {
+  try {
+    const normalizedEmail = String(req.body.email || "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: "Enter the email address used for your student account" });
+    }
+    await ensureEmailVerificationSchema();
+    await query("DELETE FROM pending_student_password_resets WHERE expires_at < DATE_SUB(NOW(), INTERVAL 1 DAY)");
+    const [student] = await query(
+      "SELECT id, name FROM users WHERE email=? AND role='student' AND status='active' LIMIT 1",
+      [normalizedEmail],
+    );
+    const genericResponse = {
+      message: "If an active student account matches this email, a 6-digit reset code has been sent.",
+      email: normalizedEmail,
+      expiresInSeconds: CODE_TTL_MINUTES * 60,
+      resendAfterSeconds: RESEND_COOLDOWN_SECONDS,
+    };
+    if (!student) return res.status(202).json(genericResponse);
+
+    const [pending] = await query(
+      `SELECT GREATEST(0, ${RESEND_COOLDOWN_SECONDS} - TIMESTAMPDIFF(SECOND, sent_at, NOW())) AS retry_after
+       FROM pending_student_password_resets WHERE email=? LIMIT 1`,
+      [normalizedEmail],
+    );
+    const retryAfter = Number(pending?.retry_after || 0);
+    if (retryAfter > 0) {
+      return res.status(429).json({
+        error: `Please wait ${retryAfter} seconds before requesting another code.`,
+        retryAfterSeconds: retryAfter,
+      });
+    }
+
+    const code = generateVerificationCode();
+    const codeHash = hashPasswordResetCode(normalizedEmail, code);
+    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000);
+    await query(
+      `INSERT INTO pending_student_password_resets
+         (email, user_id, code_hash, expires_at, attempt_count, sent_at, send_count)
+       VALUES (?, ?, ?, ?, 0, NOW(), 1)
+       ON DUPLICATE KEY UPDATE
+         user_id=VALUES(user_id), code_hash=VALUES(code_hash), expires_at=VALUES(expires_at),
+         attempt_count=0, sent_at=NOW(), send_count=send_count+1`,
+      [normalizedEmail, student.id, codeHash, expiresAt],
+    );
+    try {
+      await sendPasswordResetEmail({ email: normalizedEmail, name: student.name, code });
+    } catch (error) {
+      await query(
+        "DELETE FROM pending_student_password_resets WHERE email=? AND code_hash=?",
+        [normalizedEmail, codeHash],
+      ).catch(() => {});
+      throw error;
+    }
+    res.status(202).json(genericResponse);
+  } catch (error) { next(error); }
+});
+
+router.post("/password/reset/resend", passwordResetEmailLimiter, async (req, res, next) => {
+  try {
+    const normalizedEmail = String(req.body.email || "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: "Enter a valid email address" });
+    }
+    await ensureEmailVerificationSchema();
+    const [pending] = await query(
+      `SELECT r.user_id, u.name,
+              GREATEST(0, ${RESEND_COOLDOWN_SECONDS} - TIMESTAMPDIFF(SECOND, r.sent_at, NOW())) AS retry_after
+       FROM pending_student_password_resets r
+       JOIN users u ON u.id=r.user_id AND u.role='student' AND u.status='active'
+       WHERE r.email=? LIMIT 1`,
+      [normalizedEmail],
+    );
+    if (!pending) return res.status(404).json({ error: "Request a new password reset code first." });
+    const retryAfter = Number(pending.retry_after || 0);
+    if (retryAfter > 0) {
+      return res.status(429).json({
+        error: `Please wait ${retryAfter} seconds before requesting another code.`,
+        retryAfterSeconds: retryAfter,
+      });
+    }
+    const code = generateVerificationCode();
+    const codeHash = hashPasswordResetCode(normalizedEmail, code);
+    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000);
+    await query(
+      `UPDATE pending_student_password_resets
+       SET code_hash=?, expires_at=?, attempt_count=0, sent_at=NOW(), send_count=send_count+1
+       WHERE email=?`,
+      [codeHash, expiresAt, normalizedEmail],
+    );
+    try {
+      await sendPasswordResetEmail({ email: normalizedEmail, name: pending.name, code });
+    } catch (error) {
+      await query(
+        "UPDATE pending_student_password_resets SET expires_at=NOW() WHERE email=? AND code_hash=?",
+        [normalizedEmail, codeHash],
+      ).catch(() => {});
+      throw error;
+    }
+    res.json({
+      message: "A new password reset code was sent.",
+      expiresInSeconds: CODE_TTL_MINUTES * 60,
+      resendAfterSeconds: RESEND_COOLDOWN_SECONDS,
+    });
+  } catch (error) { next(error); }
+});
+
+router.post("/password/reset/verify", passwordResetVerifyLimiter, async (req, res, next) => {
+  let connection;
+  try {
+    const normalizedEmail = String(req.body.email || "").trim().toLowerCase();
+    const code = String(req.body.code || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || !/^\d{6}$/.test(code)) {
+      return res.status(400).json({ error: "Enter the 6-digit code from your email." });
+    }
+    await ensureEmailVerificationSchema();
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const [pendingRows] = await connection.execute(
+      `SELECT email, user_id, code_hash, attempt_count, expires_at <= NOW() AS expired,
+              GREATEST(1, TIMESTAMPDIFF(SECOND, NOW(), expires_at)) AS expires_in
+       FROM pending_student_password_resets WHERE email=? LIMIT 1 FOR UPDATE`,
+      [normalizedEmail],
+    );
+    const pending = pendingRows[0];
+    if (!pending) {
+      await connection.rollback();
+      return res.status(404).json({ error: "This reset code is invalid or expired. Request a new one." });
+    }
+    if (Boolean(pending.expired)) {
+      await connection.execute("DELETE FROM pending_student_password_resets WHERE email=?", [normalizedEmail]);
+      await connection.commit();
+      return res.status(410).json({ error: "This reset code has expired. Request a new one." });
+    }
+    const nextAttemptCount = Number(pending.attempt_count || 0) + 1;
+    if (!matchesPasswordResetCode(normalizedEmail, code, pending.code_hash)) {
+      if (nextAttemptCount >= MAX_VERIFICATION_ATTEMPTS) {
+        await connection.execute("DELETE FROM pending_student_password_resets WHERE email=?", [normalizedEmail]);
+        await connection.commit();
+        return res.status(429).json({ error: "Too many incorrect codes. Request a new one." });
+      }
+      await connection.execute(
+        "UPDATE pending_student_password_resets SET attempt_count=? WHERE email=?",
+        [nextAttemptCount, normalizedEmail],
+      );
+      await connection.commit();
+      return res.status(400).json({
+        error: "That reset code is incorrect.",
+        attemptsRemaining: MAX_VERIFICATION_ATTEMPTS - nextAttemptCount,
+      });
+    }
+    const resetToken = jwt.sign(
+      { purpose: "student-password-reset", userId: Number(pending.user_id), email: normalizedEmail },
+      process.env.PASSWORD_RESET_SECRET || JWT_SECRET,
+      { expiresIn: `${Math.min(CODE_TTL_MINUTES * 60, Number(pending.expires_in || 1))}s` },
+    );
+    await connection.commit();
+    res.json({
+      message: "Code verified. Set a new password.",
+      resetToken,
+      expiresInSeconds: Math.min(CODE_TTL_MINUTES * 60, Number(pending.expires_in || 1)),
+    });
+  } catch (error) {
+    try { await connection?.rollback(); } catch {}
+    next(error);
+  } finally {
+    connection?.release();
+  }
+});
+
+router.post("/password/reset/confirm", passwordResetVerifyLimiter, async (req, res, next) => {
+  let connection;
+  try {
+    const password = String(req.body.password || "");
+    const resetToken = String(req.body.resetToken || "");
+    const settings = await getPlatformSettings();
+    if (!resetToken) return res.status(400).json({ error: "Verify your email code before choosing a new password." });
+    if (password.length < settings.security.minimumPasswordLength) {
+      return res.status(400).json({ error: `Password must contain at least ${settings.security.minimumPasswordLength} characters.` });
+    }
+    if (settings.security.requireUppercase && !/[A-Z]/.test(password)) {
+      return res.status(400).json({ error: "Password must contain an uppercase letter." });
+    }
+    if (settings.security.requireNumber && !/\d/.test(password)) {
+      return res.status(400).json({ error: "Password must contain a number." });
+    }
+    let tokenPayload;
+    try {
+      tokenPayload = jwt.verify(resetToken, process.env.PASSWORD_RESET_SECRET || JWT_SECRET);
+    } catch {
+      return res.status(410).json({ error: "Your reset session has expired. Request a new code." });
+    }
+    if (tokenPayload?.purpose !== "student-password-reset" || !Number.isSafeInteger(Number(tokenPayload.userId))) {
+      return res.status(400).json({ error: "Invalid password reset session." });
+    }
+    const normalizedEmail = String(tokenPayload.email || "").trim().toLowerCase();
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const [pendingRows] = await connection.execute(
+      `SELECT user_id, expires_at <= NOW() AS expired
+       FROM pending_student_password_resets WHERE email=? LIMIT 1 FOR UPDATE`,
+      [normalizedEmail],
+    );
+    const pending = pendingRows[0];
+    if (!pending || Boolean(pending.expired) || Number(pending.user_id) !== Number(tokenPayload.userId)) {
+      await connection.rollback();
+      return res.status(410).json({ error: "Your reset code has expired. Request a new one." });
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    const [result] = await connection.execute(
+      "UPDATE users SET password_hash=? WHERE id=? AND email=? AND role='student' AND status='active'",
+      [passwordHash, tokenPayload.userId, normalizedEmail],
+    );
+    if (!result.affectedRows) {
+      await connection.rollback();
+      return res.status(410).json({ error: "This student account is no longer available." });
+    }
+    await connection.execute("DELETE FROM pending_student_password_resets WHERE email=?", [normalizedEmail]);
+    await connection.commit();
+    res.json({ message: "Password changed. Sign in with your new password." });
   } catch (error) {
     try { await connection?.rollback(); } catch {}
     next(error);

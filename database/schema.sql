@@ -27,6 +27,20 @@ CREATE TABLE IF NOT EXISTS pending_student_registrations (
   INDEX idx_pending_registration_expiry (expires_at)
 );
 
+CREATE TABLE IF NOT EXISTS pending_student_password_resets (
+  email VARCHAR(190) PRIMARY KEY,
+  user_id BIGINT UNSIGNED NOT NULL,
+  code_hash CHAR(64) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  attempt_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  send_count SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_pending_password_reset_expiry (expires_at),
+  CONSTRAINT fk_pending_password_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS student_profiles (
   user_id BIGINT UNSIGNED PRIMARY KEY,
   university VARCHAR(190) NULL,

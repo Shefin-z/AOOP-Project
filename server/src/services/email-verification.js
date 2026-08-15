@@ -11,8 +11,8 @@ let gmailTransporter;
 
 async function ensureEmailVerificationSchema() {
   if (!schemaPromise) {
-    schemaPromise = query(
-      `CREATE TABLE IF NOT EXISTS pending_student_registrations (
+    schemaPromise = (async () => {
+      await query(`CREATE TABLE IF NOT EXISTS pending_student_registrations (
         email VARCHAR(190) PRIMARY KEY,
         name VARCHAR(120) NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
@@ -25,8 +25,21 @@ async function ensureEmailVerificationSchema() {
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_pending_registration_expiry (expires_at)
-      )`,
-    ).catch((error) => {
+      )`);
+      await query(`CREATE TABLE IF NOT EXISTS pending_student_password_resets (
+        email VARCHAR(190) PRIMARY KEY,
+        user_id BIGINT UNSIGNED NOT NULL,
+        code_hash CHAR(64) NOT NULL,
+        expires_at DATETIME NOT NULL,
+        attempt_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
+        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        send_count SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_pending_password_reset_expiry (expires_at),
+        CONSTRAINT fk_pending_password_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )`);
+    })().catch((error) => {
       schemaPromise = null;
       throw error;
     });
@@ -60,8 +73,21 @@ function hashVerificationCode(email, code) {
     .digest("hex");
 }
 
+function hashPasswordResetCode(email, code) {
+  return crypto
+    .createHmac("sha256", verificationSecret())
+    .update(`password-reset:${String(email).trim().toLowerCase()}:${String(code).trim()}`)
+    .digest("hex");
+}
+
 function matchesVerificationCode(email, code, expectedHash) {
   const actual = Buffer.from(hashVerificationCode(email, code), "hex");
+  const expected = Buffer.from(String(expectedHash || ""), "hex");
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+}
+
+function matchesPasswordResetCode(email, code, expectedHash) {
+  const actual = Buffer.from(hashPasswordResetCode(email, code), "hex");
   const expected = Buffer.from(String(expectedHash || ""), "hex");
   return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }
@@ -88,6 +114,25 @@ function verificationEmailContent({ name, code }) {
           <p style="margin:0 0 24px;color:#697386;line-height:1.7">Hi ${safeName}, use this code to finish creating your student account.</p>
           <div style="border-radius:18px;background:#f2f4fb;padding:22px;text-align:center;font-size:36px;font-weight:800;letter-spacing:10px;color:#3559d5">${code}</div>
           <p style="margin:22px 0 0;color:#697386;font-size:14px;line-height:1.6">This code expires in ${CODE_TTL_MINUTES} minutes. Never share it with anyone. If you did not request this account, ignore this email.</p>
+        </div>
+      </div>
+    `,
+  };
+}
+
+function passwordResetEmailContent({ name, code }) {
+  const safeName = escapeHtml(name);
+  return {
+    subject: `${code} is your CareerForge password reset code`,
+    text: `Hi ${name}, your CareerForge password reset code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes. If you did not request a password reset, you can ignore this email.`,
+    html: `
+      <div style="margin:0;background:#f5f1ea;padding:36px 16px;font-family:Inter,Arial,sans-serif;color:#1e2532">
+        <div style="max-width:560px;margin:0 auto;border:1px solid #e3ddd3;border-radius:24px;background:#ffffff;padding:36px">
+          <div style="font-size:22px;font-weight:800">Career<span style="color:#3559d5">Forge</span></div>
+          <h1 style="margin:32px 0 10px;font-family:Georgia,serif;font-size:34px;line-height:1.1">Reset your password</h1>
+          <p style="margin:0 0 24px;color:#697386;line-height:1.7">Hi ${safeName}, use this code to choose a new password for your student account.</p>
+          <div style="border-radius:18px;background:#f2f4fb;padding:22px;text-align:center;font-size:36px;font-weight:800;letter-spacing:10px;color:#3559d5">${code}</div>
+          <p style="margin:22px 0 0;color:#697386;font-size:14px;line-height:1.6">This code expires in ${CODE_TTL_MINUTES} minutes. Never share it with anyone. If you did not request this reset, ignore this email.</p>
         </div>
       </div>
     `,
@@ -152,7 +197,7 @@ async function sendWithGmail({ email, content }) {
   }
 }
 
-async function sendWithResend({ email, code, content }) {
+async function sendWithResend({ email, code, content, purpose = "registration" }) {
   const apiKey = String(process.env.RESEND_API_KEY || "").trim();
   if (!apiKey) throw providerConfigurationError();
 
@@ -161,7 +206,7 @@ async function sendWithResend({ email, code, content }) {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "Idempotency-Key": `careerforge-registration-${hashVerificationCode(email, code)}`,
+      "Idempotency-Key": `careerforge-${purpose}-${hashVerificationCode(email, code)}`,
     },
     body: JSON.stringify({
       from: String(process.env.EMAIL_FROM || "CareerForge <onboarding@resend.dev>").trim(),
@@ -195,7 +240,7 @@ async function sendVerificationEmail({ email, name, code }) {
     return sendWithGmail({ email, content });
   }
   if (provider === "resend") {
-    return sendWithResend({ email, code, content });
+    return sendWithResend({ email, code, content, purpose: "registration" });
   }
   if (
     provider === "console" &&
@@ -203,6 +248,24 @@ async function sendVerificationEmail({ email, name, code }) {
     String(process.env.EMAIL_DELIVERY_MODE || "console").toLowerCase() === "console"
   ) {
     console.info(`[CareerForge local verification] ${email}: ${code} (valid for ${CODE_TTL_MINUTES} minutes)`);
+    return { provider: "console" };
+  }
+  throw providerConfigurationError();
+}
+
+async function sendPasswordResetEmail({ email, name, code }) {
+  const provider = selectedEmailProvider();
+  const content = passwordResetEmailContent({ name, code });
+  const isHostedProduction = process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL);
+
+  if (provider === "gmail") return sendWithGmail({ email, content });
+  if (provider === "resend") return sendWithResend({ email, code, content, purpose: "password-reset" });
+  if (
+    provider === "console" &&
+    !isHostedProduction &&
+    String(process.env.EMAIL_DELIVERY_MODE || "console").toLowerCase() === "console"
+  ) {
+    console.info(`[CareerForge local password reset] ${email}: ${code} (valid for ${CODE_TTL_MINUTES} minutes)`);
     return { provider: "console" };
   }
   throw providerConfigurationError();
@@ -216,5 +279,8 @@ module.exports = {
   generateVerificationCode,
   hashVerificationCode,
   matchesVerificationCode,
+  hashPasswordResetCode,
+  matchesPasswordResetCode,
   sendVerificationEmail,
+  sendPasswordResetEmail,
 };
