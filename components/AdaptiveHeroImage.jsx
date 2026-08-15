@@ -14,13 +14,13 @@ export default function AdaptiveHeroImage({
       aria-label={alt}
     >
       <img
-        src="/careerforge-hero-light-v4.png"
+        src="/careerforge-hero-graduation-light.jpg"
         alt=""
         aria-hidden="true"
         className={`adaptive-hero-image ${imageClassName} ${isDark ? "opacity-0" : "opacity-100"}`}
       />
       <img
-        src="/careerforge-hero-dark-v4.png"
+        src="/careerforge-hero-graduation-dark.png"
         alt=""
         aria-hidden="true"
         className={`adaptive-hero-image ${imageClassName} ${isDark ? "opacity-100" : "opacity-0"}`}

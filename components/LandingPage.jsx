@@ -107,8 +107,8 @@ export default function LandingPage() {
           <div className="landing-clay-visual relative">
             <div className="clay-hero-shell">
               <AdaptiveHeroImage
-                alt="Two university students exploring an AI-guided career path together"
-                className="aspect-[1.25/1] w-full sm:aspect-[1.4/1]"
+                alt="A group of university graduates celebrating their next career chapter"
+                className="aspect-[1.5/1] w-full"
                 imageClassName="object-cover object-center"
               />
             </div>

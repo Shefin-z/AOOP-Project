@@ -771,12 +771,12 @@ textarea:focus-visible {
   border-radius: clamp(2.2rem, 4vw, 3.8rem);
   background: #eadfce;
   box-shadow: 22px 26px 58px rgba(80, 69, 53, 0.17), -10px -12px 28px rgba(255, 255, 255, 0.8), inset 0 0 0 1px rgba(121, 104, 82, 0.05);
-  transform: rotate(1.2deg);
+  transform: none;
   transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 500ms ease;
 }
 
 .landing-clay-visual:hover .clay-hero-shell {
-  transform: rotate(0deg) translateY(-4px);
+  transform: translateY(-4px);
   box-shadow: 26px 35px 74px rgba(80, 69, 53, 0.21), -10px -12px 28px rgba(255, 255, 255, 0.8);
 }
 
