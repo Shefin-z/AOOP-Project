@@ -3,11 +3,6 @@
   "framework": "vite",
   "buildCommand": "node scripts/vercel-build.cjs",
   "outputDirectory": "dist/client",
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30
-    }
-  },
   "headers": [
     {
       "source": "/",
@@ -29,10 +24,6 @@
     }
   ],
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api"
-    },
     {
       "source": "/(.*)",
       "destination": "/index.html"

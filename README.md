@@ -1,11 +1,11 @@
-# CareerCube
+# CareerForge
 
-CareerCube is a full-stack AI career-development platform for university students. The project includes a premium, responsive glassmorphism UI and separate Student and Admin experiences.
+CareerForge is a full-stack AI career-development platform for university students. The existing responsive React/Tailwind UI is retained, while the active API is now the Java/Spring Boot AOOP implementation in `backend/`.
 
 ## Technology
 
 - Frontend: React 19, Vite 7, Tailwind CSS, Lucide icons
-- Backend: Node.js, Express, JWT authentication, bcrypt, MySQL2
+- Backend: Java 21, Spring Boot 3, Spring Security, JWT, Spring Data JPA, MySQL/TiDB
 - Data: MySQL 8.4 with normalized schema and seed data
 - AI: Gemini API adaptive skill assessments plus Python 3.12+/FastAPI job matching, career-readiness scoring, skill-gap analytics, and cover-letter generation
 - Delivery: Docker Compose and ChatGPT Sites configuration
@@ -26,18 +26,22 @@ docker compose up --build
 Open:
 
 - Web: `http://localhost:3000`
-- Express API: `http://localhost:4000/api/health`
+- Spring Boot API: `http://localhost:4000/api/health`
 - Python AI docs: `http://localhost:8000/docs`
 - MySQL: `localhost:3306`
 
 The first MySQL startup automatically applies `database/schema.sql` and `database/seed.sql`.
+
+For a Vercel frontend deployment, set `VITE_API_URL` to the deployed Spring Boot API URL (ending in `/api`). Spring Boot should be deployed to a Java/container host such as Render or Railway, as described in the lab report; Vercel no longer runs the legacy Node API.
 
 ## Manual development
 
 ```bash
 npm install
 copy .env.example .env
-npm run dev:all
+npm run dev
+cd backend
+mvn spring-boot:run
 ```
 
 Run the Python service in another terminal:

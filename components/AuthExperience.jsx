@@ -145,6 +145,13 @@ export default function AuthExperience({ role = "student" }) {
     try {
       if (mode === "register") {
         const result = await registerStudent({ name, email, password });
+        // The Spring Boot AOOP API creates the authenticated account in one
+        // transaction. Keep the existing verification screen compatible with
+        // deployments that still enable an email-verification provider.
+        if (result.token && result.user) {
+          enterWorkspace(result.user, result.token);
+          return;
+        }
         const verification = {
           email: result.email || email,
           expiresAt: Date.now() + Number(result.expiresInSeconds || 600) * 1000,

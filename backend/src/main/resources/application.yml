@@ -1,0 +1,31 @@
+server:
+  port: ${PORT:4000}
+  servlet:
+    context-path: /api
+spring:
+  application:
+    name: careerforge-api
+  datasource:
+    url: jdbc:mysql://${TIDB_HOST:${MYSQL_HOST:127.0.0.1}}:${TIDB_PORT:${MYSQL_PORT:3306}}/${TIDB_DATABASE:${MYSQL_DATABASE:careerforge}}?useSSL=${MYSQL_SSL:false}&serverTimezone=UTC
+    username: ${TIDB_USER:${MYSQL_USER:careerforge}}
+    password: ${TIDB_PASSWORD:${MYSQL_PASSWORD:careerforge}}
+  jpa:
+    hibernate:
+      # The existing SQL schema is the shared contract during the migration.
+      # Hibernate manages entities but must never alter production tables.
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate.jdbc.time_zone: UTC
+      hibernate.dialect: org.hibernate.dialect.MySQLDialect
+  jackson:
+    default-property-inclusion: non_null
+careerforge:
+  jwt:
+    secret: ${JWT_SECRET:careerforge-local-development-secret-change-me-before-production}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:120}
+  cors:
+    origins: ${CLIENT_ORIGIN:http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173}
+  features:
+    registration-enabled: ${REGISTRATION_ENABLED:true}
+    community-posting-enabled: ${COMMUNITY_POSTING_ENABLED:true}
