@@ -49,7 +49,7 @@ const featureCards = [
 const journey = [
   ["01", "Give your goals a home", "Add the skills, degree, interests and role you are moving toward."],
   ["02", "Make progress visible", "Assessments, projects and applications turn effort into a career signal."],
-  ["03", "Take the next right move", "CareerForge surfaces practical actions instead of another generic checklist."],
+  ["03", "Take the next right move", "CareerCube surfaces practical actions instead of another generic checklist."],
 ];
 
 const orbitItems = ["Profile", "Assess", "Match", "Apply"];
@@ -77,7 +77,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="mt-6 max-w-xl text-base leading-7 text-muted sm:text-lg">
-              CareerForge gives ambitious students one calm, connected space to understand their strengths, follow the right signal and act with confidence.
+              CareerCube gives ambitious students one calm, connected space to understand their strengths, follow the right signal and act with confidence.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -169,7 +169,7 @@ export default function LandingPage() {
             <span className="clay-section-mark"><Sparkles size={15} /> A clearer rhythm</span>
             <h2 className="landing-section-title mt-5">No generic path.<br /><i>A path that reacts.</i></h2>
             <p className="mt-6 max-w-md leading-7 text-muted">
-              CareerForge starts from the details you give it, then keeps becoming more useful as you build evidence of what you can do.
+              CareerCube starts from the details you give it, then keeps becoming more useful as you build evidence of what you can do.
             </p>
             <div className="clay-path-orbit mt-9" aria-hidden="true">
               <span className="clay-path-core"><Sparkles size={20} /></span>

@@ -7,7 +7,7 @@ async function buildMatchingSchema() {
     `CREATE TABLE IF NOT EXISTS skills (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(120) NOT NULL UNIQUE,
-      category VARCHAR(100) NOT NULL DEFAULT 'CareerForge skills',
+      category VARCHAR(100) NOT NULL DEFAULT 'CareerCube skills',
       description TEXT NULL
     )`,
   );

@@ -97,7 +97,7 @@ export function PublicFooter() {
     <footer className="border-t border-ink/[0.08] py-8">
       <div className="page-shell flex flex-col items-center justify-between gap-5 text-center sm:flex-row sm:text-left">
         <Brand href="/" />
-        <p className="text-xs text-muted">© 2026 CareerForge. Built for the careers still becoming.</p>
+        <p className="text-xs text-muted">© 2026 CareerCube. Built for the careers still becoming.</p>
         <div className="flex gap-1">
           <Link to="/community" className="btn-ghost text-xs">Community</Link>
           <Link to="/resources" className="btn-ghost text-xs">Resources</Link>

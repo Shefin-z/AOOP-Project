@@ -2,8 +2,8 @@ const { query } = require("../config/db");
 
 const defaultSettings = Object.freeze({
   general: {
-    platformName: "CareerForge",
-    supportEmail: "support@careerforge.com",
+    platformName: "CareerCube",
+    supportEmail: "support@careercube.com",
     timezone: "Asia/Dhaka",
     locale: "English (Bangladesh)",
   },
@@ -20,10 +20,10 @@ const defaultSettings = Object.freeze({
     sessionHours: 168,
   },
   email: {
-    senderName: "CareerForge",
-    replyTo: "support@careerforge.com",
-    welcomeSubject: "Welcome to CareerForge",
-    welcomeBody: "Welcome {{name}}. Your CareerForge student workspace is ready.",
+    senderName: "CareerCube",
+    replyTo: "support@careercube.com",
+    welcomeSubject: "Welcome to CareerCube",
+    welcomeBody: "Welcome {{name}}. Your CareerCube student workspace is ready.",
     applicationSubject: "Application received for {{job_title}}",
     applicationBody: "Hi {{name}}, your application for {{job_title}} has been received.",
   },
@@ -44,6 +44,35 @@ const defaultSettings = Object.freeze({
 let schemaPromise;
 let cachedSettings;
 let cacheExpiresAt = 0;
+
+const replaceLegacyBrand = (value) => {
+  if (Array.isArray(value)) return value.map(replaceLegacyBrand);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, replaceLegacyBrand(item)]));
+  }
+  return typeof value === "string"
+    ? value.replaceAll("CareerForge", "CareerCube").replaceAll("careerforge.com", "careercube.com")
+    : value;
+};
+
+async function migrateLegacyBrandSettings() {
+  const [row] = await query("SELECT setting_value FROM platform_settings WHERE setting_key='platform' LIMIT 1");
+  if (!row) return;
+  const raw = typeof row.setting_value === "string" ? row.setting_value : JSON.stringify(row.setting_value);
+  if (!/CareerForge|careerforge\.com/.test(raw)) return;
+  let settings;
+  try {
+    settings = typeof row.setting_value === "string" ? JSON.parse(row.setting_value) : row.setting_value;
+  } catch {
+    return;
+  }
+  await query(
+    "UPDATE platform_settings SET setting_value=?, updated_at=NOW() WHERE setting_key='platform'",
+    [JSON.stringify(replaceLegacyBrand(settings))],
+  );
+  cachedSettings = null;
+  cacheExpiresAt = 0;
+}
 
 const deepMerge = (base, override = {}) => Object.fromEntries(
   Object.entries(base).map(([key, value]) => [
@@ -71,6 +100,7 @@ async function ensureSettingsSchema() {
          ON DUPLICATE KEY UPDATE setting_key=VALUES(setting_key)`,
         [JSON.stringify(defaultSettings)],
       );
+      await migrateLegacyBrandSettings();
     })().catch((error) => {
       schemaPromise = null;
       throw error;

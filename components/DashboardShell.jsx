@@ -140,7 +140,7 @@ export default function DashboardShell({
         <div className="px-4 pb-10 pt-6 sm:px-7 lg:px-9">
           <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <p className="mb-1 text-[11px] font-extrabold uppercase tracking-[0.15em] text-cobalt">{role === "admin" ? "CareerForge control center" : "My CareerForge"}</p>
+              <p className="mb-1 text-[11px] font-extrabold uppercase tracking-[0.15em] text-cobalt">{role === "admin" ? "CareerCube control center" : "My CareerCube"}</p>
               <h1 className="text-2xl font-extrabold tracking-[-0.04em] sm:text-3xl">{title}</h1>
               {subtitle && <p className="mt-1.5 text-sm text-muted">{subtitle}</p>}
             </div>

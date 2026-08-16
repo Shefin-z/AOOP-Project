@@ -15,7 +15,7 @@ async function authenticate(req, res, next) {
     if (req.user.role === "student") {
       const settings = await getPlatformSettings();
       if (settings.features.maintenanceMode) {
-        return res.status(503).json({ error: "CareerForge student services are temporarily under maintenance" });
+        return res.status(503).json({ error: "CareerCube student services are temporarily under maintenance" });
       }
     }
     next();

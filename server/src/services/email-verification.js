@@ -104,12 +104,12 @@ function escapeHtml(value) {
 function verificationEmailContent({ name, code }) {
   const safeName = escapeHtml(name);
   return {
-    subject: `${code} is your CareerForge verification code`,
-    text: `Hi ${name}, your CareerForge verification code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes. If you did not request this account, you can ignore this email.`,
+    subject: `${code} is your CareerCube verification code`,
+    text: `Hi ${name}, your CareerCube verification code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes. If you did not request this account, you can ignore this email.`,
     html: `
       <div style="margin:0;background:#f5f1ea;padding:36px 16px;font-family:Inter,Arial,sans-serif;color:#1e2532">
         <div style="max-width:560px;margin:0 auto;border:1px solid #e3ddd3;border-radius:24px;background:#ffffff;padding:36px">
-          <div style="font-size:22px;font-weight:800">Career<span style="color:#3559d5">Forge</span></div>
+          <div style="font-size:22px;font-weight:800">Career<span style="color:#3559d5">Cube</span></div>
           <h1 style="margin:32px 0 10px;font-family:Georgia,serif;font-size:34px;line-height:1.1">Verify your email</h1>
           <p style="margin:0 0 24px;color:#697386;line-height:1.7">Hi ${safeName}, use this code to finish creating your student account.</p>
           <div style="border-radius:18px;background:#f2f4fb;padding:22px;text-align:center;font-size:36px;font-weight:800;letter-spacing:10px;color:#3559d5">${code}</div>
@@ -123,12 +123,12 @@ function verificationEmailContent({ name, code }) {
 function passwordResetEmailContent({ name, code }) {
   const safeName = escapeHtml(name);
   return {
-    subject: `${code} is your CareerForge password reset code`,
-    text: `Hi ${name}, your CareerForge password reset code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes. If you did not request a password reset, you can ignore this email.`,
+    subject: `${code} is your CareerCube password reset code`,
+    text: `Hi ${name}, your CareerCube password reset code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes. If you did not request a password reset, you can ignore this email.`,
     html: `
       <div style="margin:0;background:#f5f1ea;padding:36px 16px;font-family:Inter,Arial,sans-serif;color:#1e2532">
         <div style="max-width:560px;margin:0 auto;border:1px solid #e3ddd3;border-radius:24px;background:#ffffff;padding:36px">
-          <div style="font-size:22px;font-weight:800">Career<span style="color:#3559d5">Forge</span></div>
+          <div style="font-size:22px;font-weight:800">Career<span style="color:#3559d5">Cube</span></div>
           <h1 style="margin:32px 0 10px;font-family:Georgia,serif;font-size:34px;line-height:1.1">Reset your password</h1>
           <p style="margin:0 0 24px;color:#697386;line-height:1.7">Hi ${safeName}, use this code to choose a new password for your student account.</p>
           <div style="border-radius:18px;background:#f2f4fb;padding:22px;text-align:center;font-size:36px;font-weight:800;letter-spacing:10px;color:#3559d5">${code}</div>
@@ -179,7 +179,7 @@ async function sendWithGmail({ email, content }) {
 
   try {
     const result = await gmailTransporter.sendMail({
-      from: String(process.env.EMAIL_FROM || `CareerForge <${user}>`).trim(),
+      from: String(process.env.EMAIL_FROM || `CareerCube <${user}>`).trim(),
       to: email,
       subject: content.subject,
       text: content.text,
@@ -209,7 +209,7 @@ async function sendWithResend({ email, code, content, purpose = "registration" }
       "Idempotency-Key": `careerforge-${purpose}-${hashVerificationCode(email, code)}`,
     },
     body: JSON.stringify({
-      from: String(process.env.EMAIL_FROM || "CareerForge <onboarding@resend.dev>").trim(),
+      from: String(process.env.EMAIL_FROM || "CareerCube <onboarding@resend.dev>").trim(),
       to: [email],
       subject: content.subject,
       text: content.text,
@@ -247,7 +247,7 @@ async function sendVerificationEmail({ email, name, code }) {
     !isHostedProduction &&
     String(process.env.EMAIL_DELIVERY_MODE || "console").toLowerCase() === "console"
   ) {
-    console.info(`[CareerForge local verification] ${email}: ${code} (valid for ${CODE_TTL_MINUTES} minutes)`);
+    console.info(`[CareerCube local verification] ${email}: ${code} (valid for ${CODE_TTL_MINUTES} minutes)`);
     return { provider: "console" };
   }
   throw providerConfigurationError();
@@ -265,7 +265,7 @@ async function sendPasswordResetEmail({ email, name, code }) {
     !isHostedProduction &&
     String(process.env.EMAIL_DELIVERY_MODE || "console").toLowerCase() === "console"
   ) {
-    console.info(`[CareerForge local password reset] ${email}: ${code} (valid for ${CODE_TTL_MINUTES} minutes)`);
+    console.info(`[CareerCube local password reset] ${email}: ${code} (valid for ${CODE_TTL_MINUTES} minutes)`);
     return { provider: "console" };
   }
   throw providerConfigurationError();

@@ -106,7 +106,7 @@ async function syncProfileSkills(connection, userId, profileSkills) {
 
   for (const skill of profileSkills) {
     await connection.execute(
-      "INSERT INTO skills (name, category) VALUES (?, 'CareerForge skills') ON DUPLICATE KEY UPDATE name=VALUES(name)",
+      "INSERT INTO skills (name, category) VALUES (?, 'CareerCube skills') ON DUPLICATE KEY UPDATE name=VALUES(name)",
       [skill],
     );
     const [skillRows] = await connection.execute("SELECT id FROM skills WHERE name=? LIMIT 1", [skill]);
@@ -332,7 +332,7 @@ router.post("/register/verify", registrationVerifyLimiter, async (req, res, next
     const user = { id: result.insertId, name: pending.name, email: normalizedEmail, role: "student" };
     const token = jwt.sign(user, JWT_SECRET, { expiresIn: `${settings.security.sessionHours}h` });
     res.status(201).json({
-      message: "Email verified. Your CareerForge account is ready.",
+      message: "Email verified. Your CareerCube account is ready.",
       token,
       user,
     });
@@ -582,7 +582,7 @@ router.post("/login", async (req, res, next) => {
     if (user.status !== "active") return res.status(403).json({ error: "This account is not active" });
     if (role && user.role !== role) return res.status(403).json({ error: `Use the ${user.role} sign-in page for this account` });
     if (user.role === "student" && settings.features.maintenanceMode) {
-      return res.status(503).json({ error: "CareerForge student services are temporarily under maintenance" });
+      return res.status(503).json({ error: "CareerCube student services are temporarily under maintenance" });
     }
     const token = jwt.sign(
       { id: user.id, name: user.name, email: user.email, role: user.role },

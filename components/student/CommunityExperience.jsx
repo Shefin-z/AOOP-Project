@@ -168,7 +168,7 @@ function PostCard({ post, viewer, onUpdate, onRemove, notify }) {
 
   const reportPost = async (reason) => {
     setMenuOpen(false);
-    if (!window.confirm(`Report this post as ${reason}? CareerForge administrators will review it.`)) return;
+    if (!window.confirm(`Report this post as ${reason}? CareerCube administrators will review it.`)) return;
     try {
       await apiRequest(`/community/posts/${post.id}/report`, {
         method: "POST",
@@ -199,9 +199,9 @@ function PostCard({ post, viewer, onUpdate, onRemove, notify }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <b className="text-sm">{post.author}</b>
-            {post.author_role === "admin" && <span className="tag !bg-plum/10 !text-plum"><ShieldCheck size={11} /> CareerForge admin</span>}
+            {post.author_role === "admin" && <span className="tag !bg-plum/10 !text-plum"><ShieldCheck size={11} /> CareerCube admin</span>}
           </div>
-          <small className="block truncate text-[11px] text-muted">{post.university || (post.author_role === "admin" ? "Platform team" : "CareerForge student")} · {timeAgo(post.created_at)}</small>
+          <small className="block truncate text-[11px] text-muted">{post.university || (post.author_role === "admin" ? "Platform team" : "CareerCube student")} · {timeAgo(post.created_at)}</small>
         </div>
         <div className="relative">
           <button onClick={() => setMenuOpen((current) => !current)} className="btn-ghost min-h-8 px-2" aria-label="Post actions">•••</button>
@@ -224,7 +224,7 @@ function PostCard({ post, viewer, onUpdate, onRemove, notify }) {
       {awaitingReview && (
         <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-500/20 bg-amber-400/10 p-3 text-xs leading-5 text-amber-800 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 shrink-0" size={15} />
-          <span><b>Awaiting administrator review.</b> Only you and CareerForge administrators can see this post until it is approved.</span>
+          <span><b>Awaiting administrator review.</b> Only you and CareerCube administrators can see this post until it is approved.</span>
         </div>
       )}
       {!!post.link_url && (

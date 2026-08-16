@@ -42,7 +42,7 @@ export default function ResourcesLandingPage() {
       <section className="page-shell pb-16 pt-14 sm:pb-24 sm:pt-20">
         <div className="grid items-center gap-10 lg:grid-cols-[.9fr_1.1fr]">
           <div>
-            <div className="eyebrow mb-6"><BookOpen size={14} /> CareerForge resource library</div>
+            <div className="eyebrow mb-6"><BookOpen size={14} /> CareerCube resource library</div>
             <h1 className="display-title max-w-3xl">
               Learn what moves
               <span className="block italic text-jade">your career forward.</span>
@@ -153,7 +153,7 @@ export default function ResourcesLandingPage() {
           ))}
         </div>
         <div className="mt-5 flex flex-col items-center justify-between gap-6 rounded-[34px] bg-jade px-7 py-9 text-center text-white sm:flex-row sm:px-10 sm:text-left">
-          <div><h2 className="font-display text-3xl tracking-[-0.04em] sm:text-4xl">Get a library shaped around your goals.</h2><p className="mt-2 text-sm text-white/70">Create a free profile and let CareerForge prioritize the right next resource.</p></div>
+          <div><h2 className="font-display text-3xl tracking-[-0.04em] sm:text-4xl">Get a library shaped around your goals.</h2><p className="mt-2 text-sm text-white/70">Create a free profile and let CareerCube prioritize the right next resource.</p></div>
           <Link to="/login/student?mode=register" className="btn-primary shrink-0 !bg-white !text-ink">Create free account <ArrowRight size={17} /></Link>
         </div>
       </section>

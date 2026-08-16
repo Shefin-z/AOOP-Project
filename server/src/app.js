@@ -50,7 +50,7 @@ app.use("/api", rateLimit({ windowMs: 15 * 60 * 1000, limit: 600, standardHeader
 app.get("/api/health", async (_req, res) => {
   let database = "unavailable";
   try { await query("SELECT 1"); database = "healthy"; } catch {}
-  res.json({ status: "ok", service: "careerforge-api", database, timestamp: new Date().toISOString() });
+  res.json({ status: "ok", service: "careercube-api", database, timestamp: new Date().toISOString() });
 });
 
 app.use("/api/auth", authRoutes);
@@ -75,7 +75,7 @@ app.use((error, _req, res, _next) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => console.log(`CareerForge API running on http://localhost:${PORT}`));
+  app.listen(PORT, () => console.log(`CareerCube API running on http://localhost:${PORT}`));
 }
 
 module.exports = app;

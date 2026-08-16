@@ -24,7 +24,7 @@ class AppErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error) {
-    console.error("CareerForge route render failed", error);
+    console.error("CareerCube route render failed", error);
     if (!sessionStorage.getItem(RECOVERY_KEY)) {
       sessionStorage.setItem(RECOVERY_KEY, window.location.pathname);
       navigateFresh(`${window.location.pathname}${window.location.search}`);

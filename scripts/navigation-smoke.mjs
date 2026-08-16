@@ -29,7 +29,7 @@ const mockFetch = async (url, options = {}) => {
   const body = JSON.parse(options.body || "{}");
   if (String(url).endsWith("/auth/register/verify")) {
     return new window.Response(JSON.stringify({
-      message: "Email verified. Your CareerForge account is ready.",
+      message: "Email verified. Your CareerCube account is ready.",
       token: "navigation-test-token",
       user: { name: "New Student", email: body.email, role: "student" },
     }), { status: 201, headers: { "Content-Type": "application/json" } });
@@ -213,7 +213,7 @@ if (scenario === "public") {
   await clickButtonAndAssert("Available jobs", "/student", "Available jobs");
   await clickButtonAndAssert("Sign out", "/");
 } else if (scenario === "brand") {
-  await clickAndAssert("/student", "/student", "My CareerForge");
+  await clickAndAssert("/student", "/student", "My CareerCube");
 } else if (scenario === "login-student") {
   await submitLoginAndAssert("/student");
 } else if (scenario === "login-admin") {

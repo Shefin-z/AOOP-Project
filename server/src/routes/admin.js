@@ -56,7 +56,7 @@ function sanitisePlatformSettings(input, current) {
 
   return {
     general: {
-      platformName: cleanSettingText(general.platformName, "CareerForge", 80) || "CareerForge",
+      platformName: cleanSettingText(general.platformName, "CareerCube", 80) || "CareerCube",
       supportEmail,
       timezone: cleanSettingText(general.timezone, "Asia/Dhaka", 80) || "Asia/Dhaka",
       locale: cleanSettingText(general.locale, "English (Bangladesh)", 80) || "English (Bangladesh)",
@@ -74,9 +74,9 @@ function sanitisePlatformSettings(input, current) {
       sessionHours,
     },
     email: {
-      senderName: cleanSettingText(email.senderName, "CareerForge", 120) || "CareerForge",
+      senderName: cleanSettingText(email.senderName, "CareerCube", 120) || "CareerCube",
       replyTo,
-      welcomeSubject: cleanSettingText(email.welcomeSubject, "Welcome to CareerForge", 200),
+      welcomeSubject: cleanSettingText(email.welcomeSubject, "Welcome to CareerCube", 200),
       welcomeBody: cleanSettingText(email.welcomeBody, "", 5000),
       applicationSubject: cleanSettingText(email.applicationSubject, "Application received", 200),
       applicationBody: cleanSettingText(email.applicationBody, "", 5000),
@@ -293,7 +293,7 @@ async function syncJobSkills(connection, jobId, requiredSkills) {
   await connection.execute("DELETE FROM job_skills WHERE job_id=?", [jobId]);
   for (const skill of requiredSkills) {
     await connection.execute(
-      "INSERT INTO skills (name, category) VALUES (?, 'CareerForge skills') ON DUPLICATE KEY UPDATE name=VALUES(name)",
+      "INSERT INTO skills (name, category) VALUES (?, 'CareerCube skills') ON DUPLICATE KEY UPDATE name=VALUES(name)",
       [skill],
     );
     const [skillRows] = await connection.execute("SELECT id FROM skills WHERE name=? LIMIT 1", [skill]);

@@ -23,7 +23,7 @@ const initials = (name) => String(name || "Student")
 
 const profileLine = (student) => [student?.target_role, student?.university]
   .filter(Boolean)
-  .join(" · ") || student?.degree || "CareerForge student";
+  .join(" · ") || student?.degree || "CareerCube student";
 
 const displayTime = (value, withDate = false) => {
   if (!value) return "";
@@ -298,7 +298,7 @@ export default function ConnectionsPage({ search, setSearch, currentUser, notify
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-[28px] bg-ink px-6 py-7 text-white shadow-lift sm:px-8">
-        <div className="max-w-2xl"><span className="eyebrow !text-[#AFC0FF]"><Users size={13} /> Student network</span><h2 className="mt-3 text-2xl font-extrabold tracking-[-0.045em] sm:text-3xl">Find your people. Build your career circle.</h2><p className="mt-3 text-sm leading-6 text-white/65">Search verified CareerForge students by name or student ID, connect when they accept, then message privately.</p></div>
+        <div className="max-w-2xl"><span className="eyebrow !text-[#AFC0FF]"><Users size={13} /> Student network</span><h2 className="mt-3 text-2xl font-extrabold tracking-[-0.045em] sm:text-3xl">Find your people. Build your career circle.</h2><p className="mt-3 text-sm leading-6 text-white/65">Search verified CareerCube students by name or student ID, connect when they accept, then message privately.</p></div>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(320px,.86fr)_minmax(0,1.35fr)]">

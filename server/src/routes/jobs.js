@@ -148,7 +148,7 @@ router.get("/recommendations", authenticate, async (req, res, next) => {
     const matchingEnabled = Boolean(settings.ai.jobRecommendationsEnabled);
     const matchingJobs = jobs.map((job) => ({
       ...job,
-      source_name: job.application_mode === "external" ? job.source_label || "Verified company source" : "CareerForge",
+      source_name: job.application_mode === "external" ? job.source_label || "Verified company source" : "CareerCube",
     }));
     let matches = matchingEnabled
       ? matchingJobs.map((job) => buildLocalMatch(matchProfile, job))

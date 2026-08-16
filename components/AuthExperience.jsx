@@ -556,7 +556,7 @@ export default function AuthExperience({ role = "student" }) {
               {mode === "register" && (
                 <label className="flex items-start gap-3 text-xs leading-5 text-muted">
                   <input type="checkbox" required className="mt-1 accent-cobalt" />
-                  I agree to the Terms of Service and understand how CareerForge uses profile data to personalize recommendations.
+                  I agree to the Terms of Service and understand how CareerCube uses profile data to personalize recommendations.
                 </label>
               )}
               {error && <p className="rounded-xl bg-coral/10 px-3 py-2 text-xs font-semibold text-coral">{error}</p>}

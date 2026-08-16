@@ -81,14 +81,14 @@ const navItems = [
 
 const pageMeta = {
   overview: ["Overview", "Here’s what is moving your career forward today."],
-  jobs: ["Available jobs", "Real, unexpired opportunities published by CareerForge administrators."],
+  jobs: ["Available jobs", "Real, unexpired opportunities published by CareerCube administrators."],
   applications: ["Application tracker", "Stay on top of every opportunity and follow-up."],
   vault: ["Career Vault", "Build, refine and export your professional story."],
   assessments: ["Skill assessments", "Measure what you know and make the next learning step obvious."],
   analytics: ["Performance intelligence", "A clear view of your skills, consistency and readiness."],
   learning: ["Learning resources", "Focused material selected for the roles you want."],
   community: ["Career community", "Learn in public, ask better questions and celebrate progress."],
-  connections: ["Connections & inbox", "Find CareerForge students, build your network, and message privately."],
+  connections: ["Connections & inbox", "Find CareerCube students, build your network, and message privately."],
   events: ["Events & workshops", "Meet recruiters, mentors and students building alongside you."],
   achievements: ["Your milestones", "Proof that consistent effort is becoming real progress."],
   profile: ["Profile & preferences", "Keep your career signal accurate and your experience personal."],
@@ -1058,7 +1058,7 @@ function JobsPage({ jobs: availableJobs, recommendations, loading, error, onRetr
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-extrabold">{recommendations.matchingEnabled ? "Personalized opportunities" : "Administrator-published opportunities"}</h2>
-          <p className="mt-1 text-sm text-muted"><b className="text-ink">{filtered.length} available jobs</b> · CareerForge roles and verified external source listings</p>
+          <p className="mt-1 text-sm text-muted"><b className="text-ink">{filtered.length} available jobs</b> · CareerCube roles and verified external source listings</p>
         </div>
       </div>
       {!loading && recommendations.matchingEnabled && !recommendations.profileReady && (
@@ -1069,7 +1069,7 @@ function JobsPage({ jobs: availableJobs, recommendations, loading, error, onRetr
       )}
       {loading && <section className="panel grid min-h-64 place-items-center text-center"><div><RefreshCw className="mx-auto animate-spin text-cobalt" size={28} /><p className="mt-3 text-xs font-bold text-muted">Loading live jobs...</p></div></section>}
       {!loading && error && <section className="panel grid min-h-64 place-items-center p-6 text-center"><div><AlertTriangle className="mx-auto text-coral" size={30} /><h2 className="mt-3 text-lg font-extrabold">Jobs could not be loaded</h2><p className="mt-1 max-w-md text-xs text-muted">{error}</p><button onClick={onRetry} className="btn-secondary mt-5"><RefreshCw size={14} /> Try again</button></div></section>}
-      {!loading && !error && !filtered.length && <section className="panel grid min-h-64 place-items-center p-6 text-center"><div><BriefcaseBusiness className="mx-auto text-muted" size={32} /><h2 className="mt-3 text-lg font-extrabold">No jobs available</h2><p className="mt-1 max-w-md text-xs leading-5 text-muted">No live CareerForge roles or external listings match your filters right now. Check again later.</p></div></section>}
+      {!loading && !error && !filtered.length && <section className="panel grid min-h-64 place-items-center p-6 text-center"><div><BriefcaseBusiness className="mx-auto text-muted" size={32} /><h2 className="mt-3 text-lg font-extrabold">No jobs available</h2><p className="mt-1 max-w-md text-xs leading-5 text-muted">No live CareerCube roles or external listings match your filters right now. Check again later.</p></div></section>}
       {!loading && !error && filtered.length > 0 && (
       <section className="grid gap-4 lg:grid-cols-2">
         {filtered.map((job) => (
@@ -1542,7 +1542,7 @@ function AssessmentsPage({
       </section>
 
       <section className="panel p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-extrabold">Administrator assessments</h2><p className="text-xs text-muted">Optional published question banks from CareerForge administrators.</p></div>{loading && <RefreshCw className="animate-spin text-cobalt" size={18} />}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-extrabold">Administrator assessments</h2><p className="text-xs text-muted">Optional published question banks from CareerCube administrators.</p></div>{loading && <RefreshCw className="animate-spin text-cobalt" size={18} />}</div>
         {error ? (
           <div className="mt-5 rounded-2xl bg-coral/10 p-4"><p className="text-xs font-bold text-coral">{error}</p><button onClick={onRetry} className="btn-secondary mt-3 min-h-9"><RefreshCw size={14} /> Try again</button></div>
         ) : !loading && !assessments.length ? (
@@ -1664,7 +1664,7 @@ function AnalyticsPage({ notify, data, onNavigate }) {
       notify("Allow pop-ups to save your weekly report as a PDF.");
       return;
     }
-    reportWindow.document.write(`<!doctype html><title>CareerForge weekly report</title><style>body{font-family:Arial,sans-serif;color:#1e2430;margin:48px;line-height:1.5}.eyebrow{color:#3155c6;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}.score{font-size:38px;font-weight:800}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:28px 0}.card{border:1px solid #e5e1d8;border-radius:16px;padding:16px}.action{border-top:1px solid #e5e1d8;padding:12px 0}.muted{color:#69717d}</style><main><div class="eyebrow">CareerForge · weekly performance report</div><h1>${weekRange}</h1><p class="muted">A summary of your saved progress and next actions.</p><div class="grid"><div class="card"><div class="score">${readinessScore}%</div>Career readiness</div><div class="card"><div class="score">${assessmentScore}%</div>Assessment performance</div><div class="card"><div class="score">${learningProgress}%</div>Learning progress</div></div><h2>Progress snapshot</h2><p>${Number(metrics.assessmentsCompleted || 0)} assessments completed · ${Number(metrics.resourcesCompleted || 0)} learning resources completed · ${Number(metrics.applicationsActive || 0)} active applications</p><h2>Focus next</h2>${nextActions.map((action) => `<div class="action"><b>${action.title}</b><br><span class="muted">${action.detail}</span></div>`).join("")}</main>`);
+    reportWindow.document.write(`<!doctype html><title>CareerCube weekly report</title><style>body{font-family:Arial,sans-serif;color:#1e2430;margin:48px;line-height:1.5}.eyebrow{color:#3155c6;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}.score{font-size:38px;font-weight:800}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:28px 0}.card{border:1px solid #e5e1d8;border-radius:16px;padding:16px}.action{border-top:1px solid #e5e1d8;padding:12px 0}.muted{color:#69717d}</style><main><div class="eyebrow">CareerCube · weekly performance report</div><h1>${weekRange}</h1><p class="muted">A summary of your saved progress and next actions.</p><div class="grid"><div class="card"><div class="score">${readinessScore}%</div>Career readiness</div><div class="card"><div class="score">${assessmentScore}%</div>Assessment performance</div><div class="card"><div class="score">${learningProgress}%</div>Learning progress</div></div><h2>Progress snapshot</h2><p>${Number(metrics.assessmentsCompleted || 0)} assessments completed · ${Number(metrics.resourcesCompleted || 0)} learning resources completed · ${Number(metrics.applicationsActive || 0)} active applications</p><h2>Focus next</h2>${nextActions.map((action) => `<div class="action"><b>${action.title}</b><br><span class="muted">${action.detail}</span></div>`).join("")}</main>`);
     reportWindow.document.close();
     reportWindow.focus();
     window.setTimeout(() => reportWindow.print(), 200);
@@ -1758,7 +1758,7 @@ function LegacyServerEventsPage({ events, loading, error, onRetry, onRegister, o
   if (error) return <div className="grid min-h-64 place-items-center text-center"><div><AlertTriangle className="mx-auto text-coral" size={30} /><h2 className="mt-3 font-extrabold">Could not load events</h2><p className="mt-1 text-xs text-muted">{error}</p><button onClick={onRetry} className="btn-secondary mt-5"><RefreshCw size={14} /> Try again</button></div></div>;
   return <div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex rounded-xl bg-ink/[0.05] p-1">{["list", "calendar"].map((item) => <button onClick={() => setView(item)} key={item} className={`min-h-9 rounded-lg px-3 text-xs font-bold capitalize ${view === item ? "bg-white shadow-sm" : "text-muted"}`}>{item}</button>)}</div><p className="text-xs font-semibold text-muted">{events.length} published upcoming event{events.length === 1 ? "" : "s"}</p></div>
-    {!events.length ? <section className="panel grid min-h-72 place-items-center p-8 text-center"><div><CalendarDays className="mx-auto text-muted" size={34} /><h2 className="mt-4 text-lg font-extrabold">No upcoming events yet</h2><p className="mt-2 max-w-md text-sm leading-6 text-muted">Your CareerForge administrator has not published an event yet. New workshops and sessions will appear here automatically.</p></div></section> : view === "list" ? <section className="grid gap-4 lg:grid-cols-2">{events.map((event) => {
+    {!events.length ? <section className="panel grid min-h-72 place-items-center p-8 text-center"><div><CalendarDays className="mx-auto text-muted" size={34} /><h2 className="mt-4 text-lg font-extrabold">No upcoming events yet</h2><p className="mt-2 max-w-md text-sm leading-6 text-muted">Your CareerCube administrator has not published an event yet. New workshops and sessions will appear here automatically.</p></div></section> : view === "list" ? <section className="grid gap-4 lg:grid-cols-2">{events.map((event) => {
       const start = new Date(event.starts_at);
       const end = new Date(event.ends_at);
       const full = event.capacity != null && Number(event.seats_remaining) <= 0 && !event.registered;
@@ -1791,7 +1791,7 @@ function EventsPage({ events, loading, error, onRetry, onRegister, onCancelReser
       <p className="text-xs font-semibold text-muted">{events.length} published upcoming event{events.length === 1 ? "" : "s"}</p>
     </div>
 
-    {!events.length ? <section className="panel grid min-h-72 place-items-center p-8 text-center"><div><CalendarDays className="mx-auto text-muted" size={34} /><h2 className="mt-4 text-lg font-extrabold">No upcoming events yet</h2><p className="mt-2 max-w-md text-sm leading-6 text-muted">Your CareerForge administrator has not published an event yet. New workshops and sessions will appear here automatically.</p></div></section> : view === "list" ? <section className="grid gap-4 lg:grid-cols-2">{events.map((event) => {
+    {!events.length ? <section className="panel grid min-h-72 place-items-center p-8 text-center"><div><CalendarDays className="mx-auto text-muted" size={34} /><h2 className="mt-4 text-lg font-extrabold">No upcoming events yet</h2><p className="mt-2 max-w-md text-sm leading-6 text-muted">Your CareerCube administrator has not published an event yet. New workshops and sessions will appear here automatically.</p></div></section> : view === "list" ? <section className="grid gap-4 lg:grid-cols-2">{events.map((event) => {
       const start = new Date(event.starts_at);
       const end = new Date(event.ends_at);
       const reserved = Boolean(event.registered);
@@ -2021,7 +2021,7 @@ function JobModal({ job, applied, onClose, onApply }) {
       <div className="modal-card max-h-[92vh] max-w-3xl overflow-y-auto" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start gap-4"><span className={`grid h-14 w-14 shrink-0 place-items-center rounded-[20px] text-lg font-extrabold text-white ${job.tone}`}>{job.logo}</span><div className="flex-1"><h2 className="text-xl font-extrabold">{job.title}</h2><p className="mt-1 text-sm text-muted">{job.company} · {job.displayLocation}</p></div><button onClick={onClose} className="btn-ghost min-h-9"><X size={18} /></button></div>
         <div className="mt-6 flex flex-wrap gap-2"><span className="tag">{job.type || "Role"}</span>{job.category && <span className="tag">{job.category}</span>}<span className="tag">{job.salary}</span><span className="tag !bg-coral/10 !text-coral"><Clock3 size={12} /> {isExternal ? `Via ${job.source_name || "verified company source"}` : `Apply by ${new Date(job.expires_at).toLocaleDateString()}`}</span>{applied && <span className="tag !bg-jade/10 !text-jade"><CheckCircle2 size={12} /> Already applied</span>}</div>
-        {isExternal && <p className="mt-4 rounded-xl border border-jade/20 bg-jade/5 p-3 text-xs leading-5 text-muted">This verified job links to {job.source_name || "the company’s official application source"}. Applying opens that site, so CareerForge does not track the final application status.</p>}
+        {isExternal && <p className="mt-4 rounded-xl border border-jade/20 bg-jade/5 p-3 text-xs leading-5 text-muted">This verified job links to {job.source_name || "the company’s official application source"}. Applying opens that site, so CareerCube does not track the final application status.</p>}
         <div className="my-6 h-px bg-ink/[0.08]" />
         <h3 className="text-sm font-extrabold">About the opportunity</h3>
         <p className="mt-2 whitespace-pre-line text-sm leading-7 text-muted">{job.description}</p>
@@ -2030,7 +2030,7 @@ function JobModal({ job, applied, onClose, onApply }) {
         <ul className="mt-3 space-y-2">{job.requirementsList.map((item) => <li className="flex gap-2 text-sm leading-6 text-muted" key={item}><Check size={15} className="mt-1 shrink-0 text-jade" />{item}</li>)}</ul>
         {job.match_percentage != null && <section className="mt-6 rounded-2xl border border-cobalt/15 bg-cobalt/5 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-extrabold">Your job match</h3><p className="mt-1 text-xs text-muted">A guidance score based on your saved skills, target role, interests, education and location.</p></div><span className="rounded-xl bg-cobalt px-3 py-2 text-sm font-extrabold text-white">{job.match_percentage}%</span></div><div className="mt-4 grid gap-4 sm:grid-cols-2"><div><b className="text-[11px] uppercase tracking-[.08em] text-muted">Why it fits</b><ul className="mt-2 space-y-1.5">{job.reasons.map((reason) => <li className="flex gap-2 text-xs leading-5 text-muted" key={reason}><CheckCircle2 className="mt-0.5 shrink-0 text-jade" size={13} />{reason}</li>)}</ul></div><div><b className="text-[11px] uppercase tracking-[.08em] text-muted">Skills to strengthen</b>{job.skill_gaps.length ? <div className="mt-2 flex flex-wrap gap-1.5">{job.skill_gaps.map((skill) => <span className="tag !bg-coral/10 !text-coral" key={skill}>{skill}</span>)}</div> : <p className="mt-2 text-xs text-jade">No identified required-skill gap.</p>}</div></div>{job.ai_explained && <p className="mt-3 text-[10px] font-bold text-cobalt">AI explanation generated from non-identifying professional profile data.</p>}</section>}
         {job.company_description && <div className="mt-6 rounded-2xl bg-ink/[0.035] p-4"><h3 className="text-sm font-extrabold">About {job.company}</h3><p className="mt-2 text-xs leading-5 text-muted">{job.company_description}</p>{job.company_website && <a href={job.company_website} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-cobalt">Company website <ExternalLink size={13} /></a>}</div>}
-        <div className="mt-7 flex flex-wrap justify-end gap-3"><button className="btn-secondary"><Bookmark size={16} /> Save role</button><button disabled={!isExternal && applied} onClick={isExternal ? openExternalJob : onApply} className="btn-accent disabled:cursor-not-allowed disabled:opacity-50">{isExternal ? `Apply on ${job.source_name || "source"}` : applied ? "Application sent" : "Apply with CareerForge"} {isExternal ? <ExternalLink size={16} /> : <ArrowRight size={16} />}</button></div>
+        <div className="mt-7 flex flex-wrap justify-end gap-3"><button className="btn-secondary"><Bookmark size={16} /> Save role</button><button disabled={!isExternal && applied} onClick={isExternal ? openExternalJob : onApply} className="btn-accent disabled:cursor-not-allowed disabled:opacity-50">{isExternal ? `Apply on ${job.source_name || "source"}` : applied ? "Application sent" : "Apply with CareerCube"} {isExternal ? <ExternalLink size={16} /> : <ArrowRight size={16} />}</button></div>
       </div>
     </div>
   );

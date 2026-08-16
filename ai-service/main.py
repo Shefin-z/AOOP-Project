@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 app = FastAPI(
-    title="CareerForge AI Service",
+    title="CareerCube AI Service",
     version="1.0.0",
     description="Explainable career matching, readiness scoring and application writing.",
 )
@@ -106,7 +106,7 @@ def health():
         database = "healthy"
     except Exception:
         pass
-    return {"status": "ok", "service": "careerforge-ai", "database": database}
+    return {"status": "ok", "service": "careercube-ai", "database": database}
 
 
 @app.post("/recommend/jobs")

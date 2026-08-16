@@ -34,7 +34,7 @@ export default function CommunityLandingPage() {
       <section className="page-shell pb-16 pt-14 sm:pb-24 sm:pt-20">
         <div className="grid items-center gap-10 lg:grid-cols-[0.92fr_1.08fr]">
           <div>
-            <div className="eyebrow mb-6"><Users size={14} /> CareerForge community</div>
+            <div className="eyebrow mb-6"><Users size={14} /> CareerCube community</div>
             <h1 className="display-title max-w-3xl">
               Grow beside people
               <span className="block italic text-coral">going somewhere.</span>
@@ -133,7 +133,7 @@ export default function CommunityLandingPage() {
 
       <section className="page-shell py-20">
         <div className="relative overflow-hidden rounded-[38px] bg-coral px-7 py-12 text-white shadow-lift sm:px-12 sm:py-16">
-          <div className="relative z-10 max-w-2xl"><span className="text-xs font-extrabold uppercase tracking-[0.18em] text-white/70">Your circle is waiting</span><h2 className="mt-4 font-display text-5xl leading-none tracking-[-0.05em] sm:text-6xl">Bring your questions.<br /><i>Leave with momentum.</i></h2><Link to="/login/student?mode=register" className="btn-primary mt-8 !bg-white !text-ink">Join CareerForge free <ArrowRight size={17} /></Link></div>
+          <div className="relative z-10 max-w-2xl"><span className="text-xs font-extrabold uppercase tracking-[0.18em] text-white/70">Your circle is waiting</span><h2 className="mt-4 font-display text-5xl leading-none tracking-[-0.05em] sm:text-6xl">Bring your questions.<br /><i>Leave with momentum.</i></h2><Link to="/login/student?mode=register" className="btn-primary mt-8 !bg-white !text-ink">Join CareerCube free <ArrowRight size={17} /></Link></div>
           <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full border-[70px] border-white/10" />
         </div>
       </section>

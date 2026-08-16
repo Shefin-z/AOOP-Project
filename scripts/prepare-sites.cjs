@@ -20,7 +20,7 @@ fs.writeFileSync(
 export default {
   async fetch(request, env) {
     if (!env?.ASSETS?.fetch) {
-      return new Response("CareerForge asset binding is unavailable.", { status: 503 });
+      return new Response("CareerCube asset binding is unavailable.", { status: 503 });
     }
 
     const url = new URL(request.url);

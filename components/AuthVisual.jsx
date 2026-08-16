@@ -2,14 +2,14 @@ import { useTheme } from "../lib/theme";
 
 const artwork = {
   student: {
-    light: "/careerforge-auth-student-light-v1.jpg",
-    dark: "/careerforge-auth-student-dark-v1.jpg",
-    alt: "Two students planning their careers together in the CareerForge studio",
+    light: "/careercube-auth-student-light-v1.jpg",
+    dark: "/careercube-auth-student-dark-v1.jpg",
+    alt: "Two students planning their careers together in the CareerCube studio",
   },
   admin: {
-    light: "/careerforge-auth-admin-light-v1.jpg",
-    dark: "/careerforge-auth-admin-dark-v1.jpg",
-    alt: "CareerForge administrators reviewing platform insights together",
+    light: "/careercube-auth-admin-light-v1.jpg",
+    dark: "/careercube-auth-admin-dark-v1.jpg",
+    alt: "CareerCube administrators reviewing platform insights together",
   },
 };
 

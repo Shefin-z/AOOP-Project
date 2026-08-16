@@ -1,6 +1,6 @@
-# CareerForge
+# CareerCube
 
-CareerForge is a full-stack AI career-development platform for university students. The project includes a premium, responsive glassmorphism UI and separate Student and Admin experiences.
+CareerCube is a full-stack AI career-development platform for university students. The project includes a premium, responsive glassmorphism UI and separate Student and Admin experiences.
 
 ## Technology
 
@@ -69,10 +69,10 @@ Never use a `VITE_` prefix for this key or commit it to the repository.
 ## Verified Bangladesh jobs
 
 Administrators can publish verified external opportunities by entering the
-employer's official career-page URL or an authorized partner link. CareerForge
+employer's official career-page URL or an authorized partner link. CareerCube
 will score those roles with the same privacy-preserving matching logic, then
 opens the original source for the student to apply. No scraping is used and
-external applications are deliberately not stored as CareerForge applications.
+external applications are deliberately not stored as CareerCube applications.
 
 ### Student email verification
 
@@ -88,7 +88,7 @@ server-only environment variables:
 EMAIL_PROVIDER=gmail
 GMAIL_USER=your-email@gmail.com
 GMAIL_APP_PASSWORD=your-16-character-google-app-password
-EMAIL_FROM=CareerForge <your-email@gmail.com>
+EMAIL_FROM=CareerCube <your-email@gmail.com>
 EMAIL_VERIFICATION_SECRET=your-independent-long-random-secret
 ```
 
