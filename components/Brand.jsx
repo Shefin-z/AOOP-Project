@@ -1,8 +1,8 @@
-import { freshPath } from "../lib/sessionNavigation";
+import { Link } from "../lib/router";
 
 export default function Brand({ href = "/", compact = false }) {
   return (
-    <a href={freshPath(href)} className="inline-flex items-center gap-2.5 text-ink" aria-label="CareerForge home">
+    <Link to={href} className="inline-flex items-center gap-2.5 text-ink" aria-label="CareerForge home">
       <span className="grid h-9 w-9 place-items-center rounded-[13px] bg-ink text-white shadow-md">
         <img
           src="/careercube-mark-forward-v1.png"
@@ -16,6 +16,6 @@ export default function Brand({ href = "/", compact = false }) {
           Career<span className="text-cobalt">Forge</span>
         </span>
       )}
-    </a>
+    </Link>
   );
 }

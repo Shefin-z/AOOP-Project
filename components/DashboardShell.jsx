@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Bell, ChevronDown, LogOut, Menu, Search, X } from "lucide-react";
 import Brand from "./Brand";
 import ThemeToggle from "./ThemeToggle";
-import { navigateFresh } from "../lib/sessionNavigation";
+import { useNavigate } from "../lib/router";
 
 function getSessionName(role) {
   try {
@@ -27,6 +27,7 @@ export default function DashboardShell({
   onSearchChange,
   onSearchSubmit,
 }) {
+  const navigateTo = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [name, setName] = useState(() => getSessionName(role));
@@ -49,7 +50,7 @@ export default function DashboardShell({
   const logout = () => {
     localStorage.removeItem("careerforge_session");
     localStorage.removeItem("careerforge_token");
-    navigateFresh("/");
+    navigateTo("/", { replace: true });
   };
 
   const sidebar = (

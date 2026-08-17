@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "../lib/router";
+import { Link, useLocation, useNavigate } from "../lib/router";
 import {
   ArrowLeft,
   ArrowRight,
@@ -26,10 +26,10 @@ import {
   verifyPasswordResetCode,
   verifyStudentEmail,
 } from "../lib/api";
-import { navigateFresh } from "../lib/sessionNavigation";
 
 export default function AuthExperience({ role = "student" }) {
   const { search } = useLocation();
+  const navigate = useNavigate();
   const isAdmin = role === "admin";
   const [mode, setMode] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
@@ -58,9 +58,12 @@ export default function AuthExperience({ role = "student" }) {
   const passwordResetCodeActive = passwordReset?.stage === "verify";
 
   const enterWorkspace = (session, token) => {
-    if (token) localStorage.setItem("careerforge_token", token);
+    if (!token || session?.role !== role) {
+      throw new Error("The account service returned an invalid sign-in response. Please try again.");
+    }
+    localStorage.setItem("careerforge_token", token);
     localStorage.setItem("careerforge_session", JSON.stringify(session));
-    navigateFresh(workspacePath);
+    navigate(workspacePath, { replace: true });
   };
 
   const rememberPendingVerification = (details) => {

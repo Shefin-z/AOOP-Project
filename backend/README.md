@@ -7,7 +7,9 @@ This is the AOOP implementation of the CareerForge API described in the lab repo
 - Java 21, Spring Boot 3, Spring Security, JWT, Spring Data JPA, and MySQL/TiDB.
 - `domain` holds encapsulated JPA entities and enums; `repository` isolates persistence; `service` owns business rules; `web` holds thin REST controllers and safe error responses.
 - Core entities use a shared audited base class. Job scoring uses the Strategy pattern (`JobMatchingStrategy`), allowing an AI-backed strategy to be added without changing controllers.
-- Existing `server/` is retained only as a migration reference. Docker now starts this Spring API as the active backend.
+- The Vercel deployment uses the Express API in `server/` because Vercel runs the
+  React client and Node API together. This Spring project remains the AOOP
+  reference implementation and can be deployed separately to a Java host.
 
 ## Run locally
 
