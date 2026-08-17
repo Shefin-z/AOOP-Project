@@ -46,7 +46,7 @@ administrator, then remove them.
 2. Select the repository root as the Vercel root directory. Vercel detects
    Vite; the checked-in configuration runs `npm run build` and publishes
    `dist/client`.
-3. Deploy `backend/` to a Java 21 host with build command `mvn package` and
+3. Deploy `backend/` to a Java 21 host with build command `./mvnw package` and
    start command `java -jar target/careerforge-api-1.0.0.jar`. Add `MYSQL_*` or
    `TIDB_*`, `JWT_SECRET`, and `CLIENT_ORIGIN=https://your-vercel-domain` there.
 4. In Vercel, add `VITE_API_URL=https://your-spring-api-domain/api`, then deploy.

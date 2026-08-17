@@ -13,18 +13,18 @@ This is the active AOOP implementation of the CareerForge API described in the l
 
 ```powershell
 cd backend
-mvn spring-boot:run
+.\mvnw.cmd spring-boot:run
 ```
 
 Set `MYSQL_*` (or `TIDB_*`), `JWT_SECRET`, and `CLIENT_ORIGIN` in your environment. Apply `database/schema.sql` once to a new database, then set `FLYWAY_ENABLED=true` for later migrations. To create the first administrator, set `ADMIN_NAME`, `ADMIN_EMAIL`, and an 8+ character `ADMIN_PASSWORD` for one startup; remove those values after the account has been created.
 
 ## Deploy without Docker
 
-Build with `mvn package` and run `java -jar target/careerforge-api-1.0.0.jar`. Deploy this directory to any Java 21 host (for example Render or Railway) with that build and start command. Point the Vercel frontend's `VITE_API_URL` to the resulting public URL plus `/api`, and add the Vercel origin to `CLIENT_ORIGIN`.
+Build with `./mvnw package` (or `mvn package`) and run `java -jar target/careerforge-api-1.0.0.jar`. Deploy this directory to any Java 21 host (for example Render or Railway) with that build and start command. Point the Vercel frontend's `VITE_API_URL` to the resulting public URL plus `/api`, and add the Vercel origin to `CLIENT_ORIGIN`.
 
 ## Verify
 
 ```powershell
-mvn test
-mvn package
+.\mvnw.cmd test
+.\mvnw.cmd package
 ```
