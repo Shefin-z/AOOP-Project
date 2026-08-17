@@ -1,5 +1,7 @@
 # CareerForge
 
+For exact local API URLs and PowerShell examples, see [API_GUIDE.md](API_GUIDE.md).
+
 CareerForge is a React and Spring Boot career-development platform for university
 students. It implements the AOOP lab-report requirements: separate student and
 administrator workspaces, persistent profiles and Career Vaults, job matching,

@@ -237,6 +237,7 @@ CREATE TABLE IF NOT EXISTS questions (
   question_type ENUM('multiple_choice', 'true_false', 'numeric', 'code') NOT NULL DEFAULT 'multiple_choice',
   difficulty ENUM('Beginner', 'Intermediate', 'Advanced') NOT NULL,
   explanation TEXT NULL,
+  correct_answer TEXT NULL,
   points DECIMAL(7,2) NOT NULL DEFAULT 1,
   status ENUM('draft', 'published', 'needs_review') NOT NULL DEFAULT 'draft',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -261,11 +262,27 @@ CREATE TABLE IF NOT EXISTS assessment_attempts (
   total_points DECIMAL(8,2) NOT NULL DEFAULT 0,
   percentage DECIMAL(5,2) NOT NULL DEFAULT 0,
   started_at DATETIME NOT NULL,
+  expires_at DATETIME NULL,
   completed_at DATETIME NULL,
+  status ENUM('started', 'submitted', 'expired') NOT NULL DEFAULT 'submitted',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_attempts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_attempts_assessment FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE,
   INDEX idx_attempts_user_assessment (user_id, assessment_id)
+);
+
+CREATE TABLE IF NOT EXISTS assessment_answers (
+  attempt_id BIGINT UNSIGNED NOT NULL,
+  question_id BIGINT UNSIGNED NOT NULL,
+  option_id BIGINT UNSIGNED NULL,
+  answer_text TEXT NULL,
+  is_correct BOOLEAN NULL,
+  awarded_points DECIMAL(7,2) NOT NULL DEFAULT 0,
+  answered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (attempt_id, question_id),
+  CONSTRAINT fk_assessment_answers_attempt FOREIGN KEY (attempt_id) REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_assessment_answers_question FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_assessment_answers_option FOREIGN KEY (option_id) REFERENCES question_options(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS adaptive_assessment_programs (
@@ -511,6 +528,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   actor_id BIGINT UNSIGNED NULL,
   action VARCHAR(120) NOT NULL,
+  reason VARCHAR(500) NULL,
   entity_type VARCHAR(80) NOT NULL,
   entity_id VARCHAR(80) NULL,
   metadata JSON NULL,

@@ -383,10 +383,15 @@ export default function AdminWorkspace() {
   const moderateCommunityPost = async (post, action) => {
     const actionLabel = action === "remove" ? "remove" : action === "restore" ? "restore" : action;
     if (["remove", "restore", "approve"].includes(action) && !window.confirm(`${actionLabel[0].toUpperCase()}${actionLabel.slice(1)} this community post?`)) return;
+    const reason = window.prompt("Record the moderation reason (required):");
+    if (!reason?.trim()) {
+      notify("A moderation reason is required.");
+      return;
+    }
     try {
       const result = await apiRequest(`/admin/community/posts/${post.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, reason: reason.trim() }),
       });
       await loadCommunity({ silent: true });
       notify(result.message);
