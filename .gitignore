@@ -13,5 +13,6 @@ deploy-archive.tar.gz
 __pycache__
 *.pyc
 .venv
+backend/target/
 
 .vercel
