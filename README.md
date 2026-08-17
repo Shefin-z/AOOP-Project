@@ -25,6 +25,9 @@ Prerequisites: Node.js 20+, npm, Java 21, Maven, and a running MySQL-compatible 
 npm install
 # Apply database/schema.sql to a new MySQL/TiDB database.
 $env:JWT_SECRET="use-a-long-random-secret"
+$env:ADMIN_NAME="CareerForge Admin"
+$env:ADMIN_EMAIL="admin@example.com"
+$env:ADMIN_PASSWORD="replace-with-a-strong-password"
 npm run dev:all
 ```
 
@@ -33,7 +36,9 @@ Open `http://localhost:5173`. Vite forwards `/api/*` to Spring Boot at port
 views; routing is handled in-app.
 
 Configure database variables, `JWT_SECRET`, and `CLIENT_ORIGIN` in `.env` or the
-host environment; never commit those secrets.
+host environment; never commit those secrets. Use `ADMIN_NAME`, `ADMIN_EMAIL`,
+and `ADMIN_PASSWORD` for only the first Spring Boot start to create the private
+administrator, then remove them.
 
 ## Deploy on Vercel
 

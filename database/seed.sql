@@ -1,6 +1,7 @@
 -- Accounts are never committed as seed data.
 -- Students register through the public API. Create the private administrator
--- with `npm run admin:create` after setting the ADMIN_* environment variables.
+-- by starting Spring Boot once with ADMIN_NAME, ADMIN_EMAIL and ADMIN_PASSWORD
+-- environment variables set. Remove those variables after the account exists.
 
 INSERT INTO skills (name, category) VALUES
   ('JavaScript', 'Development'),

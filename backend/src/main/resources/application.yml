@@ -35,3 +35,7 @@ careerforge:
   features:
     registration-enabled: ${REGISTRATION_ENABLED:true}
     community-posting-enabled: ${COMMUNITY_POSTING_ENABLED:true}
+  admin:
+    name: ${ADMIN_NAME:}
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
