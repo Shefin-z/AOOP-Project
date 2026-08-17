@@ -57,11 +57,6 @@ import {
 import DashboardShell from "../DashboardShell";
 import Toast from "../Toast";
 import { CommunityPage, CommunityPostCooldown, CommunityPostModal } from "./CommunityExperience";
-import ConnectionsPage from "./ConnectionsExperience";
-import {
-  achievements as seedAchievements,
-  resources,
-} from "../../lib/mockData";
 import { apiRequest } from "../../lib/api";
 
 const navItems = [
@@ -73,7 +68,6 @@ const navItems = [
   { id: "analytics", label: "Performance", icon: BarChart3 },
   { id: "learning", label: "Learning resources", icon: BookOpen },
   { id: "community", label: "Community", icon: Users, badge: "New", group: "Connect" },
-  { id: "connections", label: "Connections & inbox", icon: MessageCircle },
   { id: "events", label: "Events", icon: CalendarDays },
   { id: "achievements", label: "Achievements", icon: Trophy },
   { id: "profile", label: "Profile & settings", icon: Settings, group: "Account" },
@@ -88,7 +82,6 @@ const pageMeta = {
   analytics: ["Performance intelligence", "A clear view of your skills, consistency and readiness."],
   learning: ["Learning resources", "Focused material selected for the roles you want."],
   community: ["Career community", "Learn in public, ask better questions and celebrate progress."],
-  connections: ["Connections & inbox", "Find CareerCube students, build your network, and message privately."],
   events: ["Events & workshops", "Meet recruiters, mentors and students building alongside you."],
   achievements: ["Your milestones", "Proof that consistent effort is becoming real progress."],
   profile: ["Profile & preferences", "Keep your career signal accurate and your experience personal."],
@@ -289,7 +282,6 @@ export default function StudentWorkspace() {
   const [postingStatus, setPostingStatus] = useState({ canPost: true, nextPostAt: null, cooldownHours: 12 });
   const [jobSearch, setJobSearch] = useState("");
   const [jobType, setJobType] = useState("All types");
-  const [studentSearch, setStudentSearch] = useState("");
   const [quiz, setQuiz] = useState({ index: 0, answers: {}, finished: false, score: 0, submitting: false, result: null, startedAt: null });
   const [assessmentRecords, setAssessmentRecords] = useState([]);
   const [assessmentLoading, setAssessmentLoading] = useState(true);
@@ -306,6 +298,14 @@ export default function StudentWorkspace() {
   });
   const [cvPhoto, setCvPhoto] = useState(null);
   const [cvData, setCvData] = useState(() => readCvData(readStudentUser()));
+  const [resumeId, setResumeId] = useState(null);
+  const [vaultSaving, setVaultSaving] = useState(false);
+  const [achievementRecords, setAchievementRecords] = useState([]);
+  const [achievementsLoading, setAchievementsLoading] = useState(true);
+  const [achievementsError, setAchievementsError] = useState("");
+  const [learningResources, setLearningResources] = useState([]);
+  const [resourcesLoading, setResourcesLoading] = useState(true);
+  const [resourcesError, setResourcesError] = useState("");
 
   useEffect(() => {
     localStorage.setItem(getCvStorageKey(currentUser), JSON.stringify(cvData));
@@ -326,6 +326,51 @@ export default function StudentWorkspace() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const loadVault = async () => {
+    try {
+      const vault = await apiRequest("/vault");
+      const latest = Array.isArray(vault.resumes) ? vault.resumes[0] : null;
+      if (!latest?.content) return;
+      const saved = typeof latest.content === "string" ? JSON.parse(latest.content) : latest.content;
+      if (saved && typeof saved === "object") {
+        setResumeId(latest.id);
+        setCvData((current) => ({ ...current, ...saved }));
+      }
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
+  const loadAchievements = async () => {
+    setAchievementsLoading(true);
+    setAchievementsError("");
+    try {
+      setAchievementRecords(await apiRequest("/achievements"));
+    } catch (error) {
+      setAchievementsError(error.message);
+    } finally {
+      setAchievementsLoading(false);
+    }
+  };
+
+  const loadResources = async () => {
+    setResourcesLoading(true);
+    setResourcesError("");
+    try {
+      setLearningResources(await apiRequest("/resources"));
+    } catch (error) {
+      setResourcesError(error.message);
+    } finally {
+      setResourcesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadVault();
+    loadAchievements();
+    loadResources();
   }, []);
 
   useEffect(() => {
@@ -577,6 +622,32 @@ export default function StudentWorkspace() {
     }
   };
 
+  const saveVault = async () => {
+    setVaultSaving(true);
+    try {
+      const result = await apiRequest("/vault/resume", {
+        method: "PUT",
+        body: JSON.stringify({ id: resumeId, title: cvData.title || "Career Vault resume", content: cvData }),
+      });
+      setResumeId(result.id);
+      notify("Resume saved to your Career Vault.");
+    } catch (error) {
+      notify(error.message);
+    } finally {
+      setVaultSaving(false);
+    }
+  };
+
+  const completeResource = async (resource) => {
+    try {
+      await apiRequest(`/resources/${resource.id}/complete`, { method: "POST" });
+      window.open(resource.resource_url, "_blank", "noopener,noreferrer");
+      notify("Learning progress saved.");
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+
   const startAdaptiveAssessment = async () => {
     if (!adaptiveAssessment?.profileReady) {
       setActive("profile");
@@ -752,8 +823,8 @@ export default function StudentWorkspace() {
   });
 
   const updateStudentSearch = (value) => {
-    setStudentSearch(value);
-    if (value.trim()) setActive("connections");
+    setJobSearch(value);
+    if (value.trim()) setActive("jobs");
   };
 
   return (
@@ -765,9 +836,9 @@ export default function StudentWorkspace() {
         navItems={studentNavItems}
         active={active}
         onNavigate={setActive}
-        searchValue={studentSearch}
+        searchValue={jobSearch}
         onSearchChange={updateStudentSearch}
-        onSearchSubmit={() => setActive("connections")}
+        onSearchSubmit={() => setActive("jobs")}
         title={active === "overview" ? `${greeting}, ${firstName}` : pageMeta[active][0]}
         subtitle={pageMeta[active][1]}
         actions={pageActions[active]}
@@ -800,7 +871,7 @@ export default function StudentWorkspace() {
           />
         )}
         {active === "applications" && <ApplicationsPage applications={applications} loading={jobsLoading} error={jobsError} onRetry={loadJobData} onWithdraw={withdrawJobApplication} />}
-        {active === "vault" && <CareerVault notify={notify} photo={cvPhoto} setPhoto={setCvPhoto} data={cvData} setData={setCvData} />}
+        {active === "vault" && <CareerVault notify={notify} photo={cvPhoto} setPhoto={setCvPhoto} data={cvData} setData={setCvData} onSave={saveVault} saving={vaultSaving} />}
         {active === "assessments" && (
           <AssessmentsPage
             assessments={assessmentRecords}
@@ -817,11 +888,10 @@ export default function StudentWorkspace() {
           />
         )}
         {active === "analytics" && <AnalyticsPage notify={notify} data={overviewData} onNavigate={setActive} />}
-        {active === "learning" && <LearningPage notify={notify} />}
+        {active === "learning" && <LearningPage resources={learningResources} loading={resourcesLoading} error={resourcesError} onRetry={loadResources} onComplete={completeResource} />}
         {active === "community" && <CommunityPage posts={posts} setPosts={setPosts} loading={communityLoading} error={communityError} onRetry={loadCommunity} notify={notify} viewer={currentUser} onNewPost={() => setModal({ type: "post" })} postingStatus={postingStatus} />}
-        {active === "connections" && <ConnectionsPage search={studentSearch} setSearch={setStudentSearch} currentUser={currentUser} notify={notify} />}
         {active === "events" && <EventsPage events={events} loading={eventsLoading} error={eventsError} onRetry={loadEvents} reservingEventId={reservingEventId} cancellingEventId={cancellingEventId} onRegister={reserveEvent} onCancelReservation={cancelEventReservation} />}
-        {active === "achievements" && <AchievementsPage />}
+        {active === "achievements" && <AchievementsPage achievements={achievementRecords} loading={achievementsLoading} error={achievementsError} onRetry={loadAchievements} />}
         {active === "profile" && <ProfilePage notify={notify} user={currentUser} onSave={saveProfile} />}
       </DashboardShell>
       <Toast message={toast} onClose={() => setToast("")} />
@@ -1169,7 +1239,7 @@ function Status({ value }) {
   return <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${styles[value] || "bg-ink/10 text-muted"}`}>{value}</span>;
 }
 
-function CareerVault({ notify, photo, setPhoto, data, setData }) {
+function CareerVault({ notify, photo, setPhoto, data, setData, onSave, saving }) {
   const [photoError, setPhotoError] = useState("");
   const update = (key, value) => setData((current) => ({ ...current, [key]: value }));
   const initials = getInitials(data.name) || "CV";
@@ -1230,7 +1300,7 @@ function CareerVault({ notify, photo, setPhoto, data, setData }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[.75fr_1.25fr]">
       <section className="panel h-fit p-5">
-        <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Resume details</h2><p className="text-xs text-muted">Every section is manually editable and updates the preview instantly.</p></div><span className="tag text-jade"><Check size={12} /> Saved</span></div>
+        <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="text-lg font-extrabold">Resume details</h2><p className="text-xs text-muted">Every section is manually editable and updates the preview instantly.</p></div><button type="button" onClick={onSave} disabled={saving} className="btn-secondary min-h-9 shrink-0 disabled:opacity-50"><Check size={14} /> {saving ? "Saving…" : "Save"}</button></div>
         <div className="space-y-5">
           <div className="rounded-[22px] border border-ink/[0.08] bg-white/45 p-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -1493,12 +1563,12 @@ function AssessmentsPage({
       <section className="panel overflow-hidden bg-ink text-white">
         <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
-            <span className="eyebrow !text-[#AFC0FF]"><Sparkles size={13} /> Gemini adaptive journey</span>
+            <span className="eyebrow !text-[#AFC0FF]"><Sparkles size={13} /> Adaptive assessment journey</span>
             <h2 className="mt-3 text-3xl font-extrabold tracking-[-0.045em]">
               {program?.status === "completed" ? "All 10 levels completed." : `Level ${currentLevel}: ${program?.levels?.[currentLevel - 1]?.label || "Foundation"}`}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-white/60">
-              Six fresh questions are generated from your degree, target role and career interests. Score at least 4/6 to unlock the next level.
+              Six role-aware questions build from your degree, target role and career interests. Score at least 4/6 to unlock the next level.
             </p>
             {adaptiveLoading ? (
               <p className="mt-5 flex items-center gap-2 text-xs font-bold text-white/70"><RefreshCw className="animate-spin" size={14} /> Loading your assessment path...</p>
@@ -1509,8 +1579,6 @@ function AssessmentsPage({
                 <p className="text-xs font-bold text-[#FFD1C5]">Required first: {(adaptive?.missingFields || []).join(", ") || "personal and career details"}</p>
                 <button onClick={onCompleteProfile} className="btn-accent mt-3 !bg-white !text-ink">Complete career profile <ArrowRight size={15} /></button>
               </div>
-            ) : !adaptive?.aiConfigured ? (
-              <div className="mt-5 rounded-2xl border border-coral/30 bg-coral/10 p-4 text-xs leading-5 text-[#FFD1C5]">The feature is implemented, but the server needs a private <b>GEMINI_API_KEY</b> environment variable before it can generate real questions.</div>
             ) : program?.status === "completed" ? (
               <div className="mt-5 inline-flex items-center gap-2 rounded-xl bg-jade/15 px-4 py-3 text-xs font-bold text-[#BEE8D5]"><Trophy size={16} /> Expert journey completed</div>
             ) : (
@@ -1546,7 +1614,7 @@ function AssessmentsPage({
         {error ? (
           <div className="mt-5 rounded-2xl bg-coral/10 p-4"><p className="text-xs font-bold text-coral">{error}</p><button onClick={onRetry} className="btn-secondary mt-3 min-h-9"><RefreshCw size={14} /> Try again</button></div>
         ) : !loading && !assessments.length ? (
-          <div className="mt-5 rounded-2xl border border-dashed border-ink/10 p-6 text-center"><ListChecks className="mx-auto text-muted" size={26} /><p className="mt-3 text-xs font-bold text-muted">No administrator assessment is published. Your Gemini journey above is still available.</p></div>
+          <div className="mt-5 rounded-2xl border border-dashed border-ink/10 p-6 text-center"><ListChecks className="mx-auto text-muted" size={26} /><p className="mt-3 text-xs font-bold text-muted">No administrator assessment is published. Your adaptive journey above is still available.</p></div>
         ) : (
           <>
             <div className="mt-5 flex flex-wrap gap-2">{categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`min-h-9 rounded-xl px-3 text-xs font-bold transition ${category === item ? "bg-ink text-white" : "border border-ink/[0.07] bg-white/60 text-muted"}`}>{item}</button>)}</div>
@@ -1698,21 +1766,32 @@ function AnalyticsPage({ notify, data, onNavigate }) {
   );
 }
 
-function LearningPage({ notify }) {
+function LearningPage({ resources, loading, error, onRetry, onComplete }) {
   const [category, setCategory] = useState("All resources");
-  const filtered = category === "All resources" ? resources : resources.filter((item) => item.category.includes(category));
+  const categories = ["All resources", ...new Set(resources.map((item) => item.category).filter(Boolean))];
+  const filtered = (category === "All resources" ? resources : resources.filter((item) => item.category === category)).map((item, index) => ({
+    ...item,
+    tone: jobTones[index % jobTones.length],
+    icon: String(item.resource_type || "R").slice(0, 2).toUpperCase(),
+    level: item.difficulty || "Self-paced",
+    time: item.estimated_minutes ? `${item.estimated_minutes} min` : "Self-paced",
+    progress: 0,
+  }));
   return (
     <div className="space-y-5">
       <section className="panel grid overflow-hidden md:grid-cols-[1fr_.6fr]">
         <div className="p-6 sm:p-8"><span className="eyebrow"><Sparkles size={13} /> Personalized next step</span><h2 className="mt-3 text-2xl font-extrabold tracking-[-0.04em]">Finish SQL for Product Decisions</h2><p className="mt-2 max-w-lg text-sm leading-6 text-muted">Completing this course supports three of your top five job matches and closes your biggest analytics gap.</p><div className="mt-5 flex items-center gap-4"><button onClick={() => notify("Course resumed at lesson 7.")} className="btn-accent"><Play size={15} fill="currentColor" /> Continue learning</button><span className="text-xs font-bold text-muted">32 min left</span></div></div>
         <div className="relative hidden place-items-center bg-[#DED2BE] md:grid"><div className="grid h-36 w-36 place-items-center rounded-full border-[20px] border-cobalt bg-white/50"><span className="text-center"><b className="block text-2xl">68%</b><small className="text-[10px] font-bold text-muted">complete</small></span></div></div>
       </section>
-      <div className="flex flex-wrap gap-2">{["All resources", "Career Toolkit", "Data & Analytics", "Development", "Communication"].map((item) => <button key={item} onClick={() => setCategory(item)} className={`min-h-9 rounded-xl px-3 text-xs font-bold ${category === item ? "bg-ink text-white" : "bg-white/60 text-muted"}`}>{item}</button>)}</div>
+      <div className="flex flex-wrap gap-2">{categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`min-h-9 rounded-xl px-3 text-xs font-bold ${category === item ? "bg-ink text-white" : "bg-white/60 text-muted"}`}>{item}</button>)}</div>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((resource) => (
+        {loading && <p className="text-sm text-muted">Loading published learning resources…</p>}
+        {error && <div className="rounded-2xl bg-coral/10 p-4 text-sm text-coral">{error} <button onClick={onRetry} className="font-bold underline">Try again</button></div>}
+        {!loading && !error && !filtered.length && <p className="rounded-2xl border border-dashed border-ink/15 p-6 text-sm text-muted">No published resources are available in this category yet.</p>}
+        {!loading && !error && filtered.map((resource) => (
           <article className="panel overflow-hidden" key={resource.id}>
             <div className={`flex h-32 items-end justify-between p-5 text-white ${resource.tone}`}><span className="font-display text-4xl italic">{resource.icon}</span><button className="grid h-9 w-9 place-items-center rounded-xl bg-white/15 backdrop-blur-md"><Bookmark size={16} /></button></div>
-            <div className="p-5"><p className="text-[10px] font-extrabold uppercase tracking-[.12em] text-coral">{resource.category}</p><h3 className="mt-2 text-base font-extrabold">{resource.title}</h3><div className="mt-3 flex gap-3 text-[11px] text-muted"><span>{resource.level}</span><span>·</span><span>{resource.time}</span></div>{resource.progress > 0 && <div className="mt-4"><div className="mb-1.5 flex justify-between text-[10px] font-bold text-muted"><span>Progress</span><span>{resource.progress}%</span></div><div className="progress-track"><div className="h-full rounded-full bg-jade" style={{ width: `${resource.progress}%` }} /></div></div>}<button onClick={() => notify(resource.category.includes("PDF") ? "Resource downloaded." : "Learning resource opened.")} className="btn-secondary mt-5 w-full">{resource.category.includes("PDF") ? <><Download size={15} /> Download resource</> : <><Play size={15} /> {resource.progress ? "Continue" : "Start learning"}</>}</button></div>
+            <div className="p-5"><p className="text-[10px] font-extrabold uppercase tracking-[.12em] text-coral">{resource.category}</p><h3 className="mt-2 text-base font-extrabold">{resource.title}</h3><p className="mt-2 text-xs leading-5 text-muted">{resource.description}</p><div className="mt-3 flex gap-3 text-[11px] text-muted"><span>{resource.level}</span><span>·</span><span>{resource.time}</span></div><button onClick={() => onComplete(resource)} className="btn-secondary mt-5 w-full">{resource.resource_type === "pdf" ? <><Download size={15} /> Open resource</> : <><Play size={15} /> Start learning</>}</button></div>
           </article>
         ))}
       </section>
@@ -1846,16 +1925,21 @@ function LegacyEventCalendar({ events }) {
   return <section className="panel overflow-hidden p-5"><div className="mb-5 flex items-center justify-between"><button className="btn-ghost"><ChevronLeft size={16} /></button><h2 className="font-extrabold">August 2026</h2><button className="btn-ghost"><ChevronRight size={16} /></button></div><div className="calendar-grid border-l border-t border-ink/[0.07]">{["SUN","MON","TUE","WED","THU","FRI","SAT"].map((day) => <div key={day} className="border-b border-r border-ink/[0.07] p-2 text-center text-[9px] font-extrabold text-muted">{day}</div>)}{Array.from({ length: 35 }, (_, i) => i - 1).map((day, index) => <div key={index} className="relative min-h-20 border-b border-r border-ink/[0.07] p-2 text-xs font-semibold text-muted">{day > 0 && day <= 31 ? day : ""}{events.some((e) => Number(e.day) === day) && <span className="absolute bottom-2 left-2 right-2 rounded-lg bg-cobalt px-1.5 py-1 text-[8px] font-bold text-white">Career event</span>}</div>)}</div></section>;
 }
 
-function AchievementsPage() {
+function AchievementsPage({ achievements, loading, error, onRetry }) {
   const iconMap = { user: UserRound, zap: Zap, message: MessageCircle, target: Target, briefcase: BriefcaseBusiness, book: BookOpen };
+  const unlocked = achievements.filter((item) => item.unlocked_at);
+  const totalXp = unlocked.reduce((sum, item) => sum + Number(item.xp_reward || 0), 0);
   return (
     <div className="space-y-5">
       <section className="grid gap-5 lg:grid-cols-[.7fr_1.3fr]">
-        <div className="panel flex items-center gap-5 p-6"><div className="grid h-28 w-28 shrink-0 place-items-center rounded-full bg-coral text-white shadow-lg"><span className="text-center"><Medal className="mx-auto" size={30} /><b className="mt-1 block text-xl">560</b><small className="text-[9px] font-bold">XP</small></span></div><div><span className="eyebrow">Level 6</span><h2 className="mt-2 text-xl font-extrabold">Career Builder</h2><p className="mt-2 text-xs leading-5 text-muted">140 XP until Level 7</p><div className="progress-track mt-3 w-full"><div className="h-full w-[72%] rounded-full bg-coral" /></div></div></div>
-        <div className="rounded-[28px] bg-ink p-6 text-white"><div className="flex items-start justify-between"><div><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#AFC0FF]">Next milestone</span><h2 className="mt-2 text-2xl font-extrabold">Interview Ready</h2><p className="mt-2 text-sm text-white/60">Reach an 80% readiness score to unlock.</p></div><Target className="text-coral" size={34} /></div><div className="mt-6 flex items-center gap-3"><div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10"><div className="h-full w-[96%] rounded-full bg-coral" /></div><b className="text-xs">78 / 80</b></div></div>
+        <div className="panel flex items-center gap-5 p-6"><div className="grid h-28 w-28 shrink-0 place-items-center rounded-full bg-coral text-white shadow-lg"><span className="text-center"><Medal className="mx-auto" size={30} /><b className="mt-1 block text-xl">{totalXp}</b><small className="text-[9px] font-bold">XP</small></span></div><div><span className="eyebrow">Verified progress</span><h2 className="mt-2 text-xl font-extrabold">Career Builder</h2><p className="mt-2 text-xs leading-5 text-muted">{unlocked.length} milestone{unlocked.length === 1 ? "" : "s"} earned from platform activity.</p><div className="progress-track mt-3 w-full"><div className="h-full rounded-full bg-coral" style={{ width: `${Math.min(100, unlocked.length * 20)}%` }} /></div></div></div>
+        <div className="rounded-[28px] bg-ink p-6 text-white"><div className="flex items-start justify-between"><div><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#AFC0FF]">Next milestone</span><h2 className="mt-2 text-2xl font-extrabold">Keep building</h2><p className="mt-2 text-sm text-white/60">Complete your profile, assessments, learning and applications to earn achievements.</p></div><Target className="text-coral" size={34} /></div></div>
       </section>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {seedAchievements.map((item) => { const Icon = iconMap[item.icon]; return <article className={`panel p-5 ${!item.unlocked ? "opacity-70" : ""}`} key={item.title}><div className="flex items-start justify-between"><span className={`grid h-14 w-14 place-items-center rounded-[20px] ${item.unlocked ? "bg-jade text-white shadow-lg" : "bg-ink/[0.07] text-muted"}`}><Icon size={23} /></span>{item.unlocked ? <span className="tag !text-jade"><Check size={12} /> Unlocked</span> : <ShieldCheck size={17} className="text-muted" />}</div><h3 className="mt-5 text-base font-extrabold">{item.title}</h3><p className="mt-1 text-xs leading-5 text-muted">{item.description}</p>{item.unlocked ? <p className="mt-5 text-[10px] font-bold text-muted">Earned {item.date}</p> : <div className="mt-5"><div className="mb-1 flex justify-between text-[10px] font-bold text-muted"><span>Progress</span><span>{item.progress}%</span></div><div className="progress-track"><div className="h-full rounded-full bg-cobalt" style={{ width: `${item.progress}%` }} /></div></div>}</article>; })}
+        {loading && <p className="text-sm text-muted">Loading your verified milestones…</p>}
+        {error && <div className="rounded-2xl bg-coral/10 p-4 text-sm text-coral">{error} <button onClick={onRetry} className="font-bold underline">Try again</button></div>}
+        {!loading && !error && !achievements.length && <p className="rounded-2xl border border-dashed border-ink/15 p-6 text-sm text-muted">Your achievements will appear here as you complete verified career activities.</p>}
+        {!loading && !error && achievements.map((item) => { const Icon = iconMap[item.icon] || Award; const complete = Boolean(item.unlocked_at); return <article className={`panel p-5 ${!complete ? "opacity-70" : ""}`} key={item.id}><div className="flex items-start justify-between"><span className={`grid h-14 w-14 place-items-center rounded-[20px] ${complete ? "bg-jade text-white shadow-lg" : "bg-ink/[0.07] text-muted"}`}><Icon size={23} /></span>{complete ? <span className="tag !text-jade"><Check size={12} /> Unlocked</span> : <ShieldCheck size={17} className="text-muted" />}</div><h3 className="mt-5 text-base font-extrabold">{item.title}</h3><p className="mt-1 text-xs leading-5 text-muted">{item.description}</p>{complete ? <p className="mt-5 text-[10px] font-bold text-muted">Earned {new Date(item.unlocked_at).toLocaleDateString()}</p> : <div className="mt-5"><div className="mb-1 flex justify-between text-[10px] font-bold text-muted"><span>Progress</span><span>{Number(item.progress || 0)}%</span></div><div className="progress-track"><div className="h-full rounded-full bg-cobalt" style={{ width: `${Number(item.progress || 0)}%` }} /></div></div>}</article>; })}
       </section>
     </div>
   );
@@ -2096,7 +2180,7 @@ function AdaptiveLoadingModal({ level }) {
       <div className="modal-card max-w-lg text-center">
         <span className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] bg-cobalt text-white shadow-lift"><Sparkles className="animate-pulse" size={27} /></span>
         <h2 className="mt-5 text-xl font-extrabold">Generating level {level}</h2>
-        <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-muted">Gemini is creating six unique questions from your degree, target role and career interests. This can take a few seconds.</p>
+        <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-muted">Preparing six role-aware questions from your degree, target role and career interests.</p>
         <p className="mt-6 text-[10px] font-bold uppercase tracking-wider text-muted">Please keep this window open</p>
       </div>
     </div>

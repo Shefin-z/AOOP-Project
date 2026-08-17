@@ -16,7 +16,7 @@ public class StudentProfile {
   @Column(name = "career_interests", columnDefinition = "json") private String careerInterests = "[]";
   @Column(columnDefinition = "json") private String preferences = "{}";
   @Column(name = "avatar_data", columnDefinition = "LONGTEXT") private String avatarData;
-  protected StudentProfile() { }
+  public StudentProfile() { }
   public void setUser(User value) { user = value; } public User getUser() { return user; }
   public String getUniversity() { return university; } public String getDegree() { return degree; } public Integer getGraduationYear() { return graduationYear; }
   public String getTargetRole() { return targetRole; } public String getLocation() { return location; } public String getPhone() { return phone; }

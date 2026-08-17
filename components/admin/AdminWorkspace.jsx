@@ -49,7 +49,6 @@ import DashboardShell from "../DashboardShell";
 import Toast from "../Toast";
 import AdminApplications from "./AdminApplications";
 import AdminCommunity from "./AdminCommunity";
-import { resources as seedResources } from "../../lib/mockData";
 import { apiRequest } from "../../lib/api";
 
 const navItems = [
@@ -415,7 +414,6 @@ export default function AdminWorkspace() {
   const addLabel = {
     assessments: "New assessment",
     questions: "Add question",
-    resources: "Add resource",
     events: "Create event",
     jobs: "Add job",
   }[active];
@@ -496,7 +494,7 @@ function AdminOverview({ onNavigate, assessments, questions, jobs, users, commun
           <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-extrabold">Platform growth</h2><p className="text-xs text-muted">Student acquisition and weekly active users</p></div><select className="select min-h-9 w-36 py-0 text-xs"><option>Last 8 weeks</option><option>Last 6 months</option></select></div>
           <div className="mt-7 flex h-56 items-end gap-3">{[["W1", 44, 31], ["W2", 56, 40], ["W3", 52, 43], ["W4", 68, 50], ["W5", 72, 58], ["W6", 78, 64], ["W7", 85, 70], ["W8", 94, 78]].map(([label, total, active]) => <div className="flex flex-1 items-end justify-center gap-1" key={label}><div className="w-[38%] rounded-t-md bg-sand" style={{ height: `${total}%` }} /><div className="w-[38%] rounded-t-md bg-cobalt" style={{ height: `${active}%` }} /><span className="absolute mt-5 self-end translate-y-5 text-[9px] font-bold text-muted">{label}</span></div>)}</div><div className="mt-8 flex gap-5 text-[10px] font-bold text-muted"><span><i className="mr-2 inline-block h-2 w-2 rounded-sm bg-sand" />New students</span><span><i className="mr-2 inline-block h-2 w-2 rounded-sm bg-cobalt" />Weekly active</span></div>
         </div>
-        <div className="panel p-6"><div className="flex items-center justify-between"><div><h2 className="text-lg font-extrabold">System health</h2><p className="text-xs text-muted">All services operational</p></div><span className="h-3 w-3 rounded-full bg-jade shadow-[0_0_0_6px_rgba(78,120,100,.12)]" /></div><div className="mt-6 space-y-4">{[["Web application", "99.99%", "Healthy"], ["Express API", "184ms", "Healthy"], ["MySQL database", "37%", "Healthy"], ["Python AI service", "212ms", "Healthy"]].map(([label, value, status]) => <div className="flex items-center justify-between border-b border-ink/[0.07] pb-3 last:border-0" key={label}><span><b className="block text-xs">{label}</b><small className="text-[10px] text-jade">{status}</small></span><b className="text-xs text-muted">{value}</b></div>)}</div></div>
+        <div className="panel p-6"><div className="flex items-center justify-between"><div><h2 className="text-lg font-extrabold">System health</h2><p className="text-xs text-muted">Service status is verified by the deployed environment.</p></div><span className="h-3 w-3 rounded-full bg-jade shadow-[0_0_0_6px_rgba(78,120,100,.12)]" /></div><div className="mt-6 space-y-4">{[["Web application", "Vercel", "Configured"], ["Spring Boot API", "Java 21", "Configured"], ["MySQL / TiDB", "Persistent", "Configured"], ["Python AI service", "Optional", "Configured"]].map(([label, value, status]) => <div className="flex items-center justify-between border-b border-ink/[0.07] pb-3 last:border-0" key={label}><span><b className="block text-xs">{label}</b><small className="text-[10px] text-jade">{status}</small></span><b className="text-xs text-muted">{value}</b></div>)}</div></div>
       </section>
       <section className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
         <div className="panel p-6"><div className="flex items-center justify-between"><div><h2 className="text-lg font-extrabold">Needs attention</h2><p className="text-xs text-muted">Prioritized operational queue</p></div><span className="tag !bg-coral/10 !text-coral">{reviewQuestions.length} question reviews</span></div><div className="mt-5 space-y-3">{attentionItems.map(([Icon, text, action, page, tone]) => <button onClick={() => onNavigate(page)} key={text} className="flex w-full items-center gap-3 rounded-2xl border border-ink/[0.07] bg-white/55 p-3 text-left hover:bg-white"><span className={`grid h-9 w-9 place-items-center rounded-xl ${tone}`}><Icon size={16} /></span><b className="flex-1 text-xs">{text}</b><span className="text-[10px] font-bold text-muted">{action}</span><ChevronRight size={14} className="text-muted" /></button>)}</div></div>
@@ -761,8 +759,16 @@ function ContentStatus({ value }) {
   return <span className={`rounded-full px-2 py-1 text-[10px] font-bold capitalize ${tone}`}>{label}</span>;
 }
 
-function ResourcesAdmin({ notify }) {
-  return <DataGrid title="68 learning resources" subtitle="9.8k downloads this month" columns={["Resource", "Category", "Level", "Format", "Downloads", "Completion", "Status", ""]} rows={seedResources.map((item, index) => [item.title, item.category, item.level, item.category.includes("PDF") ? "PDF" : "Course", 320 + index * 114, `${34 + index * 7}%`, index === 5 ? "Draft" : "Published"])} notify={notify} />;
+function ResourcesAdmin() {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const load = async () => {
+    setLoading(true); setError("");
+    try { setRecords(await apiRequest("/admin/resources")); } catch (requestError) { setError(requestError.message); } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+  return <section className="panel p-5"><div className="mb-5 flex items-end justify-between gap-3"><div><h2 className="text-lg font-extrabold">Learning resources</h2><p className="text-xs text-muted">Published records are visible to students through the Spring API.</p></div><button onClick={load} className="btn-secondary min-h-9"><RefreshCw size={14} /> Refresh</button></div><ContentState loading={loading} error={error} empty={!records.length} emptyTitle="No learning resources yet" emptyCopy="Create published resources in the database to make them available to students." onRetry={load}><div className="table-shell overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="border-b border-ink/[0.07] bg-ink/[0.035] text-[10px] uppercase tracking-[.09em] text-muted"><tr>{["Resource", "Category", "Level", "Format", "Minutes", "Status"].map((heading) => <th className="px-4 py-3" key={heading}>{heading}</th>)}</tr></thead><tbody className="divide-y divide-ink/[0.06]">{records.map((record) => <tr key={record.id}><td className="px-4 py-4"><b className="block">{record.title}</b><small className="text-muted">{record.resource_url}</small></td><td className="px-4 py-4">{record.category}</td><td className="px-4 py-4">{record.difficulty}</td><td className="px-4 py-4">{record.resource_type}</td><td className="px-4 py-4">{record.estimated_minutes || "—"}</td><td className="px-4 py-4"><ContentStatus value={record.status} /></td></tr>)}</tbody></table></div></ContentState></section>;
 }
 
 function EventsAdmin({ records, loading, error, onRetry, onEdit, onStatus, onDelete }) {

@@ -20,6 +20,12 @@ spring:
       hibernate.dialect: org.hibernate.dialect.MySQLDialect
   jackson:
     default-property-inclusion: non_null
+  flyway:
+    # Existing CareerForge databases are initialized from database/schema.sql.
+    # Enable Flyway after that baseline has been applied; V1 adds the vault tables.
+    enabled: ${FLYWAY_ENABLED:false}
+    baseline-on-migrate: true
+    baseline-version: 0
 careerforge:
   jwt:
     secret: ${JWT_SECRET:careerforge-local-development-secret-change-me-before-production}
