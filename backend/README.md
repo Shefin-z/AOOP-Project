@@ -5,9 +5,26 @@ This is the active AOOP implementation of the CareerForge API described in the l
 ## Design
 
 - Java 21, Spring Boot 3, Spring Security, JWT, Spring Data JPA, and MySQL/TiDB.
-- `domain` holds encapsulated JPA entities and enums; `repository` isolates persistence; `service` owns business rules; `web` holds thin REST controllers and safe error responses.
+- `model` holds encapsulated JPA entities and enums; `repository` isolates persistence; `service` owns business rules; `controller` holds thin REST endpoints; `dto` and `exception` hold response and error types.
 - Core entities use a shared audited base class. Job scoring uses the Strategy pattern (`JobMatchingStrategy`), allowing an AI-backed strategy to be added without changing controllers.
 - Spring Boot is the sole application API. The separate `ai-service/` is an optional Python extension for explainable matching and readiness scoring, as specified in the report.
+
+## Package map
+
+```text
+src/main/java/edu/uiu/aoop/careerforge/
+├── model/        JPA entities and enums
+├── repository/   Spring Data database access
+├── service/      business rules and Strategy implementations
+│   └── impl/     service implementations
+├── controller/   REST API endpoints
+├── dto/          API response objects
+├── exception/    API exceptions and their handler
+├── security/     JWT authentication and authorization
+├── config/       Spring configuration
+├── design/       small Factory and Builder pattern examples
+└── event/        application events (Observer pattern)
+```
 
 ## Run locally
 

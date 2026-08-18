@@ -3,8 +3,8 @@ package edu.uiu.aoop.careerforge.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import edu.uiu.aoop.careerforge.domain.Job;
-import edu.uiu.aoop.careerforge.domain.StudentProfile;
+import edu.uiu.aoop.careerforge.model.Job;
+import edu.uiu.aoop.careerforge.model.StudentProfile;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;

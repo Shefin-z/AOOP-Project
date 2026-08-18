@@ -1,7 +1,7 @@
 package edu.uiu.aoop.careerforge.config;
 
-import edu.uiu.aoop.careerforge.domain.Role;
-import edu.uiu.aoop.careerforge.domain.User;
+import edu.uiu.aoop.careerforge.model.Role;
+import edu.uiu.aoop.careerforge.model.User;
 import edu.uiu.aoop.careerforge.repository.UserRepository;
 import java.util.Locale;
 import org.springframework.beans.factory.annotation.Value;

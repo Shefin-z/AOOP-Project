@@ -1,6 +1,6 @@
 package edu.uiu.aoop.careerforge.service;
 
-import edu.uiu.aoop.careerforge.web.ApiException;
+import edu.uiu.aoop.careerforge.exception.ApiException;
 import java.util.Base64;
 import java.util.Set;
 import org.springframework.http.HttpStatus;

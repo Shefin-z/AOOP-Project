@@ -3,7 +3,7 @@ package edu.uiu.aoop.careerforge.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import edu.uiu.aoop.careerforge.web.ApiException;
+import edu.uiu.aoop.careerforge.exception.ApiException;
 import java.util.Base64;
 import org.junit.jupiter.api.Test;
 
