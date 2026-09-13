@@ -49,6 +49,7 @@ public class LearningPathService {
     }
     public LearningRecommendationResponse recommend(Long userId, String topic, String pathType) { access.requireStudent(userId); GeminiLearningService.Recommendation recommendation = gemini.recommend(topic.trim(), pathType); return new LearningRecommendationResponse(recommendation.recommendedLevels(), recommendation.reason()); }
     public LearningPathResponse get(Long userId, Long pathId) { access.requireStudent(userId); return response(path(userId, pathId), userId); }
+    public void delete(Long userId, Long pathId) { access.requireStudent(userId); paths.delete(path(userId, pathId)); }
     public LearningQuizResponse quiz(Long userId, Long pathId, int levelNumber) {
         access.requireStudent(userId); LearningPath path = path(userId, pathId); LearningLevel level = level(path, levelNumber); int unlocked = nextUnlocked(path, userId);
         if (levelNumber > unlocked) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Pass the previous level with at least 70% to unlock this one.");
