@@ -8,15 +8,22 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "applications")
 public class JobApplication {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Column(name = "public_uuid", nullable = false, unique = true, updatable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.CHAR)
+    private UUID publicUuid;
     @Column(name = "user_id", nullable = false)
     private Long userId;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "job_id", nullable = false)
@@ -29,8 +36,11 @@ public class JobApplication {
     @Column(name = "applied_at", insertable = false, updatable = false) private LocalDateTime appliedAt;
 
     protected JobApplication() { }
+    @PrePersist
+    void assignPublicUuid() { if (publicUuid == null) publicUuid = UUID.randomUUID(); }
     public JobApplication(Long userId, Job job, String cvSnapshot, java.math.BigDecimal matchPercentage, String matchExplanation) { this.userId = userId; this.job = job; this.cvSnapshot = cvSnapshot; this.matchPercentage = matchPercentage; this.matchExplanation = matchExplanation; }
     public Long getId() { return id; }
+    public UUID getPublicUuid() { return publicUuid; }
     public Long getUserId() { return userId; }
     public Job getJob() { return job; }
     public String getStatus() { return status; }

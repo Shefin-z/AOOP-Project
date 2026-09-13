@@ -44,6 +44,6 @@ public class JobService {
         if (!List.of("internship", "part_time", "full_time", "contract").contains(employment) || !List.of("onsite", "hybrid", "remote").contains(workMode) || !List.of("draft", "published", "closed").contains(status)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use a valid job type, work mode, and status.");
         job.update(request.title().trim(), clean(request.location()), employment, workMode, clean(request.salaryText()), request.description().trim(), request.expiryDate(), status);
     }
-    private JobResponse toResponse(Job job) { Company c = job.getCompany(); return new JobResponse(job.getId(), c.getName(), c.getWebsite(), c.getLocation(), job.getTitle(), job.getLocation(), job.getEmploymentType(), job.getWorkMode(), job.getSalaryText(), job.getDescription(), job.getExpiryDate(), job.getStatus()); }
+    private JobResponse toResponse(Job job) { Company c = job.getCompany(); return new JobResponse(job.getId(), c.getName(), c.getWebsite(), c.getLocation(), job.getTitle(), job.getLocation(), job.getEmploymentType(), job.getWorkMode(), job.getSalaryText(), job.getDescription(), job.getExpiryDate(), job.getStatus(), job.getPublicUuid()); }
     private String clean(String value) { return value == null || value.isBlank() ? null : value.trim(); }
 }
