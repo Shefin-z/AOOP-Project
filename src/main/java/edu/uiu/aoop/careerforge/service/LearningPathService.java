@@ -65,7 +65,8 @@ public class LearningPathService {
         for (int index = 0; index < questions.size(); index++) {
             JsonNode question = questions.get(index); int selectedIndex = request.answers().get(index); int correctIndex = question.path("answerIndex").asInt(-1); JsonNode options = question.path("options"); boolean answerCorrect = correctIndex == selectedIndex;
             if (answerCorrect) correct++;
-            results.add(new LearningAttemptResponse.QuestionResult(index + 1, question.path("prompt").asText(), options.path(selectedIndex).asText(), options.path(correctIndex).asText(), answerCorrect, question.path("explanation").asText("Review this concept before you retry.")));
+            String selectedAnswer = selectedIndex >= 0 && selectedIndex < options.size() ? options.path(selectedIndex).asText() : "No answer selected";
+            results.add(new LearningAttemptResponse.QuestionResult(index + 1, question.path("prompt").asText(), selectedAnswer, options.path(correctIndex).asText(), answerCorrect, question.path("explanation").asText("Review this concept before you retry.")));
         }
         BigDecimal percentage = BigDecimal.valueOf(correct * 100.0 / questions.size()).setScale(2, RoundingMode.HALF_UP); boolean passed = percentage.compareTo(PASSING_SCORE) >= 0;
         try { attempts.save(new LearningAttempt(level, userId, correct, questions.size(), percentage, passed, mapper.writeValueAsString(request.answers()))); } catch (Exception exception) { throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not save this level attempt."); }
