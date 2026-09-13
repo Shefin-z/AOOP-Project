@@ -8,16 +8,23 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "jobs")
 public class Job {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Column(name = "public_uuid", nullable = false, unique = true, updatable = false, length = 36)
+    @JdbcTypeCode(SqlTypes.CHAR)
+    private UUID publicUuid;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "company_id", nullable = false)
     private Company company;
     @Column(name = "created_by") private Long createdBy;
@@ -32,8 +39,11 @@ public class Job {
     @Column(name = "created_at", insertable = false, updatable = false) private LocalDateTime createdAt;
 
     protected Job() { }
+    @PrePersist
+    void assignPublicUuid() { if (publicUuid == null) publicUuid = UUID.randomUUID(); }
     public Job(Company company, Long createdBy) { this.company = company; this.createdBy = createdBy; }
     public Long getId() { return id; }
+    public UUID getPublicUuid() { return publicUuid; }
     public Company getCompany() { return company; }
     public Long getCreatedBy() { return createdBy; }
     public String getTitle() { return title; }

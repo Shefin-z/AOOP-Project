@@ -6,6 +6,7 @@ USE careerforge;
 
 CREATE TABLE users (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  public_uuid CHAR(36) NOT NULL UNIQUE,
   name VARCHAR(150) NOT NULL,
   email VARCHAR(190) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
@@ -66,6 +67,7 @@ CREATE TABLE companies (
 
 CREATE TABLE jobs (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  public_uuid CHAR(36) NOT NULL UNIQUE,
   company_id BIGINT UNSIGNED NOT NULL,
   created_by BIGINT UNSIGNED NULL,
   title VARCHAR(220) NOT NULL,
@@ -95,6 +97,7 @@ CREATE TABLE job_skills (
 
 CREATE TABLE applications (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  public_uuid CHAR(36) NOT NULL UNIQUE,
   user_id BIGINT UNSIGNED NOT NULL,
   job_id BIGINT UNSIGNED NOT NULL,
   status ENUM('submitted', 'under_review', 'shortlisted', 'rejected', 'cancelled') NOT NULL DEFAULT 'submitted',

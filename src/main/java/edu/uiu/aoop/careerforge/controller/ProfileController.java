@@ -5,6 +5,7 @@ import edu.uiu.aoop.careerforge.dto.ProfileResponse;
 import edu.uiu.aoop.careerforge.service.ProfileService;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +29,6 @@ public class ProfileController {
     @GetMapping("/{userId}/photo") public ResponseEntity<Resource> photo(@PathVariable Long userId) {
         ProfileService.ProfilePhoto photo = profiles.profilePhoto(userId);
         MediaType contentType; try { contentType = MediaType.parseMediaType(photo.contentType()); } catch (Exception ignored) { contentType = MediaType.APPLICATION_OCTET_STREAM; }
-        return ResponseEntity.ok().contentType(contentType).body(photo.resource());
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(contentType).body(photo.resource());
     }
 }
