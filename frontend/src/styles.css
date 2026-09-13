@@ -475,3 +475,48 @@ button:focus-visible, .import-file:focus-within, .upload-button:focus-within { o
 @media (max-width: 560px) {
   .workspace-search { display: none; }
 }
+
+/* Transient feedback belongs close to the user's attention, not inside a
+   persistent page section.  Every existing success/error notice uses these
+   shared styles and receives a dismiss button from the app shell. */
+.form-success, .form-error {
+  position: fixed;
+  z-index: 100;
+  bottom: 24px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  width: min(440px, calc(100vw - 32px));
+  gap: 14px;
+  margin: 0 !important;
+  padding: 13px 14px 13px 16px;
+  border: 1px solid currentColor;
+  border-radius: 12px;
+  box-shadow: 0 15px 35px #102c4324;
+  transform: translateX(-50%);
+  animation: toast-enter .22s ease-out both;
+  transition: opacity .18s ease, transform .18s ease, visibility .18s ease;
+}
+.form-success { background: #edf7f0; color: #1e744a; }
+.form-error { background: #fff2ef; color: #a94332; }
+.toast-close {
+  display: grid;
+  flex: 0 0 auto;
+  width: 27px;
+  height: 27px;
+  margin-left: auto;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+  font: inherit;
+  font-size: 21px;
+  line-height: 1;
+}
+.toast-close:hover, .toast-close:focus-visible { background: #ffffff9e; outline: none; }
+.toast-dismissed { visibility: hidden; opacity: 0; pointer-events: none; transform: translate(-50%, 8px); }
+@keyframes toast-enter { from { opacity: 0; transform: translate(-50%, 9px); } to { opacity: 1; transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .form-success, .form-error { animation: none; } }
