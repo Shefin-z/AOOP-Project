@@ -1,0 +1,22 @@
+server:
+  port: 4000
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: careerforge
+  datasource:
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:careerforge}?useSSL=false&serverTimezone=UTC
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+
+careerforge:
+  admin:
+    name: ${ADMIN_NAME:}
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
