@@ -52,7 +52,7 @@ public class GeminiLearningService {
         ArrayNode contents = request.putArray("contents");
         contents.addObject().putArray("parts").addObject().put("text", prompt);
         ObjectNode generationConfig = request.putObject("generationConfig"); generationConfig.put("temperature", 0.25); generationConfig.put("responseMimeType", "application/json");
-        HttpHeaders headers = new HttpHeaders(); headers.setContentType(MediaType.APPLICATION_JSON); headers.set("x-goog-api-key", apiKey);
+        HttpHeaders headers = new HttpHeaders(); headers.setContentType(MediaType.APPLICATION_JSON); headers.set("x-goog-api-key", apiKey.trim());
         try {
             ResponseEntity<JsonNode> response = http.exchange("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", HttpMethod.POST, new HttpEntity<>(request, headers), JsonNode.class);
             String text = response.getBody() == null ? "" : response.getBody().path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
