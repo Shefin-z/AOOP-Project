@@ -24,6 +24,8 @@ CREATE TABLE student_profiles (
   target_role VARCHAR(180) NULL,
   location VARCHAR(180) NULL,
   bio TEXT NULL,
+  skills TEXT NULL,
+  hobbies TEXT NULL,
   profile_photo_url VARCHAR(500) NULL,
   career_interests JSON NULL,
   profile_visibility ENUM('private', 'admin_only', 'public') NOT NULL DEFAULT 'private',

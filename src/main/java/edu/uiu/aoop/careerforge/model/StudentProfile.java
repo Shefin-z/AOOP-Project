@@ -21,6 +21,10 @@ public class StudentProfile {
     private String location;
     @Column(columnDefinition = "TEXT")
     private String bio;
+    @Column(columnDefinition = "TEXT")
+    private String skills;
+    @Column(columnDefinition = "TEXT")
+    private String hobbies;
     @Column(name = "profile_photo_url")
     private String profilePhotoUrl;
 
@@ -35,14 +39,19 @@ public class StudentProfile {
     public String getTargetRole() { return targetRole; }
     public String getLocation() { return location; }
     public String getBio() { return bio; }
+    public String getSkills() { return skills; }
+    public String getHobbies() { return hobbies; }
     public String getProfilePhotoUrl() { return profilePhotoUrl; }
-    public void update(String university, String degree, Integer graduationYear, String targetRole, String location, String bio, String profilePhotoUrl) {
+    public void update(String university, String degree, Integer graduationYear, String targetRole, String location, String bio, String skills, String hobbies, String profilePhotoUrl) {
         this.university = university;
         this.degree = degree;
         this.graduationYear = graduationYear;
         this.targetRole = targetRole;
         this.location = location;
         this.bio = bio;
+        this.skills = skills;
+        this.hobbies = hobbies;
         this.profilePhotoUrl = profilePhotoUrl;
     }
+    public void setProfilePhotoUrl(String profilePhotoUrl) { this.profilePhotoUrl = profilePhotoUrl; }
 }

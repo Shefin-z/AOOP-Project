@@ -6,6 +6,10 @@ server:
 spring:
   application:
     name: careerforge
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
   datasource:
     url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:careerforge}?useSSL=false&serverTimezone=UTC
     username: ${DB_USERNAME:root}
