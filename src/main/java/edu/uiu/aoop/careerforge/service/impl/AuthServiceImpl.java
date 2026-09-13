@@ -55,6 +55,6 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private AuthResponse toResponse(User user) {
-        return new AuthResponse(user.getId(), user.getName(), user.getEmail(), user.getRole().name().toLowerCase(Locale.ROOT));
+        return new AuthResponse(user.getId(), user.getName(), user.getEmail(), user.getRole().name().toLowerCase(Locale.ROOT), user.getPublicUuid());
     }
 }

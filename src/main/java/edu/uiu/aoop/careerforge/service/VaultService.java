@@ -42,7 +42,16 @@ public class VaultService {
     public ResumeResponse createResume(Long userId, ResumeRequest request) { access.requireStudent(userId); boolean defaultValue = request.isDefault() || !resumes.existsByUserIdAndIsDefaultTrue(userId); if (defaultValue) clearDefault(userId); return resumeResponse(resumes.save(new ResumeVersion(userId, request.title().trim(), request.content().toString(), defaultValue))); }
     public ResumeResponse updateResume(Long userId, Long id, ResumeRequest request) { access.requireStudent(userId); ResumeVersion resume = resume(userId, id); resume.update(request.title().trim(), request.content().toString()); if (request.isDefault()) { clearDefault(userId); resume.setDefault(true); } return resumeResponse(resumes.save(resume)); }
     public ResumeResponse makeDefault(Long userId, Long id) { access.requireStudent(userId); ResumeVersion resume = resume(userId, id); clearDefault(userId); resume.setDefault(true); return resumeResponse(resumes.save(resume)); }
-    public void deleteResume(Long userId, Long id) { access.requireStudent(userId); resumes.delete(resume(userId, id)); }
+    public void deleteResume(Long userId, Long id) {
+        access.requireStudent(userId);
+        ResumeVersion removed = resume(userId, id);
+        boolean wasDefault = removed.isDefault();
+        resumes.delete(removed);
+        if (wasDefault) {
+            List<ResumeVersion> remaining = resumes.findByUserIdOrderByUpdatedAtDesc(userId);
+            if (!remaining.isEmpty()) remaining.get(0).setDefault(true);
+        }
+    }
     @Transactional(readOnly = true) public List<DocumentResponse> listDocuments(Long userId) { access.requireStudent(userId); return documents.findByUserIdOrderByCreatedAtDesc(userId).stream().map(this::documentResponse).toList(); }
     public DocumentResponse upload(Long userId, MultipartFile file) {
         access.requireStudent(userId);

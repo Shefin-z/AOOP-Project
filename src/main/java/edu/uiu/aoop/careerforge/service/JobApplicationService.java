@@ -50,7 +50,7 @@ public class JobApplicationService {
         application.updateStatus(status);
         return toResponse(applications.save(application));
     }
-    private JobApplicationResponse toResponse(JobApplication application) { Job job = application.getJob(); return new JobApplicationResponse(application.getId(), job.getId(), job.getTitle(), job.getCompany().getName(), application.getStatus(), application.getMatchPercentage(), readReasons(application.getMatchExplanation()), vault.snapshotTitle(application.getCvSnapshot()), application.getAppliedAt()); }
+    private JobApplicationResponse toResponse(JobApplication application) { Job job = application.getJob(); return new JobApplicationResponse(application.getId(), job.getId(), job.getTitle(), job.getCompany().getName(), application.getStatus(), application.getMatchPercentage(), readReasons(application.getMatchExplanation()), vault.snapshotTitle(application.getCvSnapshot()), application.getAppliedAt(), application.getPublicUuid(), job.getPublicUuid()); }
     private String writeReasons(List<String> reasons) { try { return objectMapper.writeValueAsString(reasons); } catch (Exception exception) { throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not save the job match explanation."); } }
     private List<String> readReasons(String reasons) { try { return reasons == null ? List.of() : objectMapper.readValue(reasons, new TypeReference<List<String>>() { }); } catch (Exception exception) { return List.of(); } }
 }
