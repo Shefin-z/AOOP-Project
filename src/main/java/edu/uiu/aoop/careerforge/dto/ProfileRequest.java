@@ -10,5 +10,7 @@ public record ProfileRequest(
         @Size(max = 180) String targetRole,
         @Size(max = 180) String location,
         @Size(max = 3000) String bio,
+        @Size(max = 1500) String skills,
+        @Size(max = 1500) String hobbies,
         @Size(max = 500) String profilePhotoUrl
 ) { }
