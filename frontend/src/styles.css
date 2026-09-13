@@ -160,3 +160,274 @@ button:focus-visible, .import-file:focus-within, .upload-button:focus-within { o
   .workspace .search-results button:hover, .workspace .text-button:hover, .fin-header nav button:hover, .fin-footer button:hover, .fin-path article button:hover { background: #e6ecf4; color: var(--fin-ink); }
   .import-file:hover, .upload-button:hover { border-color: var(--fin-ink); background: var(--fin-ink); color: #fff; transform: translateY(-1px); }
 }
+
+/* Learning paths: a focused, professional plan builder with a clear active state. */
+.learning-page { gap: 24px; }
+.learning-intro { padding: 30px 34px; border: 1px solid #dce4ee; background: linear-gradient(128deg, #fff, #edf2f8); box-shadow: 0 10px 24px #102c4308; }
+.learning-intro h2 { max-width: 560px; color: var(--fin-ink); font-size: clamp(26px, 2.8vw, 34px); line-height: 1.12; }
+.learning-intro .eyebrow { color: var(--fin-blue-dark); }
+.learning-score { flex-basis: 82px; width: 82px; height: 82px; border: 7px solid #fff; background: var(--fin-ink); box-shadow: 0 7px 18px #0221371a; font-size: 22px; }
+.learning-builder { padding: 28px; border: 1px solid var(--fin-line); border-radius: 18px; background: #fff; box-shadow: 0 12px 26px #102c4309; }
+.learning-builder .form-row-title { padding-bottom: 17px; border-bottom: 1px solid var(--fin-line); }
+.learning-builder .form-row-title h3 { color: var(--fin-ink); font-size: 20px; }
+.learning-builder .form-row-title span { color: var(--fin-muted); font-size: 12px; font-weight: 700; }
+.learning-type { gap: 7px; margin: 19px 0; padding: 4px; border: 1px solid var(--fin-line); border-radius: 13px; background: #f5f7fa; }
+.learning-type button { min-height: 44px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--fin-muted); font-size: 13px; }
+.learning-type button.selected { border-color: var(--fin-ink); background: var(--fin-ink); color: #fff; box-shadow: 0 5px 12px #02213722; }
+.learning-builder > label { color: #43556b; font-size: 13px; }
+.learning-builder > label input { min-height: 44px; border-color: #d9e1eb; background: #fbfcfe; }
+.level-picker { margin: 19px 0; padding: 16px; border: 1px solid #dce4ee; border-radius: 13px; background: #f4f7fa; }
+.level-picker b { color: var(--fin-ink); }
+.level-picker small { color: var(--fin-muted); }
+.level-picker input { accent-color: var(--fin-ink); }
+.level-picker output { background: var(--fin-ink); }
+.learning-guide { border: 1px solid #163950; background: var(--fin-ink); box-shadow: 0 12px 26px #02213718; }
+.learning-guide li b { background: #284861; }
+.learning-paths { padding: 28px; border-color: var(--fin-line); background: #fff; box-shadow: 0 12px 26px #102c4308; }
+.learning-paths .list-heading h3 { color: var(--fin-ink); font-size: 20px; }
+.path-tabs { gap: 11px; margin: 20px 0 23px; padding-bottom: 6px; }
+.path-tab { min-width: 190px; }
+.path-tab > button:first-child { min-height: 94px; padding: 15px; border-color: #dce4ee; border-radius: 13px; background: #fbfcfe; }
+.path-tab.active > button:first-child { border-color: var(--fin-ink); background: var(--fin-ink); box-shadow: 0 8px 18px #0221371f; }
+.path-tab.active > button:first-child small, .path-tab.active > button:first-child b, .path-tab.active > button:first-child span { color: #fff; }
+.path-tab.active > button:first-child small { color: #c2cce0; }
+.path-tab.active > button:first-child span { color: #d9e2ec; }
+.level-grid { padding-top: 20px; border-top: 1px solid var(--fin-line); }
+.learning-level { min-height: 124px; padding: 15px; border-color: #dce4ee; border-radius: 13px; background: #fff; }
+.learning-level > span { background: #edf1f7; color: var(--fin-blue-dark); }
+.learning-level b { color: var(--fin-ink); }
+.learning-level small { color: var(--fin-muted); }
+.learning-level.available { border-color: #8d9db5; background: #f8fafc; box-shadow: 0 7px 16px #102c430d; }
+.learning-level.available > span { background: var(--fin-ink); color: #fff; }
+.learning-level.completed { border-color: #cce0d4; background: #f6fbf8; }
+.quiz-card { border: 1px solid var(--fin-line); background: #f7f9fc; box-shadow: 0 12px 26px #102c4308; }
+@media (max-width: 560px) { .learning-intro, .learning-builder, .learning-paths { padding: 20px; }.learning-type { grid-template-columns: 1fr; }.path-tab { min-width: 170px; }.learning-score { display: none; } }
+
+/* Compact result review: all answers stay visible without an oversized modal. */
+.result-modal-backdrop { align-items: center; padding: 24px; }
+.result-modal { width: min(900px, 100%); max-height: calc(100dvh - 48px); padding: 26px; border: 1px solid #dce4ee; border-radius: 20px; box-shadow: 0 26px 70px #021a2f52; }
+.result-modal header { position: sticky; z-index: 1; top: -26px; padding: 2px 0 17px; border-bottom: 1px solid var(--fin-line); background: #fff; }
+.result-modal h3 { color: var(--fin-ink); font-size: 27px; }
+.result-close { background: #edf1f7; color: var(--fin-blue-dark); }
+.result-score { align-items: center; margin: 18px 0 14px; padding: 15px 18px; border: 1px solid #dce4ee; border-radius: 13px; background: #f4f7fa; }
+.result-score strong { color: var(--fin-ink); font-size: 36px; }
+.result-score span, .result-message { color: var(--fin-muted); font-size: 12px; }
+.result-message { margin-bottom: 15px; }
+.answer-review { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 0 18px; }
+.answer-review article { min-height: 132px; padding: 13px 14px; border-color: #dce4ee; border-left-width: 4px; background: #fbfcfe; }
+.answer-review article.correct { border-left-color: #39a36f; background: #f7fcf9; }
+.answer-review b, .answer-review article.correct b { font-size: 11px; }
+.answer-review p { display: -webkit-box; overflow: hidden; color: var(--fin-ink); font-size: 12px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.answer-review small { overflow: hidden; color: var(--fin-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.answer-review em { display: none; }
+.result-modal > .button { width: 100%; min-height: 42px; }
+.result-modal-backdrop + .learning-result { display: none; }
+@media (max-width: 680px) { .result-modal-backdrop { align-items: start; padding: 12px; }.result-modal { max-height: calc(100dvh - 24px); padding: 19px; }.result-modal header { top: -19px; }.answer-review { grid-template-columns: 1fr; }.answer-review article { min-height: auto; }.result-modal h3 { font-size: 23px; } }
+
+/* Result-dialog convention: fixed context and action, with only the answer review scrolling. */
+.result-modal { display: flex; flex-direction: column; overflow: hidden; }
+.result-modal header { position: static; flex: 0 0 auto; }
+.result-score { flex: 0 0 auto; }
+.result-message { flex: 0 0 auto; }
+.answer-review { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 6px; scrollbar-gutter: stable; }
+.answer-review article { min-height: 120px; }
+.answer-review article.correct em { display: none; }
+.answer-review article.wrong { min-height: 148px; }
+.answer-review article.wrong em { display: -webkit-box; overflow: hidden; color: var(--fin-muted); font-size: 10px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.result-modal > .button { flex: 0 0 auto; margin-top: 14px; }
+
+/* A detailed assessment outcome is a page state, not a modal: use normal page scrolling and a single review column. */
+.learning-page:has(.result-modal-backdrop) { display: block; max-width: 920px; margin: 0 auto; }
+.learning-page:has(.result-modal-backdrop) > .learning-intro, .learning-page:has(.result-modal-backdrop) > .learning-layout, .learning-page:has(.result-modal-backdrop) > .learning-paths { display: none; }
+.learning-page:has(.result-modal-backdrop) .result-modal-backdrop { position: static; display: block; padding: 0; overflow: visible; background: transparent; }
+.learning-page:has(.result-modal-backdrop) .result-modal { width: 100%; max-height: none; padding: 0; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.learning-page:has(.result-modal-backdrop) .result-modal header { position: relative; display: flex; align-items: center; padding: 0 0 22px; border-bottom: 1px solid var(--fin-line); background: transparent; }
+.learning-page:has(.result-modal-backdrop) .result-modal h3 { margin-top: 7px; font-size: clamp(28px, 3vw, 36px); }
+.learning-page:has(.result-modal-backdrop) .result-close { display: inline-flex; width: auto; height: auto; margin-left: auto; padding: 9px 12px; align-items: center; gap: 7px; border: 1px solid var(--fin-line); border-radius: 8px; background: #fff; color: var(--fin-blue-dark); font-size: 0; }
+.learning-page:has(.result-modal-backdrop) .result-close::before { content: "←"; font-size: 16px; }
+.learning-page:has(.result-modal-backdrop) .result-close::after { content: "Back to assessment"; font-size: 12px; font-weight: 700; }
+.learning-page:has(.result-modal-backdrop) .result-score { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 11px; margin: 26px 0 11px; padding: 24px; border-radius: 16px; background: #f4f7fa; }
+.learning-page:has(.result-modal-backdrop) .result-score strong { font-size: 48px; line-height: 1; }
+.learning-page:has(.result-modal-backdrop) .result-score span { align-self: center; font-size: 14px; }
+.learning-page:has(.result-modal-backdrop) .result-score::after { align-self: center; justify-self: end; padding: 7px 10px; border-radius: 99px; font-size: 10px; font-weight: 800; letter-spacing: .07em; }
+.learning-page:has(.result-modal-backdrop) .result-modal.passed .result-score::after { background: #e2f3e9; color: #28724a; content: "LEVEL PASSED"; }
+.learning-page:has(.result-modal-backdrop) .result-modal.retry .result-score::after { background: #fff0ea; color: #b44f3b; content: "TRY AGAIN"; }
+.learning-page:has(.result-modal-backdrop) .result-message { margin: 0 0 24px; font-size: 14px; }
+.learning-page:has(.result-modal-backdrop) .answer-review { display: grid; grid-template-columns: 1fr; gap: 11px; margin: 0; padding: 0; overflow: visible; }
+.learning-page:has(.result-modal-backdrop) .answer-review article, .learning-page:has(.result-modal-backdrop) .answer-review article.wrong { min-height: 0; padding: 17px 19px; }
+.learning-page:has(.result-modal-backdrop) .answer-review p { display: block; overflow: visible; font-size: 14px; -webkit-line-clamp: unset; }
+.learning-page:has(.result-modal-backdrop) .answer-review small { overflow: visible; font-size: 12px; text-overflow: clip; white-space: normal; }
+.learning-page:has(.result-modal-backdrop) .answer-review article.wrong em { display: block; margin-top: 2px; font-size: 12px; -webkit-line-clamp: unset; }
+.learning-page:has(.result-modal-backdrop) .result-modal > .button { width: auto; min-width: 180px; align-self: flex-start; margin: 25px 0 0; }
+@media (max-width: 560px) { .learning-page:has(.result-modal-backdrop) { margin: 0; }.learning-page:has(.result-modal-backdrop) .result-score { grid-template-columns: 1fr; }.learning-page:has(.result-modal-backdrop) .result-score::after { justify-self: start; }.learning-page:has(.result-modal-backdrop) .result-close::after { content: "Back"; } }
+
+/* Keep the global toolbar, but prevent its page title from colliding with the result-screen heading. */
+.workspace:has(.result-modal-backdrop) .workspace-header > div:first-child { visibility: hidden; }
+.learning-page:has(.result-modal-backdrop) .result-score::after { position: absolute; top: 18px; right: 18px; }
+@media (hover: hover) { .learning-page:has(.result-modal-backdrop) .result-close:hover { border-color: var(--fin-ink); background: var(--fin-ink); color: #fff; box-shadow: 0 7px 15px #02213720; transform: translateY(-1px); } }
+/* The result screen owns its header actions; do not stack it beneath the global search toolbar. */
+.workspace:has(.result-modal-backdrop) .workspace-header { display: none; }
+
+/* Make Gemini's question-generation delay explicit on the level the student selected. */
+.learning-level.available:disabled { cursor: wait; opacity: 1; border-color: var(--fin-ink); background: #edf2f7; box-shadow: 0 9px 20px #02213718; }
+.learning-level.available:disabled > span { background: #fff; color: transparent; font-size: 0; }
+.learning-level.available:disabled > span::after { display: block; width: 13px; height: 13px; border: 2px solid #c4d0dc; border-top-color: var(--fin-ink); border-radius: 50%; content: ""; animation: learningGenerateSpin .8s linear infinite; }
+.learning-level.available:disabled b { color: transparent; font-size: 0; }
+.learning-level.available:disabled b::after { color: var(--fin-ink); content: "Generating questions"; font-size: 12px; }
+.learning-level.available:disabled small { color: transparent; font-size: 0; }
+.learning-level.available:disabled small::after { color: var(--fin-muted); content: "Gemini is preparing your level…"; font-size: 10px; }
+@keyframes learningGenerateSpin { to { transform: rotate(360deg); } }
+
+/* Quiz-taking view: structured like a focused assessment rather than a plain form. */
+.quiz-card { gap: 22px; padding: 34px; border: 1px solid var(--fin-line); border-radius: 20px; background: #fff; box-shadow: 0 14px 30px #102c430a; }
+.quiz-card header { padding-bottom: 23px; border-bottom: 1px solid var(--fin-line); }
+.quiz-card .text-button { display: inline-flex; width: fit-content; min-height: 34px; padding: 0 11px; align-items: center; border: 1px solid #dce4ee; border-radius: 8px; background: #f8fafc; color: var(--fin-blue-dark); font-size: 12px; font-weight: 800; text-decoration: none; }
+.quiz-card header .eyebrow { width: fit-content; margin-top: 19px; padding: 5px 8px; border-radius: 99px; background: #edf2f7; color: var(--fin-blue-dark); font-size: 10px; letter-spacing: .08em; }
+.quiz-card header h3 { margin-top: 13px; color: var(--fin-ink); font-size: clamp(23px, 2.4vw, 30px); line-height: 1.15; }
+.quiz-card header > p:not(.eyebrow) { max-width: 720px; margin-top: 9px; color: var(--fin-muted); font-size: 14px; line-height: 1.65; }
+.quiz-card fieldset { gap: 10px; padding: 20px; border-color: #dce4ee; border-radius: 14px; background: #fbfcfe; }
+.quiz-card legend { padding: 0 6px; color: var(--fin-ink); font-size: 14px; line-height: 1.45; }
+.quiz-card fieldset label { min-height: 42px; padding: 10px 12px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #50647b; font-size: 13px; transition: border-color .18s ease, background-color .18s ease, color .18s ease; }
+.quiz-card fieldset label:hover { border-color: #c5d0df; background: #f1f5f9; color: var(--fin-ink); }
+.quiz-card fieldset label:has(input:checked) { border-color: var(--fin-ink); background: #edf2f7; color: var(--fin-ink); font-weight: 700; }
+.quiz-card fieldset input { width: 16px; height: 16px; margin: 0; accent-color: var(--fin-ink); }
+.quiz-card > .button { min-height: 44px; padding-right: 22px; padding-left: 22px; align-self: flex-start; }
+@media (hover: hover) { .quiz-card .text-button:hover { border-color: var(--fin-ink); background: var(--fin-ink); color: #fff; transform: translateY(-1px); } }
+@media (max-width: 560px) { .quiz-card { padding: 20px; border-radius: 16px; }.quiz-card fieldset { padding: 15px; }.quiz-card fieldset label { align-items: flex-start; } }
+
+/* Keep question cards compact; a quiz should scan quickly without oversized option rows. */
+.quiz-card fieldset { gap: 4px; margin: 0; padding: 12px 14px 14px; background: #fbfcfe; }
+.quiz-card legend { padding: 0 7px; border-radius: 5px; background: #fbfcfe; line-height: 1.35; }
+.quiz-card fieldset label { min-height: 36px; padding: 7px 10px; gap: 9px; line-height: 1.35; }
+.quiz-card fieldset input { flex: 0 0 16px; }
+
+/* Override native legend rendering so the question title lives inside a deliberate card header. */
+.quiz-card fieldset { gap: 4px; padding: 0 16px 14px; border: 0; border-radius: 14px; background: #fbfcfe; box-shadow: inset 0 0 0 1px #dce4ee; overflow: hidden; }
+.quiz-card legend { float: none; width: calc(100% + 32px); margin: 0 -16px 10px; padding: 14px 16px 12px; border-bottom: 1px solid #dce4ee; border-radius: 14px 14px 0 0; background: #f4f7fa; color: var(--fin-ink); }
+
+/* Assessment dashboard — the sidebar remains the shared workspace navigation; only this main area changes. */
+.assessment-dashboard, .assessment-quiz-page, .assessment-result-page { display: grid; gap: 24px; max-width: 1200px; margin: 0 auto; }
+.assessment-hero { display: grid; grid-template-columns: minmax(0, 1.25fr) 190px minmax(220px, .72fr); gap: 28px; align-items: center; min-height: 278px; padding: 34px; border: 1px solid #0d3956; border-radius: 24px; background: radial-gradient(circle at 78% 5%, #234f6b 0, transparent 29%), linear-gradient(125deg, #062940, #0a3652); color: #fff; box-shadow: 0 18px 38px #06294020; overflow: hidden; }
+.assessment-hero .eyebrow, .assessment-result-page .eyebrow { color: #b8ef80; }
+.assessment-hero h2 { max-width: 590px; margin-top: 11px; color: #fff; font-size: clamp(28px, 3vw, 42px); letter-spacing: -.045em; line-height: 1.08; }
+.assessment-hero-copy > p:not(.eyebrow) { max-width: 600px; margin-top: 14px; color: #c0d2de; font-size: 14px; line-height: 1.7; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; align-items: center; }
+.assessment-hero .button { min-height: 43px; background: #b8ef80; color: #062940; box-shadow: none; }
+.assessment-hero .button:hover { background: #fff; transform: translateY(-1px); }
+.hero-link { padding: 9px 5px; border: 0; background: transparent; color: #e1ebf1; font: inherit; font-size: 12px; font-weight: 800; }
+.hero-link:hover { color: #b8ef80; }
+.journey-visual { display: grid; gap: 14px; justify-items: center; }
+.journey-ring, .result-ring { display: grid; width: 142px; height: 142px; place-items: center; border-radius: 50%; background: conic-gradient(#b8ef80 var(--journey-progress), #ffffff2b 0); box-shadow: 0 0 0 9px #ffffff10; }
+.journey-ring > div, .result-ring::before { display: grid; width: 118px; height: 118px; place-items: center; border-radius: 50%; background: #0a3652; }
+.journey-ring > div { align-content: center; gap: 2px; }
+.journey-ring strong { font-size: 29px; letter-spacing: -.05em; }
+.journey-ring span { color: #c3d5df; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .09em; }
+.journey-stats { display: flex; gap: 10px; }
+.journey-stats span { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid #ffffff1f; border-radius: 10px; background: #ffffff0b; text-align: center; }
+.journey-stats b { color: #fff; font-size: 13px; }
+.journey-stats small { color: #bdcfd9; font-size: 9px; white-space: nowrap; }
+.journey-chart { align-self: stretch; display: grid; grid-template-rows: auto 1fr auto; min-height: 170px; padding: 17px 0 11px 18px; border-left: 1px solid #ffffff25; }
+.chart-heading, .chart-axis { display: flex; justify-content: space-between; padding-right: 14px; color: #bfd0db; font-size: 10px; font-weight: 700; }
+.chart-heading b { color: #b8ef80; font-size: 10px; }
+.journey-chart svg { width: 100%; align-self: end; margin-top: 6px; }
+.chart-axis { color: #8da6b6; font-size: 9px; }
+.assessment-composer, .assessment-roadmap, .answer-review-panel { padding: 28px; border: 1px solid #d8e3ec; border-radius: 20px; background: #fff; box-shadow: 0 12px 28px #06294008; }
+.composer-heading, .roadmap-heading, .review-panel-heading { display: flex; justify-content: space-between; gap: 20px; align-items: start; padding-bottom: 20px; border-bottom: 1px solid #e0e8ef; }
+.composer-heading h3, .roadmap-heading h3, .review-panel-heading h3 { margin-top: 5px; color: #062940; font-size: 21px; letter-spacing: -.025em; }
+.composer-heading > button { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid #d8e3ec; border-radius: 9px; background: #f7fafc; color: #55708a; font-size: 21px; }
+.composer-heading > button:hover { border-color: #062940; background: #062940; color: #fff; }
+.assessment-composer .learning-layout { margin-top: 22px; }
+.assessment-composer .learning-builder { padding: 0; border: 0; border-radius: 0; box-shadow: none; }
+.assessment-composer .learning-type { margin-top: 0; }
+.composer-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.assessment-composer .learning-guide { min-height: 100%; border-radius: 15px; }
+.roadmap-heading > span, .review-panel-heading > span { padding: 6px 10px; border-radius: 999px; background: #edf4f8; color: #40617d; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.assessment-roadmap .path-tabs { margin: 20px 0; }
+.assessment-roadmap .level-grid { padding-top: 22px; }
+.assessment-roadmap .learning-level { position: relative; min-height: 132px; overflow: hidden; }
+.assessment-roadmap .learning-level em { position: absolute; top: 12px; right: 11px; padding: 4px 7px; border-radius: 999px; background: #e9f7db; color: #326342; font-size: 8px; font-style: normal; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.assessment-roadmap .learning-level.completed { border-color: #bfe4ce; background: linear-gradient(145deg, #f8fcf9, #effaf3); }
+.assessment-roadmap .learning-level.available { border-color: #79a1ba; background: #f4f8fb; box-shadow: 0 10px 22px #0629400d; }
+.assessment-roadmap .learning-level.available:hover { border-color: #062940; background: #eaf2f7; }
+.roadmap-empty { display: flex; gap: 15px; align-items: center; margin-top: 20px; padding: 22px; border: 1px dashed #b8c9d6; border-radius: 14px; background: #f8fbfc; }
+.roadmap-empty > span { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 12px; background: #e8f1f7; color: #0a4263; }
+.roadmap-empty div { flex: 1; }
+.roadmap-empty b { color: #062940; font-size: 13px; }
+.roadmap-empty p { margin-top: 4px; color: #637c91; font-size: 12px; line-height: 1.5; }
+.roadmap-empty .button { min-width: max-content; }
+
+/* The quiz uses regular cards instead of native fieldset/legend, preventing the cut-off title bug. */
+.assessment-quiz-page { max-width: 980px; }
+.assessment-quiz-page .quiz-card { padding: 0; border: 1px solid #d8e3ec; border-radius: 20px; background: #fff; box-shadow: 0 12px 28px #06294009; }
+.assessment-quiz-page .quiz-card > header { padding: 28px 30px 22px; }
+.assessment-back { display: inline-flex; min-height: 36px; padding: 0 12px; align-items: center; border: 1px solid #d8e3ec; border-radius: 9px; background: #fff; color: #315470; font: inherit; font-size: 12px; font-weight: 800; }
+.assessment-back:hover { border-color: #062940; background: #062940; color: #fff; transform: translateY(-1px); }
+.assessment-quiz-page .quiz-card .eyebrow { width: fit-content; margin-top: 20px; padding: 0; background: transparent; color: #58708a; }
+.assessment-quiz-page .quiz-card h2 { margin-top: 10px; color: #062940; font-size: clamp(25px, 3vw, 32px); line-height: 1.15; }
+.assessment-quiz-page .quiz-card header > p:not(.eyebrow) { margin-top: 9px; color: #62798d; font-size: 13px; line-height: 1.65; }
+.quiz-progress { display: flex; justify-content: space-between; gap: 15px; margin-top: 20px; padding: 10px 12px; border-radius: 9px; background: #eff5f8; color: #587086; font-size: 11px; }
+.quiz-progress b { color: #062940; }
+.quiz-timer { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; margin-top: 10px; padding: 10px 12px; border: 1px solid #d7e2ec; border-radius: 9px; background: #fbfcfe; }
+.quiz-timer span { color: #60798e; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
+.quiz-timer strong { color: #244f73; font-size: 19px; font-variant-numeric: tabular-nums; letter-spacing: .03em; }
+.quiz-timer small { grid-column: 1 / -1; color: #71879a; font-size: 10px; }
+.quiz-timer.urgent { border-color: #e9b9ac; background: #fff8f6; }.quiz-timer.urgent strong { color: #b95b45; }
+.quiz-questions { display: grid; gap: 14px; padding: 0 30px 30px; }
+.quiz-question { padding: 0; border: 1px solid #dce6ee; border-radius: 14px; overflow: hidden; background: #fff; }
+.quiz-question-title { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 15px 17px; border-bottom: 1px solid #dce6ee; background: #f5f8fa; color: #082d46; font-size: 14px; font-weight: 800; line-height: 1.45; }
+.quiz-question-title > span { display: grid; flex: 0 0 22px; width: 22px; height: 22px; place-items: center; border-radius: 6px; background: #082d46; color: #fff; font-size: 10px; }
+.quiz-question > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 13px; }
+.quiz-question label { display: flex; min-height: 42px; gap: 9px; align-items: center; padding: 9px 10px; border: 1px solid transparent; border-radius: 9px; background: #fff; color: #506a80; font-size: 12px; cursor: pointer; }
+.quiz-question label:hover { border-color: #b4c9d8; background: #f1f6f8; color: #062940; }
+.quiz-question label:has(input:checked) { border-color: #082d46; background: #eaf2f7; color: #062940; font-weight: 800; }
+.quiz-question input { position: absolute; opacity: 0; pointer-events: none; }
+.quiz-question label i { display: grid; flex: 0 0 21px; width: 21px; height: 21px; place-items: center; border: 1px solid #b4c6d2; border-radius: 50%; color: #5c7488; font-size: 9px; font-style: normal; font-weight: 800; }
+.quiz-question label:has(input:checked) i { border-color: #082d46; background: #082d46; color: #fff; }
+.assessment-quiz-page .quiz-card > footer { display: flex; justify-content: space-between; gap: 14px; align-items: center; padding: 18px 30px; border-top: 1px solid #e0e8ef; }
+.assessment-quiz-page .quiz-card > footer p { color: #637c91; font-size: 11px; }.assessment-quiz-page .quiz-card > footer p b { color: #082d46; }
+
+/* Results are a normal workspace page: clear feedback, no overlay, no duplicated top bar. */
+.assessment-result-page { max-width: 980px; }
+.assessment-result-head { display: flex; justify-content: space-between; gap: 25px; align-items: start; padding: 10px 0 22px; border-bottom: 1px solid #d8e3ec; }
+.assessment-result-head h2 { margin-top: 7px; color: #062940; font-size: clamp(30px, 3vw, 40px); letter-spacing: -.045em; }
+.assessment-result-head > div > p:last-child { max-width: 620px; margin-top: 9px; color: #60798e; font-size: 13px; line-height: 1.6; }
+.assessment-result-summary { position: relative; display: grid; grid-template-columns: 132px 1fr auto; gap: 24px; align-items: center; padding: 25px; border: 1px solid #d8e3ec; border-radius: 20px; background: #fff; box-shadow: 0 12px 28px #06294008; }
+.assessment-result-summary.passed { background: linear-gradient(130deg, #f6fcf8, #fff); border-color: #c4e3cf; }.assessment-result-summary.retry { background: linear-gradient(130deg, #fffaf7, #fff); }
+.result-ring { width: 112px; height: 112px; background: conic-gradient(#31865a var(--result-progress), #dce7eb 0); box-shadow: none; }.assessment-result-summary.retry .result-ring { background: conic-gradient(#c9694f var(--result-progress), #dce7eb 0); }
+.result-ring::before { grid-column: 1; grid-row: 1; width: 90px; height: 90px; background: #fff; content: ""; }.result-ring strong, .result-ring span { grid-column: 1; grid-row: 1; z-index: 1; text-align: center; }.result-ring strong { align-self: end; margin-bottom: 5px; color: #062940; font-size: 24px; letter-spacing: -.06em; }.result-ring span { align-self: start; margin-top: 62px; color: #6b8395; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.assessment-result-summary .eyebrow { color: #42705a; }.assessment-result-summary h3 { margin-top: 5px; color: #062940; font-size: 20px; }.assessment-result-summary p:not(.eyebrow) { max-width: 520px; margin-top: 7px; color: #60798e; font-size: 12px; line-height: 1.6; }
+.result-status { padding: 7px 10px; border-radius: 999px; background: #e5f4ea; color: #28734b; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }.assessment-result-summary.retry .result-status { background: #fff0e9; color: #ad563f; }
+.answer-review-panel .answer-review { display: grid; grid-template-columns: 1fr; gap: 11px; margin: 22px 0; }.answer-review-panel .answer-review article { min-height: 0; padding: 16px 18px; border-color: #dce6ee; border-left: 4px solid #c9694f; border-radius: 12px; background: #fffafa; }.answer-review-panel .answer-review article.correct { border-left-color: #349567; background: #f7fcf9; }.review-status { display: flex; justify-content: space-between; gap: 10px; color: #ad563f; font-size: 11px; font-weight: 900; }.answer-review article.correct .review-status { color: #28734b; }.review-status span { color: #6d8496; font-weight: 700; }.answer-review-panel .answer-review p { display: block; margin-top: 8px; color: #062940; font-size: 13px; -webkit-line-clamp: unset; }.answer-review-panel .answer-review small { display: block; overflow: visible; margin-top: 5px; color: #60798e; font-size: 11px; text-overflow: clip; white-space: normal; }.answer-review-panel .answer-review em, .answer-review-panel .answer-review article.wrong em { display: block; overflow: visible; margin-top: 7px; color: #73899a; font-size: 11px; font-style: normal; line-height: 1.5; -webkit-line-clamp: unset; }.answer-review-panel > .button { min-height: 42px; }
+
+@media (max-width: 980px) { .assessment-hero { grid-template-columns: 1fr 170px; }.journey-chart { grid-column: 1 / -1; min-height: 125px; border-top: 1px solid #ffffff25; border-left: 0; }.journey-chart svg { max-height: 78px; }.assessment-result-summary { grid-template-columns: 112px 1fr; }.result-status { grid-column: 2; justify-self: start; } }
+@media (max-width: 680px) { .assessment-dashboard, .assessment-quiz-page, .assessment-result-page { gap: 16px; }.assessment-hero, .assessment-composer, .assessment-roadmap, .answer-review-panel { padding: 20px; border-radius: 16px; }.assessment-hero { grid-template-columns: 1fr; }.journey-visual { justify-items: start; grid-template-columns: auto 1fr; }.journey-stats { align-self: center; }.journey-chart { grid-column: auto; }.assessment-composer .learning-layout { grid-template-columns: 1fr; }.assessment-composer .learning-guide { display: none; }.roadmap-empty { flex-wrap: wrap; }.roadmap-empty .button { width: 100%; }.assessment-quiz-page .quiz-card > header, .quiz-questions, .assessment-quiz-page .quiz-card > footer { padding-right: 18px; padding-left: 18px; }.quiz-question > div { grid-template-columns: 1fr; }.assessment-quiz-page .quiz-card > footer, .assessment-result-head { align-items: stretch; flex-direction: column; }.assessment-back { width: fit-content; }.assessment-result-summary { grid-template-columns: 1fr; }.result-status { grid-column: auto; }.review-panel-heading { align-items: center; }.assessment-result-head h2 { font-size: 30px; } }
+
+/* Keep the assessment palette consistent with the existing navy / soft-blue workspace.
+   A progress graph belongs to the level-up outcome, not an untouched 0% dashboard. */
+.assessment-hero { grid-template-columns: minmax(0, 1fr) 210px; }
+.assessment-hero .eyebrow { color: #aabbe0; }
+.assessment-hero .button { background: #8395bb; color: #fff; }
+.assessment-hero .button:hover { background: #a3b3d1; color: #062940; }
+.hero-link { color: #cfdbeb; }.hero-link:hover { color: #fff; }
+.journey-ring { background: conic-gradient(#91a6cf var(--journey-progress), #ffffff2b 0); }
+.journey-chart { display: none; }
+.journey-visual { justify-self: end; }
+.assessment-roadmap .learning-level em { background: #e7edf8; color: #45648f; }
+.assessment-result-summary .eyebrow { color: #5674a0; }
+.result-ring { background: conic-gradient(#6685bc var(--result-progress), #dce7eb 0); }
+.assessment-result-summary.passed .result-ring { background: conic-gradient(#6685bc var(--result-progress), #dce7eb 0); }
+.assessment-result-summary .result-status { background: #e7edf8; color: #45648f; }
+@media (max-width: 680px) { .assessment-hero { grid-template-columns: 1fr; }.journey-visual { justify-self: start; } }
+
+/* Result state: no leftover green success treatment; use the same restrained navy / blue system. */
+.assessment-result-page > .assessment-result-head .eyebrow { color: #5876a1; }
+.assessment-result-summary.passed { border-color: #d5e0ec; background: linear-gradient(130deg, #f5f8fc, #fff); }
+.assessment-result-summary.passed .result-ring { background: conic-gradient(#6685bc var(--result-progress), #dce7eb 0); }
+.assessment-result-summary.passed .result-status { background: #e7edf8; color: #45648f; }
+
+/* Keep the score label and number as one centered group inside the circular result meter. */
+.result-ring { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.result-ring::before { position: absolute; inset: 11px; display: block; width: auto; height: auto; border-radius: 50%; background: #fff; content: ""; }
+.result-ring strong, .result-ring span { position: relative; z-index: 1; grid-column: auto; grid-row: auto; margin: 0; }
+.result-ring span { order: -1; align-self: auto; margin-top: 0; }
+.result-ring strong { align-self: auto; margin-bottom: 0; line-height: 1; }
