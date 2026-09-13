@@ -61,12 +61,17 @@ public class LearningPathService {
         if (levelNumber > unlocked) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Pass the previous level with at least 70% to unlock this one.");
         JsonNode questionSet = questions(level); JsonNode questions = questionSet.path("questions");
         if (!questions.isArray() || questions.size() != request.answers().size()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Answer every question before submitting.");
-        int correct = 0; for (int index = 0; index < questions.size(); index++) if (questions.get(index).path("answerIndex").asInt(-1) == request.answers().get(index)) correct++;
+        int correct = 0; List<LearningAttemptResponse.QuestionResult> results = new java.util.ArrayList<>();
+        for (int index = 0; index < questions.size(); index++) {
+            JsonNode question = questions.get(index); int selectedIndex = request.answers().get(index); int correctIndex = question.path("answerIndex").asInt(-1); JsonNode options = question.path("options"); boolean answerCorrect = correctIndex == selectedIndex;
+            if (answerCorrect) correct++;
+            results.add(new LearningAttemptResponse.QuestionResult(index + 1, question.path("prompt").asText(), options.path(selectedIndex).asText(), options.path(correctIndex).asText(), answerCorrect, question.path("explanation").asText("Review this concept before you retry.")));
+        }
         BigDecimal percentage = BigDecimal.valueOf(correct * 100.0 / questions.size()).setScale(2, RoundingMode.HALF_UP); boolean passed = percentage.compareTo(PASSING_SCORE) >= 0;
         try { attempts.save(new LearningAttempt(level, userId, correct, questions.size(), percentage, passed, mapper.writeValueAsString(request.answers()))); } catch (Exception exception) { throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not save this level attempt."); }
         int next = nextUnlocked(path, userId);
         String message = passed ? (next > path.getLevelCount() ? "Excellent — you completed this learning path." : "Passed! The next level is now unlocked.") : "You need 70% to unlock the next level. Review the explanations and try again.";
-        return new LearningAttemptResponse(correct, questions.size(), percentage, passed, next, message);
+        return new LearningAttemptResponse(correct, questions.size(), percentage, passed, next, message, results);
     }
     private LearningPath path(Long userId, Long pathId) { return paths.findByIdAndUserId(pathId, userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Learning path not found.")); }
     private LearningLevel level(LearningPath path, int number) { return levels.findByPathIdAndLevelNumber(path.getId(), number).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Level not found.")); }

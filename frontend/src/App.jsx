@@ -1972,6 +1972,16 @@ function LearningPaths() {
         </p>
       )}
       {result && (
+        <div className="result-modal-backdrop" role="presentation">
+          <section className={`result-modal ${result.passed ? "passed" : "retry"}`} role="dialog" aria-modal="true" aria-labelledby="level-result-title">
+            <header><div><p className="eyebrow">Level result</p><h3 id="level-result-title">{result.passed ? "Level passed!" : "Review and try again"}</h3></div><button type="button" className="result-close" onClick={() => setResult(null)} aria-label="Close results">×</button></header>
+            <div className="result-score"><strong>{result.percentage}%</strong><span>{result.correctAnswers} of {result.totalQuestions} correct</span></div><p className="result-message">{result.message}</p>
+            <div className="answer-review">{result.results?.map((item) => <article className={item.correct ? "correct" : "wrong"} key={item.number}><b>{item.correct ? "✓ Correct" : "× Incorrect"} · Question {item.number}</b><p>{item.prompt}</p><small>Your answer: <strong>{item.selectedAnswer}</strong></small>{!item.correct && <small>Correct answer: <strong>{item.correctAnswer}</strong></small>}<em>{item.explanation}</em></article>)}</div>
+            <Button type="button" onClick={() => setResult(null)}>{result.passed ? "Continue" : "Try this level again"}</Button>
+          </section>
+        </div>
+      )}
+      {result && (
         <section
           className={`learning-result ${result.passed ? "passed" : "retry"}`}
         >
