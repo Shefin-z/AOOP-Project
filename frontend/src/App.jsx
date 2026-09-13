@@ -112,8 +112,10 @@ async function responseBody(response) {
           ? "Email or password is incorrect."
           : response.status === 403
             ? "You do not have permission for this action."
-            : response.status === 503
-              ? "Gemini is not configured. Add GEMINI_API_KEY to the project's .env file, then restart the backend."
+        : response.status === 503
+          ? "Gemini is not configured. Add GEMINI_API_KEY to the project's .env file, then restart the backend."
+          : response.status === 502
+            ? "Gemini rejected the request. Check your API key and GEMINI_MODEL in .env, then restart the backend."
               : body.error || "Something went wrong."),
     );
   return body;
