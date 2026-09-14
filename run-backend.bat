@@ -3,14 +3,20 @@ setlocal EnableExtensions
 set "PROJECT_ROOT=%~dp0"
 
 if not defined JAVA_HOME (
-  for /f "delims=" %%J in ('dir /b /ad "%ProgramFiles%\Eclipse Adoptium\jdk-21*" 2^>nul') do (
+  for /f "delims=" %%J in ('dir /b /ad "%ProgramFiles%\Java\jdk-*" 2^>nul') do (
+    set "JAVA_HOME=%ProgramFiles%\Java\%%J"
+    goto java_found
+  )
+)
+if not defined JAVA_HOME (
+  for /f "delims=" %%J in ('dir /b /ad "%ProgramFiles%\Eclipse Adoptium\jdk-*" 2^>nul') do (
     set "JAVA_HOME=%ProgramFiles%\Eclipse Adoptium\%%J"
     goto java_found
   )
 )
 :java_found
 if not exist "%JAVA_HOME%\bin\java.exe" (
-  echo [ERROR] Java 21 is required. Install Eclipse Temurin 21, then run this file again.
+  echo [ERROR] Java 17 or newer is required. Install a JDK, then run this file again.
   pause
   exit /b 1
 )
