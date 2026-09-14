@@ -582,3 +582,14 @@ button:focus-visible, .import-file:focus-within, .upload-button:focus-within { o
 .content-table .table-actions { display: flex; width: 94px; min-width: 94px; flex-wrap: nowrap; gap: 6px; overflow: visible; }.content-table .table-actions button { box-sizing: border-box; width: 44px; min-width: 44px; padding: 7px 6px; border-radius: 7px; }
 @media (max-width: 760px) { .content-table { max-height: 560px; padding-right: 3px; }.content-table article { grid-template-columns: minmax(0, 1fr) auto; gap: 7px 10px; }.content-table .item-description { grid-column: 1 / -1; }.content-table .status { justify-self: start; }.content-table .table-actions { grid-column: 2; grid-row: 1; } }
 @media (max-width: 620px) { .resource-pagination { align-items: stretch; flex-direction: column; }.resource-pagination > div { justify-content: space-between; }.resource-pagination button { width: 38px; height: 38px; } }
+
+/* Clear progress feedback while an admin waits for the external import API. */
+.admin-page .content-intro .button:disabled { min-width: 250px; cursor: wait; color: #234f82; background: #e7f0fb; border-color: #9dbbe0; opacity: 1; }
+.admin-page .content-intro .button:disabled svg { animation: resource-import-spin .85s linear infinite; }
+.admin-page .content-intro .button:disabled::after { content: " Searching YouTube…"; font-size: 11px; }
+@keyframes resource-import-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .admin-page .content-intro .button:disabled svg { animation: none; } }
+
+/* Resource manager keeps its table layout even when rendered without the shared admin-table class. */
+.admin-page .content-table { display: grid; gap: 8px; margin-top: 18px; }
+.admin-page .content-table article { display: grid; align-items: center; gap: 14px; padding: 14px; border-radius: 12px; background: #f7f6f2; }
