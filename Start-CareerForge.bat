@@ -2,6 +2,21 @@
 setlocal
 cd /d "%~dp0"
 
+where node >nul 2>nul || (
+    echo [ERROR] Node.js is required. Install the current Node.js LTS version, then run this file again.
+    pause
+    exit /b 1
+)
+where npm.cmd >nul 2>nul || (
+    echo [ERROR] npm was not found. Reinstall Node.js LTS, then run this file again.
+    pause
+    exit /b 1
+)
+if not exist "%~dp0frontend\node_modules" (
+    echo Installing frontend packages for the first run...
+    call npm.cmd --prefix "%~dp0frontend" install || exit /b 1
+)
+
 echo.
 echo ===============================================
 echo            Starting CareerForge
