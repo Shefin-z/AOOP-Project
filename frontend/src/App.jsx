@@ -6,6 +6,7 @@ import {
   ShieldCheck, Sparkles, Target, Trash2, Users,
 } from "lucide-react";
 import { AdminApplications, AdminContentManager, AdminOverview, AdminStudents } from "./AdminDashboard";
+import { StudentResources } from "./StudentResources";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 const studentItems = [["overview", "Overview", LayoutDashboard], ["profile", "My profile", CircleUserRound], ["jobs", "Job matches", BriefcaseBusiness], ["assessments", "Assessments", ClipboardCheck], ["vault", "Career Vault", FileText], ["community", "Community", MessageCircle], ["resources", "Resources", BookOpen], ["events", "Events", CalendarDays]];
@@ -318,7 +319,17 @@ function Workspace({ role, section, go }) {
   useEffect(() => { if (!accountOpen) return undefined; const closeMenu = (event) => { if (!event.target.closest(".account-control")) setAccountOpen(false); }; const closeOnEscape = (event) => { if (event.key === "Escape") setAccountOpen(false); }; document.addEventListener("pointerdown", closeMenu); document.addEventListener("keydown", closeOnEscape); return () => { document.removeEventListener("pointerdown", closeMenu); document.removeEventListener("keydown", closeOnEscape); }; }, [accountOpen]);
   const placeholder = { assessments: [admin ? "Create skill assessments" : "Measure your skills", "Published assessments and performance history will appear here."], vault: ["Career Vault", "Your resume sections and uploaded documents will appear here."], community: ["Community", "Posts, comments, and moderation activity will appear here."], resources: ["Learning resources", "Administrator-published resources will appear here."], events: ["Events", "Upcoming workshops and event registrations will appear here."], students: ["Student directory", "Registered student accounts will appear here."], settings: ["Platform settings", "Safe operational settings will appear here."] };
   const dashboard = <StudentOverview go={go} />;
-  const content = admin && section === "overview" ? <AdminOverview go={go} /> : admin && section === "students" ? <AdminStudents /> : admin && section === "applications" ? <AdminApplications /> : admin && ["assessments", "resources", "events"].includes(section) ? <AdminContentManager kind={section} /> : section === "overview" ? dashboard : section === "profile" && !admin ? <StudentProfile /> : section === "assessments" && !admin ? <LearningPaths /> : section === "vault" && !admin ? <CareerVault /> : section === "jobs" ? admin ? <AdminJobs /> : <StudentJobs /> : <EmptyPanel title={placeholder[section]?.[0] || label} copy={placeholder[section]?.[1] || "This section is ready for Spring Boot API data."} />;
+  const content = admin && section === "overview" ? <AdminOverview go={go} />
+    : admin && section === "students" ? <AdminStudents />
+    : admin && section === "applications" ? <AdminApplications />
+    : admin && ["assessments", "resources", "events"].includes(section) ? <AdminContentManager kind={section} />
+    : section === "overview" ? dashboard
+    : section === "profile" && !admin ? <StudentProfile />
+    : section === "assessments" && !admin ? <LearningPaths />
+    : section === "resources" && !admin ? <StudentResources />
+    : section === "vault" && !admin ? <CareerVault />
+    : section === "jobs" ? admin ? <AdminJobs /> : <StudentJobs />
+    : <EmptyPanel title={placeholder[section]?.[0] || label} copy={placeholder[section]?.[1] || "This section is ready for Spring Boot API data."} />;
   const signOut = () => { localStorage.removeItem("careerforge_session"); go("/"); };
   return <main className="workspace"><aside className="sidebar"><Brand onClick={() => go("/")} /><div className="sidebar-role">{admin ? "ADMIN WORKSPACE" : "STUDENT WORKSPACE"}</div><nav>{items.map(([id, name, Icon]) => <button className={id === section ? "active" : ""} onClick={() => go(`/${role}/${id}`)} key={id}><Icon size={17} />{name}</button>)}</nav><button className="signout" onClick={signOut}>Sign out</button></aside><div className="workspace-main"><header className="workspace-header"><div><p className="breadcrumb">{admin ? "ADMINISTRATION" : "CAREERFORGE"}</p><h1>{label}</h1></div><div className="top-actions"><div className="workspace-search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search workspace" aria-label="Search workspace" />{matches.length > 0 && <div className="search-results">{matches.map(([id, name, Icon]) => <button key={id} onClick={() => { go(`/${role}/${id}`); setQuery(""); }}><Icon size={15} />{name}</button>)}</div>}{query && matches.length === 0 && <div className="search-results no-results">No matching workspace section.</div>}</div><div className="account-control"><button className="avatar" onClick={() => setAccountOpen(!accountOpen)} aria-label="Open account menu">{current?.name?.slice(0, 1)?.toUpperCase() || (admin ? "A" : "S")}</button>{accountOpen && <div className="account-menu"><b>{current?.name || (admin ? "Administrator" : "Student")}</b><small>{current?.email || "Local session"}</small>{!admin && <button onClick={() => { go("/student/profile"); setAccountOpen(false); }}>My profile</button>}<button onClick={signOut}>Sign out</button></div>}</div></div></header>{content}</div></main>;
 }
