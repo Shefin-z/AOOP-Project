@@ -3,14 +3,14 @@ setlocal EnableExtensions
 set "PROJECT_ROOT=%~dp0"
 
 if not defined JAVA_HOME (
-  for /f "delims=" %%J in ('dir /b /ad "%ProgramFiles%\Eclipse Adoptium\jdk-17*" 2^>nul') do (
+  for /f "delims=" %%J in ('dir /b /ad "%ProgramFiles%\Eclipse Adoptium\jdk-21*" 2^>nul') do (
     set "JAVA_HOME=%ProgramFiles%\Eclipse Adoptium\%%J"
     goto java_found
   )
 )
 :java_found
 if not exist "%JAVA_HOME%\bin\java.exe" (
-  echo [ERROR] Java 17 is required. Install Eclipse Temurin 17, then run this file again.
+  echo [ERROR] Java 21 is required. Install Eclipse Temurin 21, then run this file again.
   pause
   exit /b 1
 )
@@ -25,6 +25,9 @@ for /f "delims=" %%M in ('dir /b /s "%ProgramFiles%\JetBrains\mvn.cmd" 2^>nul') 
   goto maven_found
 )
 :maven_found
+if not defined MAVEN_CMD (
+  if exist "%PROJECT_ROOT%..\Software Lab Project\backend\mvnw.cmd" set "MAVEN_CMD=%PROJECT_ROOT%..\Software Lab Project\backend\mvnw.cmd"
+)
 if not defined MAVEN_CMD (
   echo [ERROR] Maven was not found. Install Apache Maven and add it to PATH.
   pause
