@@ -24,6 +24,9 @@ careerforge:
     name: ${ADMIN_NAME:}
     email: ${ADMIN_EMAIL:}
     password: ${ADMIN_PASSWORD:}
+  jobs:
+    # Remotive public API: keep imports manual and limited; the provider recommends no more than four refreshes per day.
+    remotive-url: ${REMOTIVE_JOBS_URL:https://remotive.com/api/remote-jobs?limit=20}
 
 gemini:
   api-key: ${GEMINI_API_KEY:}

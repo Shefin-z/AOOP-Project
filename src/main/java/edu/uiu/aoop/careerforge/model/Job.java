@@ -28,6 +28,9 @@ public class Job {
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "company_id", nullable = false)
     private Company company;
     @Column(name = "created_by") private Long createdBy;
+    @Column(name = "source", length = 40) private String source;
+    @Column(name = "external_id", length = 100) private String externalId;
+    @Column(name = "source_url", length = 600) private String sourceUrl;
     private String title;
     private String location;
     @Column(name = "employment_type") private String employmentType;
@@ -46,6 +49,9 @@ public class Job {
     public UUID getPublicUuid() { return publicUuid; }
     public Company getCompany() { return company; }
     public Long getCreatedBy() { return createdBy; }
+    public String getSource() { return source; }
+    public String getExternalId() { return externalId; }
+    public String getSourceUrl() { return sourceUrl; }
     public String getTitle() { return title; }
     public String getLocation() { return location; }
     public String getEmploymentType() { return employmentType; }
@@ -58,5 +64,8 @@ public class Job {
     public void update(String title, String location, String employmentType, String workMode, String salaryText, String description, LocalDate expiryDate, String status) {
         this.title = title; this.location = location; this.employmentType = employmentType; this.workMode = workMode;
         this.salaryText = salaryText; this.description = description; this.expiryDate = expiryDate; this.status = status;
+    }
+    public void markImported(String source, String externalId, String sourceUrl) {
+        this.source = source; this.externalId = externalId; this.sourceUrl = sourceUrl;
     }
 }

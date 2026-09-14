@@ -22,9 +22,9 @@ public class JobService {
     private final AccessService access;
     public JobService(JobRepository jobs, CompanyRepository companies, AccessService access) { this.jobs = jobs; this.companies = companies; this.access = access; }
     @Transactional(readOnly = true)
-    public List<JobResponse> list() { return jobs.findAllByOrderByCreatedAtDesc().stream().map(this::toResponse).toList(); }
+    public List<JobResponse> list() { return jobs.findAllByOrderByCreatedAtDescIdDesc().stream().map(this::toResponse).toList(); }
     @Transactional(readOnly = true)
-    public List<JobResponse> listPublished() { return jobs.findByStatusAndExpiryDateGreaterThanEqualOrderByCreatedAtDesc("published", java.time.LocalDate.now()).stream().map(this::toResponse).toList(); }
+    public List<JobResponse> listPublished() { return jobs.findByStatusAndExpiryDateGreaterThanEqualOrderByCreatedAtDescIdDesc("published", java.time.LocalDate.now()).stream().map(this::toResponse).toList(); }
     public List<JobResponse> listForAdmin(Long adminId) { access.requireAdmin(adminId); return list(); }
     public JobResponse create(Long adminId, JobRequest request) { access.requireAdmin(adminId); Job job = new Job(company(request), adminId); apply(job, request); return toResponse(jobs.save(job)); }
     public int importFromProvider(Long adminId, JobImportProvider provider) { access.requireAdmin(adminId); return provider.importJobs(); }
@@ -44,6 +44,6 @@ public class JobService {
         if (!List.of("internship", "part_time", "full_time", "contract").contains(employment) || !List.of("onsite", "hybrid", "remote").contains(workMode) || !List.of("draft", "published", "closed").contains(status)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use a valid job type, work mode, and status.");
         job.update(request.title().trim(), clean(request.location()), employment, workMode, clean(request.salaryText()), request.description().trim(), request.expiryDate(), status);
     }
-    private JobResponse toResponse(Job job) { Company c = job.getCompany(); return new JobResponse(job.getId(), c.getName(), c.getWebsite(), c.getLocation(), job.getTitle(), job.getLocation(), job.getEmploymentType(), job.getWorkMode(), job.getSalaryText(), job.getDescription(), job.getExpiryDate(), job.getStatus(), job.getPublicUuid()); }
+    public JobResponse toResponse(Job job) { Company c = job.getCompany(); return new JobResponse(job.getId(), c.getName(), c.getWebsite(), c.getLocation(), job.getTitle(), job.getLocation(), job.getEmploymentType(), job.getWorkMode(), job.getSalaryText(), job.getDescription(), job.getExpiryDate(), job.getStatus(), job.getPublicUuid(), job.getSource(), job.getSourceUrl()); }
     private String clean(String value) { return value == null || value.isBlank() ? null : value.trim(); }
 }

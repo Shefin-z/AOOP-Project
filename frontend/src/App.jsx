@@ -280,13 +280,79 @@ function LearningPaths() {
   </section>;
 }
 
-function StudentJobs() {
+function LegacyStudentJobs() {
   const current = getSession(); const [jobs, setJobs] = useState([]); const [applications, setApplications] = useState([]); const [resumes, setResumes] = useState([]); const [documents, setDocuments] = useState([]); const [selectedJob, setSelectedJob] = useState(null); const [selectedCv, setSelectedCv] = useState(""); const [notice, setNotice] = useState(""); const [submitting, setSubmitting] = useState(false);
   const headers = { "Content-Type": "application/json", "X-User-Id": current?.id || "" };
   const load = () => { fetch(`${API_BASE_URL}/jobs`).then(responseBody).then(setJobs).catch((e) => setNotice(e.message)); if (current?.id) Promise.all([fetch(`${API_BASE_URL}/applications`, { headers }).then(responseBody), fetch(`${API_BASE_URL}/vault/resumes`, { headers }).then(responseBody), fetch(`${API_BASE_URL}/vault/documents`, { headers }).then(responseBody)]).then(([applicationItems, resumeItems, documentItems]) => { setApplications(applicationItems); setResumes(resumeItems); setDocuments(documentItems); const defaultResume = resumeItems.find((item) => item.isDefault); if (defaultResume) setSelectedCv((existing) => existing || `resume:${defaultResume.id}`); }).catch((e) => setNotice(e.message)); };
   useEffect(() => { load(); }, []);
   async function apply(event) { event.preventDefault(); if (!selectedJob || !selectedCv) return setNotice("Select a resume version or uploaded document first."); setSubmitting(true); setNotice(""); try { const [cvSourceType, cvSourceId] = selectedCv.split(":"); const response = await fetch(`${API_BASE_URL}/jobs/${selectedJob.id}/applications`, { method: "POST", headers, body: JSON.stringify({ cvSourceType, cvSourceId: Number(cvSourceId) }) }); const application = await responseBody(response); setApplications([application, ...applications]); setSelectedJob(null); setNotice("Application submitted successfully with your selected CV."); } catch (e) { setNotice(e.message); } finally { setSubmitting(false); } }
   return <section><div className="content-intro compact"><div><p className="eyebrow"><BriefcaseBusiness size={14} /> Live opportunities</p><h2>Jobs published by CareerForge.</h2><p>Choose a role, then select a Career Vault CV to submit with your application.</p></div></div>{selectedJob && <form className="apply-panel" onSubmit={apply}><div><p className="eyebrow"><FileText size={14} /> CV selection</p><h3>Apply for {selectedJob.title}</h3><p>{selectedJob.companyName} · Deadline {selectedJob.expiryDate}</p></div><label>Select the CV to submit<select value={selectedCv} onChange={(e) => setSelectedCv(e.target.value)} required><option value="">Choose a CV or document</option>{resumes.length > 0 && <optgroup label="Resume versions">{resumes.map((resume) => <option key={`resume:${resume.id}`} value={`resume:${resume.id}`}>{resume.title}{resume.isDefault ? " (default)" : ""}</option>)}</optgroup>}{documents.length > 0 && <optgroup label="Uploaded documents">{documents.map((document) => <option key={`document:${document.id}`} value={`document:${document.id}`}>{document.fileName}</option>)}</optgroup>}</select></label>{resumes.length === 0 && documents.length === 0 && <p className="form-error">Create a resume version or upload a CV in Career Vault before applying.</p>}<div className="row"><Button type="submit" disabled={submitting || !selectedCv}>{submitting ? "Submitting..." : "Submit selected CV"}<ArrowRight size={15} /></Button><Button className="quiet" type="button" onClick={() => setSelectedJob(null)}>Cancel</Button></div></form>}{notice && <p className={notice.includes("success") ? "form-success" : "form-error"}>{notice}</p>}<div className="job-card-grid">{jobs.length ? jobs.map((job) => { const application = applications.find((item) => item.jobId === job.id); return <article className="job-card" key={job.id}><div className="job-company"><span><Building2 size={18} /></span><div><small>{job.companyName}</small><h3>{job.title}</h3></div></div><p>{job.description}</p><div className="job-meta"><span><MapPin size={14} /> {job.location || "Location flexible"}</span><span>{job.workMode}</span><span>{job.employmentType.replace("_", " ")}</span></div><footer><span>Apply by {job.expiryDate}</span>{application ? <b className="application-state">{application.status}</b> : <Button type="button" onClick={() => { setSelectedJob(job); setNotice(""); }}>Select CV <ArrowRight size={14} /></Button>}</footer></article>; }) : <EmptyPanel title="No published jobs yet" copy="When an administrator publishes a job, it will appear here." />}</div>{applications.length > 0 && <section className="content-card application-list"><div className="list-heading"><h3>Your submitted applications</h3><span>{applications.length} total</span></div>{applications.map((application) => <article key={application.id}><div><b>{application.jobTitle}</b><small>{application.companyName} · {application.cvTitle} · Submitted {new Date(application.appliedAt).toLocaleDateString()}</small></div><span className="status submitted">{application.status}</span></article>)}</section>}</section>;
+}
+
+function StudentJobs() {
+  const current = getSession();
+  const [matches, setMatches] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [resumes, setResumes] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [selectedCv, setSelectedCv] = useState("");
+  const [notice, setNotice] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({ query: "", location: "", skills: "", workMode: "", employmentType: "" });
+  const headers = { "Content-Type": "application/json", "X-User-Id": current?.id || "" };
+
+  const load = async (activeFilters = filters) => {
+    if (!current?.id) return;
+    setLoading(true);
+    try {
+      const params = new URLSearchParams(Object.entries(activeFilters).filter(([, value]) => value));
+      const [jobMatches, applicationItems, resumeItems, documentItems] = await Promise.all([
+        fetch(`${API_BASE_URL}/jobs/matches?${params}`, { headers }).then(responseBody),
+        fetch(`${API_BASE_URL}/applications`, { headers }).then(responseBody),
+        fetch(`${API_BASE_URL}/vault/resumes`, { headers }).then(responseBody),
+        fetch(`${API_BASE_URL}/vault/documents`, { headers }).then(responseBody),
+      ]);
+      setMatches(jobMatches); setApplications(applicationItems); setResumes(resumeItems); setDocuments(documentItems);
+      const defaultResume = resumeItems.find((item) => item.isDefault);
+      if (defaultResume) setSelectedCv((value) => value || `resume:${defaultResume.id}`);
+    } catch (error) { setNotice(error.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const changeFilter = (event) => setFilters({ ...filters, [event.target.name]: event.target.value });
+  const search = (event) => { event.preventDefault(); setNotice(""); load(); };
+  const clearFilters = () => { const empty = { query: "", location: "", skills: "", workMode: "", employmentType: "" }; setFilters(empty); setNotice(""); load(empty); };
+  async function apply(event) {
+    event.preventDefault();
+    if (!selectedJob || !selectedCv) return setNotice("Select a resume version or uploaded document first.");
+    setSubmitting(true); setNotice("");
+    try {
+      const [cvSourceType, cvSourceId] = selectedCv.split(":");
+      const application = await responseBody(await fetch(`${API_BASE_URL}/jobs/${selectedJob.id}/applications`, { method: "POST", headers, body: JSON.stringify({ cvSourceType, cvSourceId: Number(cvSourceId) }) }));
+      setApplications([application, ...applications]); setSelectedJob(null); setNotice("Application submitted successfully with your selected CV.");
+    } catch (error) { setNotice(error.message); }
+    finally { setSubmitting(false); }
+  }
+
+  return <section className="student-jobs-page">
+    <div className="content-intro compact"><div><p className="eyebrow"><BriefcaseBusiness size={14} /> Personalized job matches</p><h2>Find jobs that fit your skills.</h2><p>Matches use the skills and target role saved in your profile. Search further by title, location, skills, work mode, or type.</p></div></div>
+    <form className="job-search-panel" onSubmit={search}>
+      <label className="job-search-main"><Search size={17} /><input name="query" value={filters.query} onChange={changeFilter} placeholder="Search job title or company" /></label>
+      <input name="location" value={filters.location} onChange={changeFilter} placeholder="Location" />
+      <input name="skills" value={filters.skills} onChange={changeFilter} placeholder="Required skill, e.g. React" />
+      <select name="workMode" value={filters.workMode} onChange={changeFilter}><option value="">Any work mode</option><option value="remote">Remote</option><option value="hybrid">Hybrid</option><option value="onsite">Onsite</option></select>
+      <select name="employmentType" value={filters.employmentType} onChange={changeFilter}><option value="">Any job type</option><option value="internship">Internship</option><option value="part_time">Part time</option><option value="full_time">Full time</option><option value="contract">Contract</option></select>
+      <Button type="submit"><Search size={15} /> Search</Button><button className="text-button" type="button" onClick={clearFilters}>Clear</button>
+    </form>
+    {selectedJob && <form className="apply-panel" onSubmit={apply}><div><p className="eyebrow"><FileText size={14} /> CV selection</p><h3>Apply for {selectedJob.title}</h3><p>{selectedJob.companyName} · Deadline {selectedJob.expiryDate}</p></div><label>Select the CV to submit<select value={selectedCv} onChange={(event) => setSelectedCv(event.target.value)} required><option value="">Choose a CV or document</option>{resumes.length > 0 && <optgroup label="Resume versions">{resumes.map((resume) => <option key={`resume:${resume.id}`} value={`resume:${resume.id}`}>{resume.title}{resume.isDefault ? " (default)" : ""}</option>)}</optgroup>}{documents.length > 0 && <optgroup label="Uploaded documents">{documents.map((document) => <option key={`document:${document.id}`} value={`document:${document.id}`}>{document.fileName}</option>)}</optgroup>}</select></label>{resumes.length === 0 && documents.length === 0 && <p className="form-error">Create a resume version or upload a CV in Career Vault before applying.</p>}<div className="row"><Button type="submit" disabled={submitting || !selectedCv}>{submitting ? "Submitting..." : "Submit selected CV"}<ArrowRight size={15} /></Button><Button className="quiet" type="button" onClick={() => setSelectedJob(null)}>Cancel</Button></div></form>}
+    {notice && <p className={notice.includes("success") ? "form-success" : "form-error"}>{notice}</p>}
+    <div className="job-results-heading"><div><h3>{loading ? "Finding your matches..." : `${matches.length} matching opportunities`}</h3><p>Highest skill match first. Imported remote jobs are marked with their source.</p></div></div>
+    <div className="job-card-grid">{matches.map((match) => { const job = match.job; const application = applications.find((item) => item.jobId === job.id); return <article className="job-card matched-job" key={job.id}><div className="job-company"><span><Building2 size={18} /></span><div><small>{job.companyName}</small><h3>{job.title}</h3></div><b className="match-score">{match.matchPercentage}% match</b></div><p>{job.description}</p>{match.matchedSkills?.length > 0 && <div className="matched-skills">{match.matchedSkills.map((skill) => <span key={skill}>{skill}</span>)}</div>}<small className="match-summary">{match.matchSummary}</small><div className="job-meta"><span><MapPin size={14} /> {job.location || "Location flexible"}</span><span>{job.workMode}</span><span>{job.employmentType.replace("_", " ")}</span></div><footer><span>Apply by {job.expiryDate}</span><div>{job.sourceUrl && <a className="job-source-link" href={job.sourceUrl} target="_blank" rel="noreferrer">View source</a>}{application ? <b className="application-state">{application.status}</b> : <Button type="button" onClick={() => { setSelectedJob(job); setNotice(""); }}>Select CV <ArrowRight size={14} /></Button>}</div></footer></article>; })}</div>
+    {!loading && matches.length === 0 && <EmptyPanel title="No matching jobs found" copy="Try a broader search, or add skills and a target role in My profile to improve recommendations." />}
+  </section>;
 }
 
 function AdminJobs() {
