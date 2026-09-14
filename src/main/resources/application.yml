@@ -30,6 +30,7 @@ careerforge:
     rapidapi-key: ${RAPIDAPI_KEY:}
     rapidapi-host: ${RAPIDAPI_HOST:jsearch.p.rapidapi.com}
     jsearch-url: ${JSEARCH_URL:https://jsearch.p.rapidapi.com/search-v2?query=software%20engineer%20intern&page=1&num_pages=1&date_posted=week}
+    bdjobs-url: ${BDJOBS_URL:https://jobs.bdjobs.com/jobsearch.asp}
 
 youtube:
   api-key: ${YOUTUBE_API_KEY:}

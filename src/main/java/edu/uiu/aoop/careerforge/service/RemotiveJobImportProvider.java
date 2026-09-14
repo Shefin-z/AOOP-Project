@@ -22,7 +22,7 @@ import java.util.Locale;
 /** Imports a small, rate-friendly batch of active remote jobs from Remotive. */
 @Service
 @Transactional
-public class RemotiveJobImportProvider implements JobImportProvider {
+public class RemotiveJobImportProvider implements JobSourceAdapter {
     private static final String SOURCE = "Remotive";
     private final JobRepository jobs;
     private final CompanyRepository companies;
@@ -48,6 +48,9 @@ public class RemotiveJobImportProvider implements JobImportProvider {
     public int importJobs() {
         return rapidApiKey.isBlank() ? importRemotive() : importJsearch();
     }
+
+    @Override public String sourceKey() { return "remotive"; }
+    @Override public String displayName() { return rapidApiKey.isBlank() ? "Remotive" : "JSearch"; }
 
     private int importRemotive() {
         try {
