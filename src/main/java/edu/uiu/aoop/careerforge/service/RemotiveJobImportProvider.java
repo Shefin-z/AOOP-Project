@@ -37,7 +37,7 @@ public class RemotiveJobImportProvider implements JobImportProvider {
                                     @Value("${careerforge.jobs.remotive-url:https://remotive.com/api/remote-jobs?limit=20}") String remotiveEndpoint,
                                     @Value("${careerforge.jobs.rapidapi-key:}") String rapidApiKey,
                                     @Value("${careerforge.jobs.rapidapi-host:jsearch.p.rapidapi.com}") String rapidApiHost,
-                                    @Value("${careerforge.jobs.jsearch-url:https://jsearch.p.rapidapi.com/search?query=software%20engineer%20intern&page=1&num_pages=1&date_posted=week}") String jsearchEndpoint) {
+                                    @Value("${careerforge.jobs.jsearch-url:https://jsearch.p.rapidapi.com/search-v2?query=software%20engineer%20intern&page=1&num_pages=1&date_posted=week}") String jsearchEndpoint) {
         this.jobs = jobs; this.companies = companies; this.mapper = mapper;
         this.client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
         this.remotiveEndpoint = remotiveEndpoint; this.rapidApiKey = rapidApiKey == null ? "" : rapidApiKey.trim();
@@ -80,6 +80,7 @@ public class RemotiveJobImportProvider implements JobImportProvider {
             if (response.statusCode() == 401 || response.statusCode() == 403) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "JSearch rejected the RapidAPI key. Check RAPIDAPI_KEY and your JSearch subscription.");
             if (response.statusCode() < 200 || response.statusCode() >= 300) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "JSearch could not be reached right now.");
             JsonNode listings = mapper.readTree(response.body()).path("data");
+            if (listings.isObject()) listings = listings.path("jobs");
             if (!listings.isArray()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "JSearch returned an unexpected response.");
             int imported = 0;
             for (JsonNode listing : listings) if (saveJsearch(listing)) imported++;
