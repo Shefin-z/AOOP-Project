@@ -24,6 +24,12 @@ careerforge:
     name: ${ADMIN_NAME:}
     email: ${ADMIN_EMAIL:}
     password: ${ADMIN_PASSWORD:}
+  jobs:
+    # Remotive public API: keep imports manual and limited; the provider recommends no more than four refreshes per day.
+    remotive-url: ${REMOTIVE_JOBS_URL:https://remotive.com/api/remote-jobs?limit=20}
+    rapidapi-key: ${RAPIDAPI_KEY:}
+    rapidapi-host: ${RAPIDAPI_HOST:jsearch.p.rapidapi.com}
+    jsearch-url: ${JSEARCH_URL:https://jsearch.p.rapidapi.com/search-v2?query=software%20engineer%20intern&page=1&num_pages=1&date_posted=week}
 
 gemini:
   api-key: ${GEMINI_API_KEY:}

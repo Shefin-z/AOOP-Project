@@ -2,6 +2,8 @@ package edu.uiu.aoop.careerforge.controller;
 
 import edu.uiu.aoop.careerforge.dto.JobRequest;
 import edu.uiu.aoop.careerforge.dto.JobResponse;
+import edu.uiu.aoop.careerforge.dto.JobDiscoveryResponse;
+import edu.uiu.aoop.careerforge.service.JobDiscoveryService;
 import edu.uiu.aoop.careerforge.service.JobImportProvider;
 import edu.uiu.aoop.careerforge.service.JobService;
 import jakarta.validation.Valid;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,9 +25,16 @@ import java.util.Map;
 
 @RestController
 public class JobController {
-    private final JobService jobs; private final JobImportProvider importer;
-    public JobController(JobService jobs, JobImportProvider importer) { this.jobs = jobs; this.importer = importer; }
+    private final JobService jobs; private final JobImportProvider importer; private final JobDiscoveryService discovery;
+    public JobController(JobService jobs, JobImportProvider importer, JobDiscoveryService discovery) { this.jobs = jobs; this.importer = importer; this.discovery = discovery; }
     @GetMapping("/jobs") public List<JobResponse> list() { return jobs.listPublished(); }
+    @GetMapping("/jobs/matches") public List<JobDiscoveryResponse> matches(
+            @RequestHeader(name = "X-User-Id", required = false) Long id,
+            @RequestParam(required = false) String query, @RequestParam(required = false) String location,
+            @RequestParam(required = false) String skills, @RequestParam(required = false) String workMode,
+            @RequestParam(required = false) String employmentType) {
+        return discovery.discover(id, query, location, skills, workMode, employmentType);
+    }
     @GetMapping("/admin/jobs") public List<JobResponse> adminList(@RequestHeader(name = "X-User-Id", required = false) Long id) { return jobs.listForAdmin(id); }
     @PostMapping("/admin/jobs") @ResponseStatus(HttpStatus.CREATED) public JobResponse create(@RequestHeader(name = "X-User-Id", required = false) Long id, @Valid @RequestBody JobRequest request) { return jobs.create(id, request); }
     @PutMapping("/admin/jobs/{jobId}") public JobResponse update(@PathVariable Long jobId, @RequestHeader(name = "X-User-Id", required = false) Long id, @Valid @RequestBody JobRequest request) { return jobs.update(jobId, id, request); }

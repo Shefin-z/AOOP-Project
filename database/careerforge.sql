@@ -70,6 +70,9 @@ CREATE TABLE jobs (
   public_uuid CHAR(36) NOT NULL UNIQUE,
   company_id BIGINT UNSIGNED NOT NULL,
   created_by BIGINT UNSIGNED NULL,
+  source VARCHAR(40) NULL,
+  external_id VARCHAR(100) NULL,
+  source_url VARCHAR(600) NULL,
   title VARCHAR(220) NOT NULL,
   location VARCHAR(180) NULL,
   employment_type ENUM('internship', 'part_time', 'full_time', 'contract') NOT NULL,
@@ -82,6 +85,7 @@ CREATE TABLE jobs (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_jobs_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
   CONSTRAINT fk_jobs_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  UNIQUE KEY uq_jobs_external_source (source, external_id),
   INDEX idx_jobs_visibility (status, expiry_date)
 ) ENGINE=InnoDB;
 
