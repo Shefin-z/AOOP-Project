@@ -6,6 +6,7 @@ import {
   ShieldCheck, Sparkles, Target, Trash2, Users,
 } from "lucide-react";
 import { AdminApplications, AdminContentManager, AdminOverview, AdminStudents } from "./AdminDashboard";
+import { StudentResources } from "./StudentResources";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 const studentItems = [["overview", "Overview", LayoutDashboard], ["profile", "My profile", CircleUserRound], ["jobs", "Job matches", BriefcaseBusiness], ["assessments", "Assessments", ClipboardCheck], ["vault", "Career Vault", FileText], ["community", "Community", MessageCircle], ["resources", "Resources", BookOpen], ["events", "Events", CalendarDays]];
@@ -384,10 +385,59 @@ function Workspace({ role, section, go }) {
   useEffect(() => { if (!accountOpen) return undefined; const closeMenu = (event) => { if (!event.target.closest(".account-control")) setAccountOpen(false); }; const closeOnEscape = (event) => { if (event.key === "Escape") setAccountOpen(false); }; document.addEventListener("pointerdown", closeMenu); document.addEventListener("keydown", closeOnEscape); return () => { document.removeEventListener("pointerdown", closeMenu); document.removeEventListener("keydown", closeOnEscape); }; }, [accountOpen]);
   const placeholder = { assessments: [admin ? "Create skill assessments" : "Measure your skills", "Published assessments and performance history will appear here."], vault: ["Career Vault", "Your resume sections and uploaded documents will appear here."], community: ["Community", "Posts, comments, and moderation activity will appear here."], resources: ["Learning resources", "Administrator-published resources will appear here."], events: ["Events", "Upcoming workshops and event registrations will appear here."], students: ["Student directory", "Registered student accounts will appear here."], settings: ["Platform settings", "Safe operational settings will appear here."] };
   const dashboard = <StudentOverview go={go} />;
-  const content = admin && section === "overview" ? <AdminOverview go={go} /> : admin && section === "students" ? <AdminStudents /> : admin && section === "applications" ? <AdminApplications /> : admin && ["assessments", "resources", "events"].includes(section) ? <AdminContentManager kind={section} /> : section === "overview" ? dashboard : section === "profile" && !admin ? <StudentProfile /> : section === "assessments" && !admin ? <LearningPaths /> : section === "vault" && !admin ? <CareerVault /> : section === "jobs" ? admin ? <AdminJobs /> : <StudentJobs /> : <EmptyPanel title={placeholder[section]?.[0] || label} copy={placeholder[section]?.[1] || "This section is ready for Spring Boot API data."} />;
+  const content = admin && section === "overview" ? <AdminOverview go={go} />
+    : admin && section === "students" ? <AdminStudents />
+    : admin && section === "applications" ? <AdminApplications />
+    : admin && ["assessments", "resources", "events"].includes(section) ? <AdminContentManager kind={section} />
+    : section === "overview" ? dashboard
+    : section === "profile" && !admin ? <StudentProfile />
+    : section === "assessments" && !admin ? <LearningPaths />
+    : section === "resources" && !admin ? <StudentResources />
+    : section === "vault" && !admin ? <CareerVault />
+    : section === "jobs" ? admin ? <AdminJobs /> : <StudentJobs />
+    : <EmptyPanel title={placeholder[section]?.[0] || label} copy={placeholder[section]?.[1] || "This section is ready for Spring Boot API data."} />;
   const signOut = () => { localStorage.removeItem("careerforge_session"); go("/"); };
   return <main className="workspace"><aside className="sidebar"><Brand onClick={() => go("/")} /><div className="sidebar-role">{admin ? "ADMIN WORKSPACE" : "STUDENT WORKSPACE"}</div><nav>{items.map(([id, name, Icon]) => <button className={id === section ? "active" : ""} onClick={() => go(`/${role}/${id}`)} key={id}><Icon size={17} />{name}</button>)}</nav><button className="signout" onClick={signOut}>Sign out</button></aside><div className="workspace-main"><header className="workspace-header"><div><p className="breadcrumb">{admin ? "ADMINISTRATION" : "CAREERFORGE"}</p><h1>{label}</h1></div><div className="top-actions"><div className="workspace-search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search workspace" aria-label="Search workspace" />{matches.length > 0 && <div className="search-results">{matches.map(([id, name, Icon]) => <button key={id} onClick={() => { go(`/${role}/${id}`); setQuery(""); }}><Icon size={15} />{name}</button>)}</div>}{query && matches.length === 0 && <div className="search-results no-results">No matching workspace section.</div>}</div><div className="account-control"><button className="avatar" onClick={() => setAccountOpen(!accountOpen)} aria-label="Open account menu">{current?.name?.slice(0, 1)?.toUpperCase() || (admin ? "A" : "S")}</button>{accountOpen && <div className="account-menu"><b>{current?.name || (admin ? "Administrator" : "Student")}</b><small>{current?.email || "Local session"}</small>{!admin && <button onClick={() => { go("/student/profile"); setAccountOpen(false); }}>My profile</button>}<button onClick={signOut}>Sign out</button></div>}</div></div></header>{content}</div></main>;
 }
 
-function App() { const [route, go] = useRoute(); const pieces = route.split("/").filter(Boolean); if (pieces[0] === "login") return <Login role={pieces[1] === "admin" ? "admin" : "student"} register={false} go={go} />; if (pieces[0] === "register") return <Login role="student" register go={go} />; if (pieces[0] === "student" || pieces[0] === "admin") return <Workspace role={pieces[0]} section={pieces[1] || "overview"} go={go} />; return <FinpayLanding go={go} />; }
+function App() {
+  const [route, go] = useRoute();
+  useEffect(() => {
+    const timeouts = new WeakMap();
+    const dismiss = (toast) => {
+      window.clearTimeout(timeouts.get(toast));
+      toast.classList.add("toast-dismissed");
+    };
+    const prepareToast = (toast) => {
+      const message = Array.from(toast.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent.trim()).join(" ");
+      if (!message || toast.dataset.toastMessage === message) return;
+      toast.dataset.toastMessage = message;
+      toast.classList.remove("toast-dismissed");
+      toast.setAttribute("role", toast.classList.contains("form-error") ? "alert" : "status");
+      toast.setAttribute("aria-live", "polite");
+      let close = toast.querySelector(".toast-close");
+      if (!close) {
+        close = document.createElement("button");
+        close.type = "button";
+        close.className = "toast-close";
+        close.setAttribute("aria-label", "Dismiss notification");
+        close.textContent = "×";
+        close.addEventListener("click", () => dismiss(toast));
+        toast.appendChild(close);
+      }
+      window.clearTimeout(timeouts.get(toast));
+      timeouts.set(toast, window.setTimeout(() => dismiss(toast), 4500));
+    };
+    const findToasts = () => document.querySelectorAll(".form-success, .form-error").forEach(prepareToast);
+    const observer = new MutationObserver(findToasts);
+    findToasts();
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    return () => { observer.disconnect(); document.querySelectorAll(".form-success, .form-error").forEach((toast) => window.clearTimeout(timeouts.get(toast))); };
+  }, []);
+  const pieces = route.split("/").filter(Boolean);
+  if (pieces[0] === "login") return <Login role={pieces[1] === "admin" ? "admin" : "student"} register={false} go={go} />;
+  if (pieces[0] === "register") return <Login role="student" register go={go} />;
+  if (pieces[0] === "student" || pieces[0] === "admin") return <Workspace role={pieces[0]} section={pieces[1] || "overview"} go={go} />;
+  return <FinpayLanding go={go} />;
+}
 export default App;

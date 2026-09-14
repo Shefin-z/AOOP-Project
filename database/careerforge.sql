@@ -264,6 +264,7 @@ CREATE TABLE resource_progress (
   resource_id BIGINT UNSIGNED NOT NULL,
   progress_percentage DECIMAL(5,2) NOT NULL DEFAULT 0.00,
   completed_at DATETIME NULL,
+  saved BOOLEAN NOT NULL DEFAULT FALSE,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id, resource_id),
   CONSTRAINT fk_resource_progress_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
