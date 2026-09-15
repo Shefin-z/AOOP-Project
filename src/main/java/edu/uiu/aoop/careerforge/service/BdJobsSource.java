@@ -6,6 +6,7 @@ import edu.uiu.aoop.careerforge.model.Company;
 import edu.uiu.aoop.careerforge.model.Job;
 import edu.uiu.aoop.careerforge.repository.CompanyRepository;
 import edu.uiu.aoop.careerforge.repository.JobRepository;
+import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.slf4j.Logger;
@@ -21,6 +22,7 @@ import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.Duration;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -40,6 +42,7 @@ public class BdJobsSource implements JobSourceAdapter {
     private static final Pattern NG_STATE = Pattern.compile(
             "<script[^>]*id=[\\\"']ng-state[\\\"'][^>]*>(.*?)</script>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final DateTimeFormatter BD_DATE = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH);
+    private static final int MAX_PAGES = 2;
 
     private final JobRepository jobs;
     private final CompanyRepository companies;
@@ -48,20 +51,20 @@ public class BdJobsSource implements JobSourceAdapter {
     private final String endpoint;
     private final String apiEndpoint;
     private final JobNlpService nlp;
-    private final EmbeddingService embeddings;
+    private final EntityManager entityManager;
 
     public BdJobsSource(JobRepository jobs, CompanyRepository companies, ObjectMapper mapper,
                         @Value("${careerforge.jobs.bdjobs-url:https://jobs.bdjobs.com/jobsearch.asp}") String endpoint,
                         @Value("${careerforge.jobs.bdjobs-api-url:https://api.bdjobs.com/Jobs/api/JobSearch/GetJobSearch}") String apiEndpoint,
-                        JobNlpService nlp, EmbeddingService embeddings) {
+                        JobNlpService nlp, EntityManager entityManager) {
         this.jobs = jobs;
         this.companies = companies;
         this.mapper = mapper;
-        this.client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+        this.client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NORMAL).build();
         this.endpoint = endpoint;
         this.apiEndpoint = apiEndpoint;
         this.nlp = nlp;
-        this.embeddings = embeddings;
+        this.entityManager = entityManager;
     }
 
     @Override public String sourceKey() { return "bdjobs"; }
@@ -72,7 +75,17 @@ public class BdJobsSource implements JobSourceAdapter {
         try {
             List<JsonNode> listings = fetchListings();
             int imported = 0;
-            for (JsonNode listing : listings) if (save(listing)) imported++;
+            int processed = 0;
+            for (JsonNode listing : listings) {
+                if (save(listing)) imported++;
+                // Keep the persistence context small. Otherwise each repository lookup auto-flushes
+                // every earlier listing and a 20-item sync becomes progressively slower.
+                if (++processed % 5 == 0) {
+                    entityManager.flush();
+                    entityManager.clear();
+                }
+            }
+            entityManager.flush();
             return imported;
         } catch (ResponseStatusException exception) {
             throw exception;
@@ -95,7 +108,7 @@ public class BdJobsSource implements JobSourceAdapter {
     private List<JsonNode> fetchApiListings() throws Exception {
         Map<String, JsonNode> unique = new LinkedHashMap<>();
         JsonNode first = fetchApiPage(1);
-        int totalPages = Math.max(1, first.path("common").path("totalpages").asInt(1));
+        int totalPages = Math.min(MAX_PAGES, Math.max(1, first.path("common").path("totalpages").asInt(1)));
         addListings(unique, first.path("data"));
         addListings(unique, first.path("premiumData"));
         for (int page = 2; page <= totalPages; page++) {
@@ -110,9 +123,10 @@ public class BdJobsSource implements JobSourceAdapter {
     private JsonNode fetchApiPage(int page) throws Exception {
         String query = "Icat=&industry=&category=&org=&jobNature=&Fcat=&location=&Qot=&jobType=&jobLevel=&postedWithin=&deadline="
                 + "&keyword=&pg=" + page + "&qAge=&Salary=&experience=&gender=&MExp=&genderB=&MPostings=&MCat=&version="
-                + "&rpp=5000&Newspaper=&armyp=&QDisablePerson=&pwd=&workplace=&facilitiesForPWD=&SaveFilterList="
+                + "&rpp=50&Newspaper=&armyp=&QDisablePerson=&pwd=&workplace=&facilitiesForPWD=&SaveFilterList="
                 + "&UserFilterName=&HUserFilterName=&earlyJobAccess=&isPro=0&ToggleJobs=true&isFresher=false";
         HttpRequest request = HttpRequest.newBuilder(URI.create(apiEndpoint + (apiEndpoint.contains("?") ? "&" : "?") + query))
+                .timeout(Duration.ofSeconds(20))
                 .header("Accept", "application/json")
                 .header("User-Agent", "CareerForge-AOOP-Project/1.0")
                 .GET().build();
@@ -134,6 +148,7 @@ public class BdJobsSource implements JobSourceAdapter {
     /** Fallback for a custom/legacy endpoint that still embeds listings in ng-state. */
     private List<JsonNode> fetchHtmlListings() throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint))
+                .timeout(Duration.ofSeconds(20))
                 .header("Accept", "text/html,application/xhtml+xml")
                 .header("User-Agent", "CareerForge-AOOP-Project/1.0")
                 .GET().build();
@@ -191,8 +206,7 @@ public class BdJobsSource implements JobSourceAdapter {
         job.markVerified(publishedAt(listing), needsReview ? "needs_review" : "valid");
         job.markImported(SOURCE, externalId, "https://jobs.bdjobs.com/jobdetails.asp?id=" + externalId);
         nlp.analyze(job);
-        Job saved = jobs.save(job);
-        if (isNew) embeddings.enqueueJob(saved);
+        jobs.save(job);
         return isNew;
     }
 

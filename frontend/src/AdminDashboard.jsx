@@ -4,7 +4,7 @@ import { BookOpen, CalendarDays, CheckCircle2, ClipboardCheck, FileText, Plus, R
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 const currentSession = () => { try { return JSON.parse(localStorage.getItem("careerforge_session")) || null; } catch { return null; } };
 const headers = () => ({ "Content-Type": "application/json", "X-User-Id": currentSession()?.id || "" });
-async function body(response) { const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.message || data.detail || (response.status === 503 ? "YouTube is not configured. Add YOUTUBE_API_KEY to .env, then restart the backend." : response.status === 502 ? "YouTube could not import playlists right now. Please check the API key and quota." : "Unable to complete that request.")); return data; }
+async function body(response) { const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.message || data.detail || (response.status === 503 ? "YouTube is not configured. Add YOUTUBE_API_KEY to .env, then restart the backend." : response.status === 502 ? "The external provider could not complete this request right now." : "Unable to complete that request.")); return data; }
 const ActionButton = ({ children, className = "", ...props }) => <button className={`button ${className}`} {...props}>{children}</button>;
 const Status = ({ value }) => <span className={`status ${value || ""}`}>{String(value || "unknown").replaceAll("_", " ")}</span>;
 const formatDate = (value) => value ? new Date(value).toLocaleDateString() : "—";

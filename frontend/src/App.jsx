@@ -16,7 +16,7 @@ const blankJob = { companyName: "", companyWebsite: "", companyLocation: "", tit
 const blankResumeContent = { fullName: "", email: "", phone: "", location: "", headline: "", summary: "", skills: "", education: "", experience: "", projects: "" };
 
 function getSession() { try { return JSON.parse(localStorage.getItem("careerforge_session")) || null; } catch { return null; } }
-async function responseBody(response) { const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.message || body.detail || (response.status === 401 ? "Email or password is incorrect." : response.status === 403 ? "You do not have permission for this action." : response.status === 503 ? "Gemini is not configured. Add GEMINI_API_KEY to the project's .env file, then restart the backend." : response.status === 502 ? "Gemini rejected the request. Check your API key and GEMINI_MODEL in .env, then restart the backend." : body.error || "Something went wrong.")); return body; }
+async function responseBody(response) { const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.message || body.detail || (response.status === 401 ? "Email or password is incorrect." : response.status === 403 ? "You do not have permission for this action." : response.status === 503 ? "The required service is not configured. Check the project .env file, then restart the backend." : response.status === 502 ? "The external provider could not complete this request right now." : body.error || "Something went wrong.")); return body; }
 
 function useRoute() {
   const read = () => window.location.hash.replace("#", "") || "/";
