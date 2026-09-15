@@ -17,5 +17,7 @@ public record JobRequest(
         @Size(max = 120) String salaryText,
         @NotBlank @Size(max = 10000) String description,
         @NotNull LocalDate expiryDate,
-        @NotBlank String status
+        @NotBlank String status,
+        @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(60) Integer minExperienceYears,
+        @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(60) Integer maxExperienceYears
 ) { }

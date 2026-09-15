@@ -20,15 +20,18 @@ public class JobService {
     private final JobRepository jobs;
     private final CompanyRepository companies;
     private final AccessService access;
-    public JobService(JobRepository jobs, CompanyRepository companies, AccessService access) { this.jobs = jobs; this.companies = companies; this.access = access; }
+    private final JobNlpService nlp;
+    private final EmbeddingService embeddings;
+    public JobService(JobRepository jobs, CompanyRepository companies, AccessService access, JobNlpService nlp, EmbeddingService embeddings) { this.jobs = jobs; this.companies = companies; this.access = access; this.nlp = nlp; this.embeddings = embeddings; }
     @Transactional(readOnly = true)
-    public List<JobResponse> list() { return jobs.findAllByOrderByCreatedAtDescIdDesc().stream().map(this::toResponse).toList(); }
+    public List<JobResponse> list() { return jobs.findAllByOrderByLastVerifiedAtDescCreatedAtDescIdDesc().stream().map(this::toResponse).toList(); }
     @Transactional(readOnly = true)
-    public List<JobResponse> listPublished() { return jobs.findByStatusAndExpiryDateGreaterThanEqualOrderByCreatedAtDescIdDesc("published", java.time.LocalDate.now()).stream().map(this::toResponse).toList(); }
-    public List<JobResponse> listForAdmin(Long adminId) { access.requireAdmin(adminId); return list(); }
-    public JobResponse create(Long adminId, JobRequest request) { access.requireAdmin(adminId); Job job = new Job(company(request), adminId); apply(job, request); return toResponse(jobs.save(job)); }
+    public List<JobResponse> listPublished() { return jobs.findByStatusAndExpiryDateGreaterThanEqualOrderByLastVerifiedAtDescCreatedAtDescIdDesc("published", java.time.LocalDate.now()).stream().map(this::toResponse).toList(); }
+    public List<JobResponse> listForAdmin(Long adminId) { access.requireAdmin(adminId); closeExpiredJobs(); return list(); }
+    public JobResponse create(Long adminId, JobRequest request) { access.requireAdmin(adminId); Job job = new Job(company(request), adminId); apply(job, request); nlp.analyze(job); Job saved = jobs.save(job); embeddings.enqueueJob(saved); return toResponse(saved); }
     public int importFromProvider(Long adminId, JobImportProvider provider) { access.requireAdmin(adminId); return provider.importJobs(); }
-    public JobResponse update(Long id, Long adminId, JobRequest request) { access.requireAdmin(adminId); Job job = find(id); apply(job, request); return toResponse(jobs.save(job)); }
+    public int closeExpiredJobs() { return jobs.closeExpired(java.time.LocalDate.now()); }
+    public JobResponse update(Long id, Long adminId, JobRequest request) { access.requireAdmin(adminId); Job job = find(id); apply(job, request); nlp.analyze(job); Job saved = jobs.save(job); embeddings.enqueueJob(saved); return toResponse(saved); }
     public void delete(Long id, Long adminId) { access.requireAdmin(adminId); jobs.delete(find(id)); }
     private Job find(Long id) { return jobs.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found.")); }
     private Company company(JobRequest request) {
@@ -43,7 +46,12 @@ public class JobService {
         String status = request.status().trim().toLowerCase(Locale.ROOT);
         if (!List.of("internship", "part_time", "full_time", "contract").contains(employment) || !List.of("onsite", "hybrid", "remote").contains(workMode) || !List.of("draft", "published", "closed").contains(status)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use a valid job type, work mode, and status.");
         job.update(request.title().trim(), clean(request.location()), employment, workMode, clean(request.salaryText()), request.description().trim(), request.expiryDate(), status);
+        if (request.minExperienceYears() != null && request.maxExperienceYears() != null
+                && request.minExperienceYears() > request.maxExperienceYears()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Minimum experience cannot exceed maximum experience.");
+        }
+        job.setExperienceRange(request.minExperienceYears(), request.maxExperienceYears());
     }
-    public JobResponse toResponse(Job job) { Company c = job.getCompany(); return new JobResponse(job.getId(), c.getName(), c.getWebsite(), c.getLocation(), job.getTitle(), job.getLocation(), job.getEmploymentType(), job.getWorkMode(), job.getSalaryText(), job.getDescription(), job.getExpiryDate(), job.getStatus(), job.getPublicUuid(), job.getSource(), job.getSourceUrl()); }
+    public JobResponse toResponse(Job job) { Company c = job.getCompany(); return new JobResponse(job.getId(), c.getName(), c.getWebsite(), c.getLocation(), job.getTitle(), job.getLocation(), job.getEmploymentType(), job.getWorkMode(), job.getSalaryText(), job.getDescription(), job.getExpiryDate(), job.getStatus(), job.getPublicUuid(), job.getSource(), job.getSourceUrl(), job.getMinExperienceYears(), job.getMaxExperienceYears(), job.getValidationStatus(), job.getLastVerifiedAt(), job.getNormalizedRole(), job.getExtractedSkills(), job.getNlpStatus(), job.getNlpConfidence(), job.getNlpProcessedAt()); }
     private String clean(String value) { return value == null || value.isBlank() ? null : value.trim(); }
 }

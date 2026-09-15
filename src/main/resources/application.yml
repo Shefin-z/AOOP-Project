@@ -6,6 +6,9 @@ server:
 spring:
   application:
     name: careerforge
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   servlet:
     multipart:
       max-file-size: 2MB
@@ -31,6 +34,10 @@ careerforge:
     rapidapi-host: ${RAPIDAPI_HOST:jsearch.p.rapidapi.com}
     jsearch-url: ${JSEARCH_URL:https://jsearch.p.rapidapi.com/search-v2?query=software%20engineer%20intern&page=1&num_pages=1&date_posted=week}
     bdjobs-url: ${BDJOBS_URL:https://jobs.bdjobs.com/jobsearch.asp}
+    bdjobs-api-url: ${BDJOBS_API_URL:https://api.bdjobs.com/Jobs/api/JobSearch/GetJobSearch}
+    sync-enabled: ${JOB_SYNC_ENABLED:false}
+    sync-interval-ms: ${JOB_SYNC_INTERVAL_MS:21600000}
+    sync-initial-delay-ms: ${JOB_SYNC_INITIAL_DELAY_MS:21600000}
 
 youtube:
   api-key: ${YOUTUBE_API_KEY:}
@@ -38,3 +45,5 @@ youtube:
 gemini:
   api-key: ${GEMINI_API_KEY:}
   model: ${GEMINI_MODEL:gemini-3.6-flash}
+  embedding-model: ${GEMINI_EMBEDDING_MODEL:gemini-embedding-2}
+  embedding-dimensions: ${GEMINI_EMBEDDING_DIMENSIONS:768}

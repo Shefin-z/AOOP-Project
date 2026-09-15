@@ -584,6 +584,10 @@ button:focus-visible, .import-file:focus-within, .upload-button:focus-within { o
 @media (max-width: 620px) { .resource-pagination { align-items: stretch; flex-direction: column; }.resource-pagination > div { justify-content: space-between; }.resource-pagination button { width: 38px; height: 38px; } }
 
 /* Clear progress feedback while an admin waits for the external import API. */
+.sync-progress { display: grid; justify-items: center; gap: 10px; max-width: 560px; margin: 42px auto; padding: 42px 30px; text-align: center; color: #315a7c; }
+.sync-progress .spin { color: #4b7095; animation: resource-import-spin .85s linear infinite; }
+.sync-progress h3 { margin: 0; color: #173d5a; }
+.sync-progress p { max-width: 420px; margin: 0; line-height: 1.6; color: #698095; }
 .admin-page .content-intro .button:disabled { min-width: 250px; cursor: wait; color: #234f82; background: #e7f0fb; border-color: #9dbbe0; opacity: 1; }
 .admin-page .content-intro .button:disabled svg { animation: resource-import-spin .85s linear infinite; }
 .admin-page .content-intro .button:disabled::after { content: " Searching YouTube…"; font-size: 11px; }
@@ -593,3 +597,51 @@ button:focus-visible, .import-file:focus-within, .upload-button:focus-within { o
 /* Resource manager keeps its table layout even when rendered without the shared admin-table class. */
 .admin-page .content-table { display: grid; gap: 8px; margin-top: 18px; }
 .admin-page .content-table article { display: grid; align-items: center; gap: 14px; padding: 14px; border-radius: 12px; background: #f7f6f2; }
+
+/* Job moderation is split into clear status sections for faster admin review. */
+.job-list + .job-list { margin-top: 14px; }
+.job-list .list-heading > div { display: grid; gap: 4px; }
+.job-list .list-heading small, .job-source-meta { color: #7d8798; font-size: 11px; }
+.job-list-review .status { background: #fff1d9; color: #a06b18; }
+.job-pagination { display: flex; grid-column: 1 / -1; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 8px; padding-top: 12px; border-top: 1px solid #e3e8e4; }
+.job-pagination button { min-width: 34px; height: 32px; padding: 0 9px; border: 1px solid #d3ddd6; border-radius: 8px; background: #fff; color: #31583b; font: inherit; font-size: 11px; font-weight: 800; }
+.job-pagination button:hover:not(:disabled), .job-pagination button.active { border-color: #31583b; background: #31583b; color: #fff; }
+.job-pagination button:disabled { cursor: not-allowed; opacity: .45; }
+.job-pagination .page-ellipsis { display: inline-grid; min-width: 18px; height: 32px; place-items: center; color: #718174; font-size: 12px; }
+.job-pagination small { margin-left: 8px; color: #718174; font-size: 11px; }
+
+/* Admin jobs visual polish: match the Student Overview hierarchy and contrast. */
+.admin-jobs .content-intro { border: 1px solid #d9e2ee; background: linear-gradient(135deg, #e8edff 0%, #e1f1ea 100%); box-shadow: 0 12px 30px #203a5a10; }
+.admin-jobs .content-intro h2 { color: #092f48; }
+.admin-jobs .content-intro .button.quiet { border-color: #7b8fb9; background: #7b8fb9; color: #fff; box-shadow: 0 7px 16px #203a5a20; }
+.admin-jobs .content-intro .button.quiet:hover { border-color: #092f48; background: #092f48; }
+.admin-jobs .data-form, .admin-jobs .job-list { border-color: #dfe7f1; background: #fff; box-shadow: 0 10px 25px #1b35590a; }
+.admin-jobs .job-list-published { border-top: 3px solid #7eaa96; }
+.admin-jobs .job-list-review { border-top: 3px solid #e5b260; }
+.admin-jobs .job-list-closed { border-top: 3px solid #c58a7d; }
+.admin-jobs .job-list .list-heading span { background: #edf2f8; color: #355b7c; }
+.admin-jobs .job-list-review .list-heading span { background: #fff2da; color: #a26a17; }
+.admin-jobs .job-list-closed .list-heading span { background: #f8e8e3; color: #a35e4d; }
+.admin-jobs .job-table article { border: 1px solid #ebeff5; background: #f3f6fa; transition: border-color .18s ease, background .18s ease; }
+.admin-jobs .job-table article:hover { border-color: #d8e3ef; background: #edf3fa; }
+.admin-jobs .job-table b { color: #20324d; }
+.admin-jobs .job-table article > span:not(.status) { color: #55708c; font-weight: 700; }
+.admin-jobs .table-actions button { border: 1px solid #e1e8f0; transition: border-color .18s ease, background .18s ease, color .18s ease; }
+.admin-jobs .table-actions button:hover { border-color: #7b8fb9; background: #eef2ff; color: #445cb8; }
+.admin-jobs .table-actions button:last-child:hover { border-color: #e1a291; background: #fff1ee; color: #b95743; }
+.search-results-section { margin-top: 20px; padding: 24px; border: 1px solid #dce4f0; border-left: 3px solid #5264dd; border-radius: 18px; background: #fff; box-shadow: 0 10px 25px #1b35590a; }
+.search-results-section .job-results-heading { margin-bottom: 0; }
+.profile-match-heading { margin-top: 28px; padding: 18px 20px; border: 1px solid #dce8e1; border-left: 3px solid #7eaa96; border-radius: 14px; background: #f4f8f5; }
+.profile-match-heading h3 { margin-top: 5px; color: #203b31; }
+.match-section-actions { display: flex; justify-content: center; margin-top: 16px; }
+.match-section-actions .button.quiet { border: 1px solid #d7e2dc; background: #f1f7f3; color: #2d6b51; }
+.match-section-actions .button.quiet:hover { border-color: #7eaa96; background: #e5f2eb; }
+.match-section-actions .job-pagination { width: 100%; margin-top: 0; }
+.ai-processing-panel { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 20px; padding: 20px 24px; border-color: #d9e4ee; background: linear-gradient(120deg, #f8fbfd, #edf4f8); }
+.ai-processing-panel h3 { margin-top: 6px; color: var(--fin-ink); font-size: 18px; }
+.ai-processing-panel p:not(.eyebrow) { margin-top: 5px; color: var(--fin-muted); font-size: 12px; }
+.ai-config-status { padding: 6px 9px; border-radius: 99px; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.ai-config-status.ready { background: #e9f2ee; color: #28724a; }
+.ai-config-status.missing { background: #f8e8e3; color: #b55c43; }
+.ai-processing-panel .button { margin-top: 0; white-space: nowrap; }
+@media (max-width: 700px) { .ai-processing-panel { align-items: flex-start; flex-direction: column; } }

@@ -16,6 +16,8 @@ public class StudentProfile {
     private String degree;
     @Column(name = "graduation_year")
     private Integer graduationYear;
+    @Column(name = "experience_years")
+    private Integer experienceYears;
     @Column(name = "target_role")
     private String targetRole;
     private String location;
@@ -36,16 +38,18 @@ public class StudentProfile {
     public String getUniversity() { return university; }
     public String getDegree() { return degree; }
     public Integer getGraduationYear() { return graduationYear; }
+    public Integer getExperienceYears() { return experienceYears; }
     public String getTargetRole() { return targetRole; }
     public String getLocation() { return location; }
     public String getBio() { return bio; }
     public String getSkills() { return skills; }
     public String getHobbies() { return hobbies; }
     public String getProfilePhotoUrl() { return profilePhotoUrl; }
-    public void update(String university, String degree, Integer graduationYear, String targetRole, String location, String bio, String skills, String hobbies, String profilePhotoUrl) {
+    public void update(String university, String degree, Integer graduationYear, Integer experienceYears, String targetRole, String location, String bio, String skills, String hobbies, String profilePhotoUrl) {
         this.university = university;
         this.degree = degree;
         this.graduationYear = graduationYear;
+        this.experienceYears = experienceYears;
         this.targetRole = targetRole;
         this.location = location;
         this.bio = bio;

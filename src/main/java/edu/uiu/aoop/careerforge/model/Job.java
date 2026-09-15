@@ -32,12 +32,22 @@ public class Job {
     @Column(name = "external_id", length = 100) private String externalId;
     @Column(name = "source_url", length = 600) private String sourceUrl;
     private String title;
-    private String location;
+    @Column(length = 500) private String location;
     @Column(name = "employment_type") private String employmentType;
     @Column(name = "work_mode") private String workMode;
     @Column(name = "salary_text") private String salaryText;
     @Column(columnDefinition = "TEXT") private String description;
     @Column(name = "expiry_date") private LocalDate expiryDate;
+    @Column(name = "min_experience_years") private Integer minExperienceYears;
+    @Column(name = "max_experience_years") private Integer maxExperienceYears;
+    @Column(name = "source_published_at") private LocalDateTime sourcePublishedAt;
+    @Column(name = "last_verified_at") private LocalDateTime lastVerifiedAt;
+    @Column(name = "validation_status") private String validationStatus = "unknown";
+    @Column(name = "normalized_role", length = 180) private String normalizedRole;
+    @Column(name = "extracted_skills", columnDefinition = "TEXT") private String extractedSkills;
+    @Column(name = "nlp_status", length = 30) private String nlpStatus = "pending";
+    @Column(name = "nlp_confidence", precision = 5, scale = 2) private java.math.BigDecimal nlpConfidence;
+    @Column(name = "nlp_processed_at") private LocalDateTime nlpProcessedAt;
     private String status;
     @Column(name = "created_at", insertable = false, updatable = false) private LocalDateTime createdAt;
 
@@ -59,6 +69,16 @@ public class Job {
     public String getSalaryText() { return salaryText; }
     public String getDescription() { return description; }
     public LocalDate getExpiryDate() { return expiryDate; }
+    public Integer getMinExperienceYears() { return minExperienceYears; }
+    public Integer getMaxExperienceYears() { return maxExperienceYears; }
+    public LocalDateTime getSourcePublishedAt() { return sourcePublishedAt; }
+    public LocalDateTime getLastVerifiedAt() { return lastVerifiedAt; }
+    public String getValidationStatus() { return validationStatus; }
+    public String getNormalizedRole() { return normalizedRole; }
+    public String getExtractedSkills() { return extractedSkills; }
+    public String getNlpStatus() { return nlpStatus; }
+    public java.math.BigDecimal getNlpConfidence() { return nlpConfidence; }
+    public LocalDateTime getNlpProcessedAt() { return nlpProcessedAt; }
     public String getStatus() { return status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void update(String title, String location, String employmentType, String workMode, String salaryText, String description, LocalDate expiryDate, String status) {
@@ -67,5 +87,14 @@ public class Job {
     }
     public void markImported(String source, String externalId, String sourceUrl) {
         this.source = source; this.externalId = externalId; this.sourceUrl = sourceUrl;
+    }
+    public void setExperienceRange(Integer min, Integer max) { this.minExperienceYears = min; this.maxExperienceYears = max; }
+    public void markVerified(LocalDateTime publishedAt, String validationStatus) { this.sourcePublishedAt = publishedAt; this.lastVerifiedAt = LocalDateTime.now(); this.validationStatus = validationStatus; }
+    public void applyNlp(String normalizedRole, String extractedSkills, String nlpStatus, double confidence, LocalDateTime processedAt) {
+        this.normalizedRole = normalizedRole;
+        this.extractedSkills = extractedSkills;
+        this.nlpStatus = nlpStatus;
+        this.nlpConfidence = java.math.BigDecimal.valueOf(confidence).setScale(2, java.math.RoundingMode.HALF_UP);
+        this.nlpProcessedAt = processedAt;
     }
 }
