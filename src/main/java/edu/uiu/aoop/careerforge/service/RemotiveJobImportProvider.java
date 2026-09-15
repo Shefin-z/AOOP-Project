@@ -17,12 +17,15 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.Locale;
 
 /** Imports a small, rate-friendly batch of active remote jobs from Remotive. */
 @Service
 @Transactional
-public class RemotiveJobImportProvider implements JobImportProvider {
+public class RemotiveJobImportProvider implements JobSourceAdapter {
     private static final String SOURCE = "Remotive";
     private final JobRepository jobs;
     private final CompanyRepository companies;
@@ -32,22 +35,28 @@ public class RemotiveJobImportProvider implements JobImportProvider {
     private final String rapidApiKey;
     private final String rapidApiHost;
     private final String jsearchEndpoint;
+    private final JobNlpService nlp;
+    private final EmbeddingService embeddings;
 
     public RemotiveJobImportProvider(JobRepository jobs, CompanyRepository companies, ObjectMapper mapper,
                                     @Value("${careerforge.jobs.remotive-url:https://remotive.com/api/remote-jobs?limit=20}") String remotiveEndpoint,
                                     @Value("${careerforge.jobs.rapidapi-key:}") String rapidApiKey,
                                     @Value("${careerforge.jobs.rapidapi-host:jsearch.p.rapidapi.com}") String rapidApiHost,
-                                    @Value("${careerforge.jobs.jsearch-url:https://jsearch.p.rapidapi.com/search-v2?query=software%20engineer%20intern&page=1&num_pages=1&date_posted=week}") String jsearchEndpoint) {
+                                    @Value("${careerforge.jobs.jsearch-url:https://jsearch.p.rapidapi.com/search-v2?query=software%20engineer%20intern&page=1&num_pages=1&date_posted=week}") String jsearchEndpoint,
+                                    JobNlpService nlp, EmbeddingService embeddings) {
         this.jobs = jobs; this.companies = companies; this.mapper = mapper;
         this.client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
         this.remotiveEndpoint = remotiveEndpoint; this.rapidApiKey = rapidApiKey == null ? "" : rapidApiKey.trim();
-        this.rapidApiHost = rapidApiHost; this.jsearchEndpoint = jsearchEndpoint;
+        this.rapidApiHost = rapidApiHost; this.jsearchEndpoint = jsearchEndpoint; this.nlp = nlp; this.embeddings = embeddings;
     }
 
     @Override
     public int importJobs() {
         return rapidApiKey.isBlank() ? importRemotive() : importJsearch();
     }
+
+    @Override public String sourceKey() { return "remotive"; }
+    @Override public String displayName() { return rapidApiKey.isBlank() ? "Remotive" : "JSearch"; }
 
     private int importRemotive() {
         try {
@@ -103,8 +112,12 @@ public class RemotiveJobImportProvider implements JobImportProvider {
         String location = clean(listing.path("candidate_required_location").asText());
         String description = text(listing.path("description").asText());
         job.update(title, location, employmentType(listing.path("job_type").asText()), "remote", clean(listing.path("salary").asText()), description.isBlank() ? "See the original job listing for full details." : description, LocalDate.now().plusDays(30), "published");
+        job.setExperienceRange(number(listing, "min_experience", "job_min_experience"), number(listing, "max_experience", "job_max_experience"));
+        job.markVerified(dateTime(listing, "publication_date", "published_at"), "needs_review");
         job.markImported(SOURCE, externalId, clean(listing.path("url").asText()));
-        jobs.save(job);
+        nlp.analyze(job);
+        Job saved = jobs.save(job);
+        if (isNew) embeddings.enqueueJob(saved);
         return isNew;
     }
 
@@ -119,8 +132,12 @@ public class RemotiveJobImportProvider implements JobImportProvider {
         String location = String.join(", ", java.util.stream.Stream.of(clean(listing.path("job_city").asText()), clean(listing.path("job_state").asText()), clean(listing.path("job_country").asText())).filter(java.util.Objects::nonNull).toList());
         String description = text(listing.path("job_description").asText());
         job.update(title, location.isBlank() ? null : location, employmentType(listing.path("job_employment_type").asText()), listing.path("job_is_remote").asBoolean(false) ? "remote" : "onsite", salary(listing), description == null ? "See the original job listing for full details." : description, LocalDate.now().plusDays(30), "published");
+        job.setExperienceRange(number(listing, "job_min_experience", "min_experience"), number(listing, "job_max_experience", "max_experience"));
+        job.markVerified(dateTime(listing, "job_posted_at_datetime_utc", "job_posted_at"), "needs_review");
         job.markImported("JSearch", externalId, clean(listing.path("job_apply_link").asText()));
-        jobs.save(job);
+        nlp.analyze(job);
+        Job saved = jobs.save(job);
+        if (isNew) embeddings.enqueueJob(saved);
         return isNew;
     }
 
@@ -143,6 +160,26 @@ public class RemotiveJobImportProvider implements JobImportProvider {
             case "full_time", "fulltime" -> "full_time";
             default -> "contract";
         };
+    }
+
+    private Integer number(JsonNode listing, String... fields) {
+        for (String field : fields) {
+            JsonNode value = listing.path(field);
+            if (value.isInt() || value.isLong()) return value.asInt();
+            String text = value.asText("").trim();
+            if (text.matches("\\d+")) return Integer.valueOf(text);
+        }
+        return null;
+    }
+
+    private LocalDateTime dateTime(JsonNode listing, String... fields) {
+        for (String field : fields) {
+            String value = listing.path(field).asText("").trim();
+            if (value.isBlank()) continue;
+            try { return OffsetDateTime.parse(value).toLocalDateTime(); }
+            catch (DateTimeParseException ignored) { try { return LocalDateTime.parse(value); } catch (DateTimeParseException ignoredAgain) { } }
+        }
+        return null;
     }
 
     private String text(String value) {

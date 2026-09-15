@@ -22,6 +22,7 @@ CREATE TABLE student_profiles (
   university VARCHAR(180) NULL,
   degree VARCHAR(180) NULL,
   graduation_year SMALLINT UNSIGNED NULL,
+  experience_years TINYINT UNSIGNED NULL,
   target_role VARCHAR(180) NULL,
   location VARCHAR(180) NULL,
   bio TEXT NULL,
@@ -74,12 +75,22 @@ CREATE TABLE jobs (
   external_id VARCHAR(100) NULL,
   source_url VARCHAR(600) NULL,
   title VARCHAR(220) NOT NULL,
-  location VARCHAR(180) NULL,
+  location VARCHAR(500) NULL,
   employment_type ENUM('internship', 'part_time', 'full_time', 'contract') NOT NULL,
   work_mode ENUM('onsite', 'hybrid', 'remote') NOT NULL DEFAULT 'onsite',
   salary_text VARCHAR(120) NULL,
   description TEXT NOT NULL,
   expiry_date DATE NOT NULL,
+  min_experience_years TINYINT UNSIGNED NULL,
+  max_experience_years TINYINT UNSIGNED NULL,
+  source_published_at DATETIME NULL,
+  last_verified_at DATETIME NULL,
+  validation_status ENUM('unknown', 'valid', 'needs_review', 'invalid') NOT NULL DEFAULT 'unknown',
+  normalized_role VARCHAR(180) NULL,
+  extracted_skills TEXT NULL,
+  nlp_status VARCHAR(30) NOT NULL DEFAULT 'pending',
+  nlp_confidence DECIMAL(5,2) NULL,
+  nlp_processed_at DATETIME NULL,
   status ENUM('draft', 'published', 'closed') NOT NULL DEFAULT 'draft',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -87,6 +98,30 @@ CREATE TABLE jobs (
   CONSTRAINT fk_jobs_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
   UNIQUE KEY uq_jobs_external_source (source, external_id),
   INDEX idx_jobs_visibility (status, expiry_date)
+) ENGINE=InnoDB;
+
+CREATE TABLE job_embeddings (
+  job_id BIGINT UNSIGNED PRIMARY KEY,
+  model VARCHAR(80) NOT NULL,
+  dimensions INT UNSIGNED NOT NULL,
+  vector_json LONGTEXT NOT NULL,
+  content_hash CHAR(64) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  error_message VARCHAR(500) NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_job_embeddings_job FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE profile_embeddings (
+  user_id BIGINT UNSIGNED PRIMARY KEY,
+  model VARCHAR(80) NOT NULL,
+  dimensions INT UNSIGNED NOT NULL,
+  vector_json LONGTEXT NOT NULL,
+  content_hash CHAR(64) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  error_message VARCHAR(500) NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_profile_embeddings_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE job_skills (
@@ -381,4 +416,31 @@ CREATE TABLE platform_settings (
   updated_by BIGINT UNSIGNED NULL,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_platform_settings_user FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- Private Community Chat (also kept in upgrade-community-chat.sql for existing databases).
+CREATE TABLE student_connections (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_low_id BIGINT UNSIGNED NOT NULL,
+  user_high_id BIGINT UNSIGNED NOT NULL,
+  requested_by BIGINT UNSIGNED NOT NULL,
+  status ENUM('pending', 'accepted') NOT NULL DEFAULT 'pending',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT uq_student_connection_pair UNIQUE (user_low_id, user_high_id),
+  CONSTRAINT fk_connection_low_user FOREIGN KEY (user_low_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_connection_high_user FOREIGN KEY (user_high_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_connection_requester FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE student_messages (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  connection_id BIGINT UNSIGNED NOT NULL,
+  sender_id BIGINT UNSIGNED NOT NULL,
+  content VARCHAR(2000) NOT NULL,
+  read_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_message_connection FOREIGN KEY (connection_id) REFERENCES student_connections(id) ON DELETE CASCADE,
+  CONSTRAINT fk_message_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_messages_connection_created (connection_id, created_at)
 ) ENGINE=InnoDB;

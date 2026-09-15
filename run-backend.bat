@@ -1,5 +1,7 @@
 @echo off
 setlocal EnableExtensions
+rem Prevent an inherited DEBUG variable from enabling Spring Boot's verbose debug logging.
+set "DEBUG="
 set "PROJECT_ROOT=%~dp0"
 
 if not defined JAVA_HOME (

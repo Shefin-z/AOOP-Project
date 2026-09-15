@@ -26,17 +26,20 @@ public class ProfileService {
     private static final String UPLOADED_PHOTO_PREFIX = "profile-upload:";
     private final StudentProfileRepository profiles;
     private final AccessService access;
+    private final EmbeddingService embeddings;
     private final Path photoRoot = Path.of(System.getProperty("user.dir"), "uploads", "profile-photos").toAbsolutePath().normalize();
 
-    public ProfileService(StudentProfileRepository profiles, AccessService access) { this.profiles = profiles; this.access = access; }
+    public ProfileService(StudentProfileRepository profiles, AccessService access, EmbeddingService embeddings) { this.profiles = profiles; this.access = access; this.embeddings = embeddings; }
     public ProfileResponse get(Long userId, Long sessionUserId) { return toResponse(access.requireUser(sessionUserId), profiles.findById(userId).orElse(null), userId, sessionUserId); }
 
     public ProfileResponse save(Long userId, Long sessionUserId, ProfileRequest request) {
         if (!userId.equals(sessionUserId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only edit your own profile.");
         User user = access.requireUser(sessionUserId);
         StudentProfile profile = profiles.findById(userId).orElseGet(() -> new StudentProfile(userId));
-        profile.update(trim(request.university()), trim(request.degree()), request.graduationYear(), trim(request.targetRole()), trim(request.location()), trim(request.bio()), trim(request.skills()), trim(request.hobbies()), photoUrl(userId, profile, request.profilePhotoUrl()));
-        return toResponse(user, profiles.save(profile), userId, sessionUserId);
+        profile.update(trim(request.university()), trim(request.degree()), request.graduationYear(), request.experienceYears(), trim(request.targetRole()), trim(request.location()), trim(request.bio()), trim(request.skills()), trim(request.hobbies()), photoUrl(userId, profile, request.profilePhotoUrl()));
+        StudentProfile saved = profiles.save(profile);
+        embeddings.enqueueProfile(saved);
+        return toResponse(user, saved, userId, sessionUserId);
     }
 
     public ProfileResponse uploadPhoto(Long userId, Long sessionUserId, MultipartFile photo) {
@@ -70,7 +73,7 @@ public class ProfileService {
 
     private ProfileResponse toResponse(User user, StudentProfile profile, Long userId, Long sessionUserId) {
         if (!userId.equals(sessionUserId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own profile.");
-        return new ProfileResponse(userId, user.getName(), user.getEmail(), profile == null ? null : profile.getUniversity(), profile == null ? null : profile.getDegree(), profile == null ? null : profile.getGraduationYear(), profile == null ? null : profile.getTargetRole(), profile == null ? null : profile.getLocation(), profile == null ? null : profile.getBio(), profile == null ? null : profile.getSkills(), profile == null ? null : profile.getHobbies(), profile == null ? null : publicPhotoUrl(userId, profile.getProfilePhotoUrl()), user.getPublicUuid());
+        return new ProfileResponse(userId, user.getName(), user.getEmail(), profile == null ? null : profile.getUniversity(), profile == null ? null : profile.getDegree(), profile == null ? null : profile.getGraduationYear(), profile == null ? null : profile.getExperienceYears(), profile == null ? null : profile.getTargetRole(), profile == null ? null : profile.getLocation(), profile == null ? null : profile.getBio(), profile == null ? null : profile.getSkills(), profile == null ? null : profile.getHobbies(), profile == null ? null : publicPhotoUrl(userId, profile.getProfilePhotoUrl()), user.getPublicUuid());
     }
     private String trim(String value) { return value == null || value.isBlank() ? null : value.trim(); }
     private String photoUrl(Long userId, StudentProfile profile, String value) {
