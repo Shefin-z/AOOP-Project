@@ -6,6 +6,7 @@ import edu.uiu.aoop.careerforge.dto.MessageRequest;
 import edu.uiu.aoop.careerforge.dto.MessageResponse;
 import edu.uiu.aoop.careerforge.dto.StudentDirectoryResponse;
 import edu.uiu.aoop.careerforge.service.CommunityChatService;
+import edu.uiu.aoop.careerforge.dto.ConnectedStudentProfileResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -33,5 +34,6 @@ public class CommunityChatController {
     @PutMapping("/connections/{connectionId}/accept") public ConnectionResponse accept(@RequestHeader(name = "X-User-Id", required = false) Long userId, @PathVariable Long connectionId) { return community.acceptConnection(userId, connectionId); }
     @DeleteMapping("/connections/{connectionId}") @ResponseStatus(HttpStatus.NO_CONTENT) public void remove(@RequestHeader(name = "X-User-Id", required = false) Long userId, @PathVariable Long connectionId) { community.deleteConnection(userId, connectionId); }
     @GetMapping("/connections/{connectionId}/messages") public List<MessageResponse> messages(@RequestHeader(name = "X-User-Id", required = false) Long userId, @PathVariable Long connectionId) { return community.messages(userId, connectionId); }
+    @GetMapping("/connections/{connectionId}/profile") public ConnectedStudentProfileResponse profile(@RequestHeader(name = "X-User-Id", required = false) Long userId, @PathVariable Long connectionId) { return community.connectedProfile(userId, connectionId); }
     @PostMapping("/connections/{connectionId}/messages") @ResponseStatus(HttpStatus.CREATED) public MessageResponse send(@RequestHeader(name = "X-User-Id", required = false) Long userId, @PathVariable Long connectionId, @Valid @RequestBody MessageRequest request) { return community.send(userId, connectionId, request.content()); }
 }

@@ -1,6 +1,7 @@
 package edu.uiu.aoop.careerforge.service;
 
 import edu.uiu.aoop.careerforge.dto.ConnectionResponse;
+import edu.uiu.aoop.careerforge.dto.ConnectedStudentProfileResponse;
 import edu.uiu.aoop.careerforge.dto.MessageResponse;
 import edu.uiu.aoop.careerforge.dto.StudentDirectoryResponse;
 import edu.uiu.aoop.careerforge.model.Role;
@@ -9,6 +10,7 @@ import edu.uiu.aoop.careerforge.model.StudentMessage;
 import edu.uiu.aoop.careerforge.model.User;
 import edu.uiu.aoop.careerforge.repository.StudentConnectionRepository;
 import edu.uiu.aoop.careerforge.repository.StudentMessageRepository;
+import edu.uiu.aoop.careerforge.repository.StudentProfileRepository;
 import edu.uiu.aoop.careerforge.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -23,9 +25,10 @@ public class CommunityChatService {
     private final UserRepository users;
     private final StudentConnectionRepository connections;
     private final StudentMessageRepository messages;
+    private final StudentProfileRepository profiles;
 
-    public CommunityChatService(AccessService access, UserRepository users, StudentConnectionRepository connections, StudentMessageRepository messages) {
-        this.access = access; this.users = users; this.connections = connections; this.messages = messages;
+    public CommunityChatService(AccessService access, UserRepository users, StudentConnectionRepository connections, StudentMessageRepository messages, StudentProfileRepository profiles) {
+        this.access = access; this.users = users; this.connections = connections; this.messages = messages; this.profiles = profiles;
     }
 
     public void openSocket(Long userId) { access.requireStudent(userId); }
@@ -82,6 +85,19 @@ public class CommunityChatService {
         List<StudentMessage> conversation = messages.findByConnectionIdOrderByCreatedAtAsc(connection.getId());
         conversation.stream().filter(message -> !message.getSenderId().equals(userId)).forEach(StudentMessage::markRead);
         return conversation.stream().map(this::messageResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ConnectedStudentProfileResponse connectedProfile(Long userId, Long connectionId) {
+        access.requireStudent(userId);
+        StudentConnection connection = requireAcceptedConnection(connectionId, userId);
+        User other = users.findById(connection.otherUserId(userId)).orElseThrow();
+        return profiles.findById(other.getId())
+                .map(profile -> new ConnectedStudentProfileResponse(other.getId(), other.getName(), profile.getUniversity(),
+                        profile.getDegree(), profile.getTargetRole(), profile.getLocation(), profile.getSkills(),
+                        profile.getHobbies(), profile.getBio(), profile.getProfilePhotoUrl()))
+                .orElseGet(() -> new ConnectedStudentProfileResponse(other.getId(), other.getName(), null, null,
+                        null, null, null, null, null, null));
     }
 
     @Transactional

@@ -103,11 +103,16 @@ public class JobController {
         return result;
     }
     private int syncOne(Long adminId, JobSourceAdapter source) {
+        if ("running".equals(syncTracker.snapshot(source.sourceKey()).get("status"))) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    source.displayName() + " sync is already running. Please wait for it to finish.");
+        }
         syncTracker.start(source.sourceKey());
         try {
             jobs.closeExpiredJobs();
             int imported = jobs.importFromProvider(adminId, source);
             syncTracker.complete(source.sourceKey(), imported, jobRepository);
+            embeddings.enqueueMissingJobs(jobRepository.findByStatusAndExpiryDateGreaterThanEqualOrderByLastVerifiedAtDescCreatedAtDescIdDesc("published", LocalDate.now()), 100);
             return imported;
         } catch (RuntimeException error) {
             syncTracker.failed(source.sourceKey(), error.getMessage());

@@ -645,3 +645,34 @@ button:focus-visible, .import-file:focus-within, .upload-button:focus-within { o
 .ai-config-status.missing { background: #f8e8e3; color: #b55c43; }
 .ai-processing-panel .button { margin-top: 0; white-space: nowrap; }
 @media (max-width: 700px) { .ai-processing-panel { align-items: flex-start; flex-direction: column; } }
+
+.connect-layout { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(340px, 1fr); gap: 18px; margin-top: 20px; }
+.connect-layout .content-card, .chat-page-layout .content-card { margin-top: 0; }
+.connection-manager { min-height: 420px; }
+.student-chat-page > .form-success, .connect-page > .form-success { margin-top: 16px; }
+.chat-page-layout { display: grid; grid-template-columns: minmax(230px, .75fr) minmax(360px, 1.35fr) minmax(230px, .8fr); gap: 18px; margin-top: 20px; align-items: start; }
+.chat-contacts { min-height: 520px; }
+.chat-contacts .connection-list article { padding: 4px; }
+.chat-contacts .connection-list article.selected { border-color: var(--fin-blue); background: #edf2ff; }
+.chat-contacts .connection-select { padding: 7px; }
+.connected-profile { min-height: 420px; text-align: center; }
+.profile-avatar { display: grid; width: 74px; height: 74px; margin: 4px auto 14px; overflow: hidden; place-items: center; border-radius: 50%; background: #e8eef6; color: var(--fin-blue-dark); font-size: 24px; font-weight: 800; }
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.connected-profile > h3 { margin: 0; color: var(--fin-ink); font-size: 17px; }
+.connected-profile > p { margin: 6px 0 16px; color: var(--fin-muted); font-size: 12px; }
+.connected-profile dl { display: grid; gap: 9px; margin: 0; padding: 13px 0; border-top: 1px solid #e4eaf1; border-bottom: 1px solid #e4eaf1; text-align: left; }
+.connected-profile dl div { display: grid; gap: 2px; }
+.connected-profile dt, .profile-label { color: var(--fin-muted); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.connected-profile dd { margin: 0; color: var(--fin-ink); font-size: 11px; }
+.profile-label { display: block; margin-top: 14px; text-align: left; }
+.profile-skills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; text-align: left; }
+.profile-skills span { border-radius: 99px; padding: 5px 7px; background: #edf2f8; color: var(--fin-blue-dark); font-size: 10px; font-weight: 700; }
+.connected-profile .profile-bio { margin: 14px 0; color: var(--fin-ink); line-height: 1.5; text-align: left; }
+.connected-profile > .muted { display: block; margin-top: 16px; font-size: 10px; }
+.community-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.community-metrics article { min-height: 105px; }
+.community-admin-table article { grid-template-columns: minmax(145px, .65fr) minmax(250px, 1.55fr) 100px auto; }
+.community-admin-table article > p { margin: 0; color: var(--fin-ink); font-size: 12px; line-height: 1.45; white-space: pre-wrap; }
+.community-connection-table article { grid-template-columns: minmax(240px, 1fr) 110px; }
+@media (max-width: 1080px) { .chat-page-layout { grid-template-columns: minmax(220px, .75fr) minmax(340px, 1.25fr); }.connected-profile { grid-column: 1 / -1; min-height: auto; }.community-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .connect-layout, .chat-page-layout { grid-template-columns: 1fr; }.connected-profile { grid-column: auto; }.chat-contacts { min-height: auto; }.community-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }.community-admin-table article, .community-connection-table article { grid-template-columns: 1fr; }.community-admin-table article > p { margin: 4px 0; } }
