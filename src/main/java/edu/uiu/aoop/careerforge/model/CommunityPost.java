@@ -21,4 +21,5 @@ public class CommunityPost {
     protected CommunityPost() { }
     public CommunityPost(Long userId, String content) { this.userId = userId; this.content = content; this.status = "visible"; }
     public Long getId() { return id; } public Long getUserId() { return userId; } public String getContent() { return content; } public String getMediaUrl() { return mediaUrl; } public String getStatus() { return status; } public LocalDateTime getCreatedAt() { return createdAt; }
+    public void moderate(String status) { this.status = status; }
 }

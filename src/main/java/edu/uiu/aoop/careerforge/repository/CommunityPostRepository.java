@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface CommunityPostRepository extends JpaRepository<CommunityPost, Long> {
     List<CommunityPost> findByStatusOrderByCreatedAtDescIdDesc(String status);
+    List<CommunityPost> findAllByOrderByCreatedAtDescIdDesc();
+    long countByStatus(String status);
 }
