@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,10 +45,11 @@ public class EmbeddingService {
         this.resumes = resumes; this.mapper = mapper; this.executor = executor;
     }
 
-    public void enqueueJob(Job job) {
-        if (!client.configured() || job == null || job.getId() == null || !queuedJobs.add(job.getId())) return;
+    public boolean enqueueJob(Job job) {
+        if (!client.configured() || job == null || job.getId() == null || !queuedJobs.add(job.getId())) return false;
         Long id = job.getId(); String title = job.getTitle(); String text = jobText(job);
         executor.submit(() -> { try { processJob(id, title, text); } finally { queuedJobs.remove(id); } });
+        return true;
     }
 
     public String model() { return client.model(); }
@@ -61,12 +63,13 @@ public class EmbeddingService {
 
     public int enqueueMissingJobs(Collection<Job> jobs, int limit) {
         int queued = 0;
+        LocalDateTime staleBefore = LocalDateTime.now().minusMinutes(1);
         for (Job job : jobs) {
             if (queued >= limit || job == null || job.getId() == null) continue;
             JobEmbedding existing = jobEmbeddings.findById(job.getId()).orElse(null);
-            if (existing != null && ("processing".equals(existing.getStatus())
+            if (existing != null && (("processing".equals(existing.getStatus()) && existing.getUpdatedAt() != null && existing.getUpdatedAt().isAfter(staleBefore))
                     || ("ready".equals(existing.getStatus()) && client.model().equals(existing.getModel())))) continue;
-            enqueueJob(job); queued++;
+            if (enqueueJob(job)) queued++;
         }
         return queued;
     }

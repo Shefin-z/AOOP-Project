@@ -29,6 +29,8 @@ public class JobSyncConfig {
             thread.setDaemon(true);
             return thread;
         };
-        return Executors.newFixedThreadPool(2, factory);
+        // Gemini embedding quotas are rate-limited. A single worker keeps background
+        // enrichment predictable and avoids bursts when multiple sources sync together.
+        return Executors.newSingleThreadExecutor(factory);
     }
 }

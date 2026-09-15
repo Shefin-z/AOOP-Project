@@ -41,7 +41,7 @@ public class JobSyncScheduler {
                 int imported = source.importJobs();
                 tracker.complete(source.sourceKey(), imported, jobRepository);
                 int queuedEmbeddings = embeddings.enqueueMissingJobs(
-                        jobRepository.findByStatusAndExpiryDateGreaterThanEqualOrderByLastVerifiedAtDescCreatedAtDescIdDesc("published", java.time.LocalDate.now()), 100);
+                        jobRepository.findByStatusAndExpiryDateGreaterThanEqualOrderByLastVerifiedAtDescCreatedAtDescIdDesc("published", java.time.LocalDate.now()), 20);
                 log.info("Job source {} refreshed: {} imported", source.sourceKey(), imported);
                 log.info("Queued {} missing job embeddings after {} refresh", queuedEmbeddings, source.sourceKey());
                 return imported;
