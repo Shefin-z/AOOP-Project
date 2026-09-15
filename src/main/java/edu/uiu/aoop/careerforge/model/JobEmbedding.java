@@ -38,6 +38,7 @@ public class JobEmbedding {
     public String getContentHash() { return contentHash; }
     public String getStatus() { return status; }
     public String getErrorMessage() { return errorMessage; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void markProcessing(String model, int dimensions, String hash) { this.model = model; this.dimensions = dimensions; this.vectorJson = this.vectorJson == null ? "[]" : this.vectorJson; this.contentHash = hash; this.status = "processing"; this.errorMessage = null; }
     public void markReady(String model, int dimensions, String vectorJson, String hash) { this.model = model; this.dimensions = dimensions; this.vectorJson = vectorJson; this.contentHash = hash; this.status = "ready"; this.errorMessage = null; }
     public void markFailed(String model, String hash, String message) { this.model = model; this.contentHash = hash; this.status = "failed"; this.errorMessage = message == null ? "Embedding request failed." : message.substring(0, Math.min(500, message.length())); }
