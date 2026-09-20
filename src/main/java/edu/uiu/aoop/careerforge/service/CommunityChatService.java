@@ -31,12 +31,7 @@ public class CommunityChatService {
         this.access = access; this.users = users; this.connections = connections; this.messages = messages; this.profiles = profiles;
     }
 
-    /**
-     * Both a student and an administrator may open the live socket.  The
-     * returned flag tells the socket handler whether the session is a
-     * read-only moderation monitor instead of a student chat session.
-     */
-    public boolean openSocket(Long userId) { return access.requireUser(userId).getRole() == Role.ADMIN; }
+    public void openSocket(Long userId) { access.requireStudent(userId); }
 
     @Transactional(readOnly = true)
     public List<StudentDirectoryResponse> directory(Long userId, String query) {

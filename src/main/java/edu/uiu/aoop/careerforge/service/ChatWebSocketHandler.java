@@ -22,7 +22,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private final CommunityChatService community;
     private final ExecutorService communityChatExecutor;
     private final ConcurrentHashMap<Long, CopyOnWriteArraySet<WebSocketSession>> sessionsByUser = new ConcurrentHashMap<>();
-    private final CopyOnWriteArraySet<WebSocketSession> administratorMonitors = new CopyOnWriteArraySet<>();
 
     public ChatWebSocketHandler(ObjectMapper json, CommunityChatService community, ExecutorService communityChatExecutor) {
         this.json = json; this.community = community; this.communityChatExecutor = communityChatExecutor;
@@ -31,20 +30,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     @Override public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         Long userId = userId(session);
         if (userId == null) { session.close(CloseStatus.NOT_ACCEPTABLE.withReason("A student session is required.")); return; }
-        try {
-            boolean administrator = community.openSocket(userId);
-            session.getAttributes().put("administratorMonitor", administrator);
-            if (administrator) administratorMonitors.add(session);
-            else sessionsByUser.computeIfAbsent(userId, ignored -> new CopyOnWriteArraySet<>()).add(session);
-            send(session, json.writeValueAsString(java.util.Map.of("type", "connected", "mode", administrator ? "monitor" : "student")));
-        } catch (Exception ignored) { session.close(CloseStatus.NOT_ACCEPTABLE.withReason("A valid signed-in session is required.")); }
+        try { community.openSocket(userId); } catch (Exception ignored) { session.close(CloseStatus.NOT_ACCEPTABLE.withReason("A valid student session is required.")); return; }
+        sessionsByUser.computeIfAbsent(userId, ignored -> new CopyOnWriteArraySet<>()).add(session);
+        send(session, json.writeValueAsString(java.util.Map.of("type", "connected")));
     }
 
     @Override protected void handleTextMessage(WebSocketSession session, TextMessage message) {
         Long userId = userId(session);
-        if (Boolean.TRUE.equals(session.getAttributes().get("administratorMonitor"))) {
-            try { send(session, json.writeValueAsString(java.util.Map.of("type", "error", "message", "Administrators can monitor chats but cannot send student messages."))); } catch (Exception ignored) { }
-        } else if (userId != null) communityChatExecutor.execute(() -> process(userId, session, message.getPayload()));
+        if (userId != null) communityChatExecutor.execute(() -> process(userId, session, message.getPayload()));
     }
 
     private void process(Long userId, WebSocketSession session, String payload) {
@@ -56,15 +49,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             String response = json.writeValueAsString(java.util.Map.of("type", "message", "message", saved));
             List<Long> recipients = community.participants(connectionId, userId);
             recipients.forEach(recipient -> sessionsByUser.getOrDefault(recipient, new CopyOnWriteArraySet<>()).forEach(target -> send(target, response)));
-            administratorMonitors.forEach(target -> send(target, response));
         } catch (Exception exception) {
             try { send(session, json.writeValueAsString(java.util.Map.of("type", "error", "message", clientMessage(exception)))); } catch (Exception ignored) { }
         }
     }
 
     @Override public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        if (Boolean.TRUE.equals(session.getAttributes().get("administratorMonitor"))) { administratorMonitors.remove(session); return; }
-        Long userId = userId(session); if (userId == null) return;
+        Long userId = userId(session);
+        if (userId == null) return;
         CopyOnWriteArraySet<WebSocketSession> sessions = sessionsByUser.get(userId);
         if (sessions != null) { sessions.remove(session); if (sessions.isEmpty()) sessionsByUser.remove(userId, sessions); }
     }
