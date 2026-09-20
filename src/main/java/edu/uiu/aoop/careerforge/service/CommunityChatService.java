@@ -39,7 +39,12 @@ public class CommunityChatService {
         String needle = query == null ? "" : query.trim().toLowerCase();
         return users.findAll().stream()
                 .filter(user -> user.getRole() == Role.STUDENT && !user.getId().equals(userId))
-                .filter(user -> needle.isBlank() || user.getName().toLowerCase().contains(needle) || user.getEmail().toLowerCase().contains(needle))
+                .filter(user -> {
+                    var profile = profiles.findById(user.getId()).orElse(null);
+                    String searchable = user.getId() + " " + user.getName() + " " + user.getEmail() + " "
+                            + (profile == null ? "" : String.join(" ", safe(profile.getUniversity()), safe(profile.getTargetRole())));
+                    return needle.isBlank() || searchable.toLowerCase().contains(needle);
+                })
                 .limit(30)
                 .map(user -> {
                     StudentConnection connection = pair(userId, user.getId()).orElse(null);
@@ -110,6 +115,18 @@ public class CommunityChatService {
         return messageResponse(messages.save(new StudentMessage(connection, userId, content)));
     }
 
+    @Transactional
+    public void deleteMessage(Long userId, Long connectionId, Long messageId) {
+        access.requireStudent(userId); requireAcceptedConnection(connectionId, userId);
+        if (messages.deleteByIdAndConnectionIdAndSenderId(messageId, connectionId, userId) == 0) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only delete messages that you sent.");
+    }
+
+    @Transactional
+    public void clearConversation(Long userId, Long connectionId) {
+        access.requireStudent(userId); StudentConnection connection = requireAcceptedConnection(connectionId, userId);
+        messages.deleteByConnectionId(connection.getId());
+    }
+
     @Transactional(readOnly = true)
     public List<Long> participants(Long connectionId, Long userId) {
         StudentConnection connection = requireAcceptedConnection(connectionId, userId);
@@ -133,6 +150,7 @@ public class CommunityChatService {
         return other;
     }
     private java.util.Optional<StudentConnection> pair(Long first, Long second) { return connections.findByUserLowIdAndUserHighId(Math.min(first, second), Math.max(first, second)); }
+    private String safe(String value) { return value == null ? "" : value; }
     private ConnectionResponse connectionResponse(StudentConnection connection, Long currentUserId) {
         User other = users.findById(connection.otherUserId(currentUserId)).orElseThrow();
         return new ConnectionResponse(connection.getId(), other.getId(), other.getName(), connection.getStatus(), connection.getRequestedBy().equals(currentUserId), messages.countByConnectionIdAndSenderIdNotAndReadAtIsNull(connection.getId(), currentUserId), connection.getUpdatedAt());

@@ -676,3 +676,14 @@ button:focus-visible, .import-file:focus-within, .upload-button:focus-within { o
 .community-connection-table article { grid-template-columns: minmax(240px, 1fr) 110px; }
 @media (max-width: 1080px) { .chat-page-layout { grid-template-columns: minmax(220px, .75fr) minmax(340px, 1.25fr); }.connected-profile { grid-column: 1 / -1; min-height: auto; }.community-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .connect-layout, .chat-page-layout { grid-template-columns: 1fr; }.connected-profile { grid-column: auto; }.chat-contacts { min-height: auto; }.community-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }.community-admin-table article, .community-connection-table article { grid-template-columns: 1fr; }.community-admin-table article > p { margin: 4px 0; } }
+
+.community-post-options { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.community-post-options input { width: 100%; border: 1px solid var(--fin-line); border-radius: 9px; padding: 9px 10px; outline-color: var(--fin-blue); font: inherit; font-size: 11px; }
+.feed-post.pending-post { border-color: #e5c88a; background: #fffcf4; }
+.pending-note { margin: 12px 0 0; color: #8d6b22; font-size: 11px; font-weight: 700; }
+.post-link { display: inline-block; margin: 0 0 10px; color: var(--fin-blue-dark); font-size: 11px; font-weight: 800; }
+.post-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 10px; }
+.post-tags span { border-radius: 99px; padding: 4px 7px; background: #eef2fb; color: var(--fin-blue-dark); font-size: 10px; font-weight: 700; }
+.feed-post > footer button + button { margin-left: 2px; }
+.risk-detail { display: block; max-width: 190px; margin-top: 6px; color: var(--fin-muted); font-size: 10px; line-height: 1.35; }
+@media (max-width: 700px) { .community-post-options { grid-template-columns: 1fr; } }

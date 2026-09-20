@@ -1,6 +1,5 @@
 package edu.uiu.aoop.careerforge.controller;
 
-import edu.uiu.aoop.careerforge.dto.AdminCommunityConnectionResponse;
 import edu.uiu.aoop.careerforge.dto.AdminCommunityPostResponse;
 import edu.uiu.aoop.careerforge.service.AdminCommunityService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,5 +21,5 @@ public class AdminCommunityController {
     @GetMapping("/overview") public Map<String, Long> overview(@RequestHeader(name = "X-User-Id", required = false) Long adminId) { return community.overview(adminId); }
     @GetMapping("/posts") public List<AdminCommunityPostResponse> posts(@RequestHeader(name = "X-User-Id", required = false) Long adminId) { return community.posts(adminId); }
     @PutMapping("/posts/{postId}/status") public AdminCommunityPostResponse status(@RequestHeader(name = "X-User-Id", required = false) Long adminId, @PathVariable Long postId, @RequestParam String status) { return community.updatePostStatus(adminId, postId, status); }
-    @GetMapping("/connections") public List<AdminCommunityConnectionResponse> connections(@RequestHeader(name = "X-User-Id", required = false) Long adminId) { return community.connections(adminId); }
+    @PutMapping("/posts/{postId}/rescan") public AdminCommunityPostResponse rescan(@RequestHeader(name = "X-User-Id", required = false) Long adminId, @PathVariable Long postId) { return community.rescan(adminId, postId); }
 }
