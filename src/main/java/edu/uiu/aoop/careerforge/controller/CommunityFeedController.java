@@ -4,7 +4,9 @@ import edu.uiu.aoop.careerforge.dto.CommentRequest;
 import edu.uiu.aoop.careerforge.dto.CommentResponse;
 import edu.uiu.aoop.careerforge.dto.PostRequest;
 import edu.uiu.aoop.careerforge.dto.PostResponse;
+import edu.uiu.aoop.careerforge.dto.CommunityAllowanceResponse;
 import edu.uiu.aoop.careerforge.service.CommunityFeedService;
+import edu.uiu.aoop.careerforge.service.CommunityAllowanceService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,7 +26,9 @@ import java.util.List;
 @RequestMapping("/community/posts")
 public class CommunityFeedController {
     private final CommunityFeedService feed;
-    public CommunityFeedController(CommunityFeedService feed) { this.feed = feed; }
+    private final CommunityAllowanceService allowance;
+    public CommunityFeedController(CommunityFeedService feed, CommunityAllowanceService allowance) { this.feed = feed; this.allowance = allowance; }
+    @GetMapping("/allowance") public CommunityAllowanceResponse allowance(@RequestHeader(name = "X-User-Id", required = false) Long userId) { return allowance.status(userId); }
     @GetMapping public List<PostResponse> list(@RequestHeader(name = "X-User-Id", required = false) Long userId) { return feed.list(userId); }
     @PostMapping @ResponseStatus(HttpStatus.CREATED) public PostResponse create(@RequestHeader(name = "X-User-Id", required = false) Long userId, @Valid @RequestBody PostRequest request) { return feed.create(userId, request.content(), request.mediaUrl(), request.topicTags()); }
     @PostMapping("/{postId}/likes") public PostResponse like(@RequestHeader(name = "X-User-Id", required = false) Long userId, @PathVariable Long postId) { return feed.toggleLike(userId, postId); }
