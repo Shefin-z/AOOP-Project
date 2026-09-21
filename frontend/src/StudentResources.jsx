@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, BookOpen, Bookmark, BookmarkCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock3, ExternalLink, FileText, LayoutTemplate, Play, PlayCircle, Search, Sparkles, Youtube } from "lucide-react";
+import { BadgeCheck, BookOpen, Bookmark, BookmarkCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock3, ExternalLink, FileText, LayoutTemplate, LoaderCircle, Play, PlayCircle, Search, Sparkles, Youtube } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -88,7 +88,7 @@ export function StudentResources() {
   async function findSkill(event, value = skill) {
     event?.preventDefault();
     const term = value.trim(); if (!term || !current?.id) return;
-    setSkill(term); setSearching(true); setError("");
+    setSkill(term); setSearching(true); setSearchResults(null); setError("");
     try { setSearchResults(await fetch(`${API_BASE_URL}/resources/search?skill=${encodeURIComponent(term)}`, { headers: { "X-User-Id": current.id } }).then(responseBody)); }
     catch (requestError) { setError(requestError.message); } finally { setSearching(false); }
   }
@@ -104,11 +104,15 @@ export function StudentResources() {
     </header>
 
     <section className="skill-resource-finder">
-      <p className="eyebrow"><Youtube size={15} /> SKILL RESOURCE FINDER</p><h3>What skill do you want to gain?</h3><p>Search a skill for up to 20 YouTube videos. Matching resources selected by your CareerForge administrator always appear first.</p>
-      <form onSubmit={findSkill}><label><Search size={20} /><input value={skill} onChange={(event) => setSkill(event.target.value)} placeholder="e.g. React, SQL, Figma, Python, public speaking" /></label><button disabled={searching || !skill.trim()} type="submit">{searching ? "Searching…" : "Search videos"}</button></form>
+      <p className="eyebrow"><Youtube size={15} /> SKILL RESOURCE FINDER</p><h3>What skill do you want to gain?</h3><p>Search a skill for the best matching YouTube playlists. A matching resource selected by your CareerForge administrator always appears first.</p>
+      <form onSubmit={findSkill}><label><Search size={20} /><input value={skill} onChange={(event) => setSkill(event.target.value)} placeholder="e.g. React, SQL, Figma, Python, public speaking" /></label><button disabled={searching || !skill.trim()} type="submit">Search playlists</button></form>
       <div className="skill-quick"><span>TRY:</span>{["React", "SQL", "Python", "Figma", "Public speaking"].map((item) => <button type="button" key={item} onClick={() => findSkill(null, item)}>{item}</button>)}</div>
-      {!searchResults && <div className="skill-empty"><Youtube size={27} /><b>Search the skill you want to learn</b><span>CareerForge will show matching administrator suggestions before public YouTube results.</span></div>}
-      {searchResults && <div className="skill-results">{searchResults.suggestions?.length > 0 && <><div className="skill-result-heading"><BadgeCheck size={17} /><div><b>Suggested by CareerForge</b><span>Selected by your administrator for {skill}</span></div></div><div className="resource-featured-grid">{searchResults.suggestions.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}</div></>}{searchResults.videos?.length > 0 && <><div className="skill-result-heading youtube"><Youtube size={17} /><div><b>Related YouTube videos</b><span>{searchResults.videos.length} results for {skill}</span></div></div><div className="resource-grid">{searchResults.videos.map((item) => <article className="resource-card video-result" key={item.id}><div className="resource-thumbnail">{item.thumbnailUrl ? <img src={item.thumbnailUrl} alt="" /> : <div className="resource-thumbnail-fallback youtube"><Youtube size={32} /></div>}<span className="resource-youtube-badge"><Youtube size={13} /> YouTube</span></div><div className="resource-card-top"><span className="resource-provider">{item.providerName}</span></div><h4>{item.title}</h4><p className="resource-description">{item.description || "Related YouTube video for this skill."}</p><footer><span>Video</span><a href={item.resourceUrl} target="_blank" rel="noreferrer">Watch on YouTube <ExternalLink size={14} /></a></footer></article>)}</div></>}{!searchResults.suggestions?.length && !searchResults.videos?.length && <div className="skill-empty"><Search size={27} /><b>No matching result found</b><span>Try a broader skill name.</span></div>}</div>}
+      {searching ? <div className="skill-searching" role="status"><LoaderCircle size={37} /><b>Finding the best YouTube playlists for {skill}...</b><span>Checking CareerForge recommendations first, then ranking public playlists.</span></div> : !searchResults ? <div className="skill-empty"><Youtube size={27} /><b>Search the skill you want to learn</b><span>CareerForge will show matching administrator suggestions before public YouTube playlists.</span></div> : <div className="skill-results">
+        {searchResults.suggestions?.length > 0 && <><div className="skill-result-heading"><BadgeCheck size={17} /><div><b>Suggested by CareerForge</b><span>Selected by your administrator for {skill}</span></div></div><div className="resource-featured-grid">{searchResults.suggestions.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}</div></>}
+        {searchResults.videos?.length > 0 && <><div className="skill-result-heading youtube"><Youtube size={17} /><div><b>Best matching YouTube playlists</b><span>{searchResults.videos.length} ranked playlist{searchResults.videos.length === 1 ? "" : "s"} for {skill}</span></div></div><div className="resource-grid">{searchResults.videos.map((item) => <article className="resource-card video-result" key={item.id}><div className="resource-thumbnail">{item.thumbnailUrl ? <img src={item.thumbnailUrl} alt="" /> : <div className="resource-thumbnail-fallback youtube"><Youtube size={32} /></div>}<span className="resource-youtube-badge"><Youtube size={13} /> YouTube playlist</span></div><div className="resource-card-top"><span className="resource-provider">{item.providerName}</span></div><h4>{item.title}</h4><p className="resource-description">{item.description || "A ranked YouTube playlist for this skill."}</p><footer><span>Playlist</span><a href={item.resourceUrl} target="_blank" rel="noreferrer">Open playlist <ExternalLink size={14} /></a></footer></article>)}</div></>}
+        {!searchResults.suggestions?.length && !searchResults.videos?.length && <div className="skill-empty"><Search size={27} /><b>{searchResults.youtubeMessage ? "YouTube results are unavailable" : "No matching result found"}</b><span>{searchResults.youtubeMessage || "Try a broader skill name."}</span></div>}
+        {searchResults.youtubeMessage && searchResults.videos?.length > 0 && <p className="skill-youtube-message">{searchResults.youtubeMessage}</p>}
+      </div>}
     </section>
 
     {error && <p className="form-error">{error}</p>}

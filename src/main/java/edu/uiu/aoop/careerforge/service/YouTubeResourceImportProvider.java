@@ -70,23 +70,22 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         }
     }
 
-    public List<Map<String, Object>> searchVideos(String topic) {
+    public List<Map<String, Object>> searchPlaylists(String topic) {
         if (apiKey.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "YouTube is not configured. Add YOUTUBE_API_KEY and restart the backend.");
         if (topic == null || topic.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a skill to search YouTube.");
         try {
-            JsonNode items = get("search", "video search", "part=snippet&type=video&order=relevance&maxResults=20&safeSearch=strict&q=" + encode(topic.trim()) + "&key=" + encode(apiKey)).path("items");
+            List<Candidate> candidates = rankCandidates(search(topic.trim()));
             List<Map<String, Object>> results = new ArrayList<>();
-            for (JsonNode item : items) {
-                String videoId = item.path("id").path("videoId").asText(); JsonNode snippet = item.path("snippet");
-                if (videoId.isBlank()) continue;
-                Map<String, Object> video = new LinkedHashMap<>();
-                video.put("id", videoId); video.put("title", clean(snippet.path("title").asText())); video.put("description", clean(snippet.path("description").asText()));
-                video.put("providerName", clean(snippet.path("channelTitle").asText())); video.put("thumbnailUrl", thumbnail(snippet));
-                video.put("resourceUrl", "https://www.youtube.com/watch?v=" + videoId); results.add(video);
+            for (Candidate candidate : candidates.stream().limit(3).toList()) {
+                JsonNode item = candidate.item(); String playlistId = item.path("id").path("playlistId").asText(); JsonNode snippet = item.path("snippet");
+                Map<String, Object> playlist = new LinkedHashMap<>();
+                playlist.put("id", playlistId); playlist.put("title", clean(snippet.path("title").asText())); playlist.put("description", clean(snippet.path("description").asText()));
+                playlist.put("providerName", clean(snippet.path("channelTitle").asText())); playlist.put("thumbnailUrl", thumbnail(snippet));
+                playlist.put("resourceUrl", "https://www.youtube.com/playlist?list=" + playlistId); results.add(playlist);
             }
             return results;
         } catch (ResponseStatusException exception) { throw exception; }
-        catch (Exception exception) { throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "YouTube search could not complete right now."); }
+        catch (Exception exception) { throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "YouTube playlist search could not complete right now."); }
     }
 
     /** Search keeps YouTube's relevance signal, then we enrich and re-rank those candidates. */
