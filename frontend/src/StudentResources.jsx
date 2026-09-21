@@ -66,7 +66,6 @@ export function StudentResources() {
   const hasProfileSignal = Boolean(profile.targetRole || profile.skills);
   const savedCount = resources.filter((item) => item.saved).length;
   const completedCount = resources.filter((item) => item.completed).length;
-  const completionPercent = resources.length ? Math.round((completedCount / resources.length) * 100) : 0;
 
   useEffect(() => { setPage(1); }, [query, category, view]);
 
@@ -126,11 +125,6 @@ export function StudentResources() {
             {[['all', 'All'], ['saved', `Saved (${savedCount})`], ['completed', `Completed (${completedCount})`]].map(([value, label]) => <button type="button" key={value} className={view === value ? "active" : ""} onClick={() => setView(value)}>{label}</button>)}
           </div>
         </div>
-      </section>
-
-      <section className="resource-progress-panel" aria-label="Your learning progress">
-        <div><p className="eyebrow">YOUR ACTIVITY</p><h3>{completedCount} of {resources.length} resources completed</h3><p>Save useful material for later and mark it complete when you are done.</p></div>
-        <div className="resource-progress-summary"><b>{completionPercent}%</b><span>complete</span><div className="resource-progress-meter" role="progressbar" aria-label="Resource completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow={completionPercent}><i style={{ width: `${completionPercent}%` }} /></div></div>
       </section>
 
       {featuredResources.length > 0 && <section className="resource-featured-section">
