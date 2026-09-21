@@ -24,16 +24,34 @@ echo ===============================================
 
 call :port_open 3306
 if errorlevel 1 (
-    echo Starting local MySQL...
-    start "CareerForge MySQL" /min "C:\xampp\mysql\bin\mysqld.exe" "--defaults-file=C:\xampp\mysql\bin\my.ini"
-    timeout /t 4 /nobreak >nul
+    set "MYSQLD_EXE="
+    set "MYSQLD_CONFIG="
+    if defined CAREERFORGE_MYSQLD if exist "%CAREERFORGE_MYSQLD%" set "MYSQLD_EXE=%CAREERFORGE_MYSQLD%"
+    if not defined MYSQLD_EXE if exist "C:\xampp\mysql\bin\mysqld.exe" (
+        set "MYSQLD_EXE=C:\xampp\mysql\bin\mysqld.exe"
+        set "MYSQLD_CONFIG=--defaults-file=C:\xampp\mysql\bin\my.ini"
+    )
+    if defined MYSQLD_EXE (
+        echo Starting local MySQL...
+        start "CareerForge MySQL" /min "%MYSQLD_EXE%" %MYSQLD_CONFIG%
+        timeout /t 4 /nobreak >nul
+    ) else (
+        rem Common standalone MySQL and MariaDB installers register a Windows service.
+        for %%S in (MySQL80 MySQL MariaDB) do (
+            sc query "%%S" >nul 2>nul && net start "%%S" >nul 2>nul
+        )
+        timeout /t 4 /nobreak >nul
+    )
 )
 
 call :port_open 3306
 if errorlevel 1 (
     echo.
     echo MySQL could not start on port 3306.
-    echo Open XAMPP as Administrator, start MySQL, then run this file again.
+    echo Start MySQL from XAMPP / Windows Services, then run this file again.
+    echo If mysqld.exe is in a custom location, run this once in PowerShell:
+    echo   setx CAREERFORGE_MYSQLD "C:\path\to\mysqld.exe"
+    echo Setup details: SETUP-RUN-BN.md
     pause
     exit /b 1
 )
