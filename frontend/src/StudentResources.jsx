@@ -34,6 +34,9 @@ export function StudentResources() {
   const [updatingId, setUpdatingId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [skill, setSkill] = useState("");
+  const [searchResults, setSearchResults] = useState(null);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     if (!current?.id) { setError("Please sign in again."); setLoading(false); return; }
@@ -82,6 +85,14 @@ export function StudentResources() {
     }
   }
 
+  async function findSkill(event, value = skill) {
+    event?.preventDefault();
+    const term = value.trim(); if (!term || !current?.id) return;
+    setSkill(term); setSearching(true); setError("");
+    try { setSearchResults(await fetch(`${API_BASE_URL}/resources/search?skill=${encodeURIComponent(term)}`, { headers: { "X-User-Id": current.id } }).then(responseBody)); }
+    catch (requestError) { setError(requestError.message); } finally { setSearching(false); }
+  }
+
   return <section className="student-resources">
     <header className="resources-hero">
       <div>
@@ -91,6 +102,14 @@ export function StudentResources() {
       </div>
       <div className="resource-total"><BookOpen size={19} /><b>{loading ? "…" : resources.length}</b><span>published resources</span></div>
     </header>
+
+    <section className="skill-resource-finder">
+      <p className="eyebrow"><Youtube size={15} /> SKILL RESOURCE FINDER</p><h3>What skill do you want to gain?</h3><p>Search a skill for up to 20 YouTube videos. Matching resources selected by your CareerForge administrator always appear first.</p>
+      <form onSubmit={findSkill}><label><Search size={20} /><input value={skill} onChange={(event) => setSkill(event.target.value)} placeholder="e.g. React, SQL, Figma, Python, public speaking" /></label><button disabled={searching || !skill.trim()} type="submit">{searching ? "Searching…" : "Search videos"}</button></form>
+      <div className="skill-quick"><span>TRY:</span>{["React", "SQL", "Python", "Figma", "Public speaking"].map((item) => <button type="button" key={item} onClick={() => findSkill(null, item)}>{item}</button>)}</div>
+      {!searchResults && <div className="skill-empty"><Youtube size={27} /><b>Search the skill you want to learn</b><span>CareerForge will show matching administrator suggestions before public YouTube results.</span></div>}
+      {searchResults && <div className="skill-results">{searchResults.suggestions?.length > 0 && <><div className="skill-result-heading"><BadgeCheck size={17} /><div><b>Suggested by CareerForge</b><span>Selected by your administrator for {skill}</span></div></div><div className="resource-featured-grid">{searchResults.suggestions.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}</div></>}{searchResults.videos?.length > 0 && <><div className="skill-result-heading youtube"><Youtube size={17} /><div><b>Related YouTube videos</b><span>{searchResults.videos.length} results for {skill}</span></div></div><div className="resource-grid">{searchResults.videos.map((item) => <article className="resource-card video-result" key={item.id}><div className="resource-thumbnail">{item.thumbnailUrl ? <img src={item.thumbnailUrl} alt="" /> : <div className="resource-thumbnail-fallback youtube"><Youtube size={32} /></div>}<span className="resource-youtube-badge"><Youtube size={13} /> YouTube</span></div><div className="resource-card-top"><span className="resource-provider">{item.providerName}</span></div><h4>{item.title}</h4><p className="resource-description">{item.description || "Related YouTube video for this skill."}</p><footer><span>Video</span><a href={item.resourceUrl} target="_blank" rel="noreferrer">Watch on YouTube <ExternalLink size={14} /></a></footer></article>)}</div></>}{!searchResults.suggestions?.length && !searchResults.videos?.length && <div className="skill-empty"><Search size={27} /><b>No matching result found</b><span>Try a broader skill name.</span></div>}</div>}
+    </section>
 
     {error && <p className="form-error">{error}</p>}
 
