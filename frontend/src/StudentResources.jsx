@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Bookmark, BookmarkCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock3, ExternalLink, FileText, LayoutTemplate, PlayCircle, Search, Sparkles } from "lucide-react";
+import { BadgeCheck, BookOpen, Bookmark, BookmarkCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock3, ExternalLink, FileText, LayoutTemplate, Play, PlayCircle, Search, Sparkles, Youtube } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -54,10 +54,12 @@ export function StudentResources() {
     const haystack = `${item.title || ""} ${item.description || ""} ${item.category || ""} ${item.type || ""}`.toLowerCase();
     return matchesCategory && matchesView && haystack.includes(query.trim().toLowerCase());
   }), [resources, category, query, view]);
+  const featuredResources = useMemo(() => filtered.filter((item) => item.featured), [filtered]);
+  const libraryResources = useMemo(() => filtered.filter((item) => !item.featured), [filtered]);
   const pageSize = 6;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const visibleResources = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const recommended = useMemo(() => [...resources].sort((left, right) => resourceScore(right, profile) - resourceScore(left, profile)).slice(0, 3), [resources, profile]);
+  const totalPages = Math.max(1, Math.ceil(libraryResources.length / pageSize));
+  const visibleResources = libraryResources.slice((page - 1) * pageSize, page * pageSize);
+  const recommended = useMemo(() => [...resources].filter((item) => !item.featured).sort((left, right) => resourceScore(right, profile) - resourceScore(left, profile)).slice(0, 3), [resources, profile]);
   const hasProfileSignal = Boolean(profile.targetRole || profile.skills);
   const savedCount = resources.filter((item) => item.saved).length;
   const completedCount = resources.filter((item) => item.completed).length;
@@ -108,14 +110,19 @@ export function StudentResources() {
         <div className="resource-progress-summary"><b>{completionPercent}%</b><span>complete</span><div className="resource-progress-meter" role="progressbar" aria-label="Resource completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow={completionPercent}><i style={{ width: `${completionPercent}%` }} /></div></div>
       </section>
 
+      {featuredResources.length > 0 && <section className="resource-featured-section">
+        <div className="resource-section-heading"><div><p className="eyebrow"><BadgeCheck size={14} /> CAREERFORGE RECOMMENDS</p><h3>Suggested by your platform</h3></div><p>These are hand-picked by your CareerForge administrator to give you a reliable next step.</p></div>
+        <div className="resource-featured-grid">{featuredResources.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}</div>
+      </section>}
+
     </>}
 
     <section className="resource-library">
-      <div className="resource-section-heading"><div><p className="eyebrow">EXPLORE THE LIBRARY</p><h3>{loading ? "Loading resources..." : resources.length ? `${filtered.length} resource${filtered.length === 1 ? "" : "s"} available` : "No resources published yet"}</h3></div>{resources.length > 0 && <span>{view === "saved" ? "Saved resources" : view === "completed" ? "Completed resources" : category === "All" ? "All topics" : category}</span>}</div>
-      {loading ? <div className="resource-loading"><i /><i /><i /></div> : resources.length === 0 ? <div className="resource-empty"><span><BookOpen size={22} /></span><div><h3>Your learning library is getting ready.</h3><p>Published resources from your CareerForge administrator will appear here.</p></div></div> : filtered.length ? <><div className="resource-grid">{visibleResources.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}</div>{totalPages > 1 && <nav className="resource-pagination" aria-label="Resource pages"><span>Page {page} of {totalPages}</span><div><button type="button" aria-label="Previous page" disabled={page === 1} onClick={() => setPage((currentPage) => currentPage - 1)}><ChevronLeft size={16} /></button>{Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => <button type="button" key={pageNumber} className={page === pageNumber ? "active" : ""} aria-label={`Page ${pageNumber}`} aria-current={page === pageNumber ? "page" : undefined} onClick={() => setPage(pageNumber)}>{pageNumber}</button>)}<button type="button" aria-label="Next page" disabled={page === totalPages} onClick={() => setPage((currentPage) => currentPage + 1)}><ChevronRight size={16} /></button></div></nav>}</> : <div className="resource-empty"><span><Search size={22} /></span><div><h3>No matching resources found.</h3><p>Try a different topic or clear the search to see all published materials.</p></div></div>}
+      <div className="resource-section-heading"><div><p className="eyebrow">EXPLORE THE LIBRARY</p><h3>{loading ? "Loading resources..." : resources.length ? `${libraryResources.length} resource${libraryResources.length === 1 ? "" : "s"} available` : "No resources published yet"}</h3></div>{resources.length > 0 && <span>{view === "saved" ? "Saved resources" : view === "completed" ? "Completed resources" : category === "All" ? "All topics" : category}</span>}</div>
+      {loading ? <div className="resource-loading"><i /><i /><i /></div> : resources.length === 0 ? <div className="resource-empty"><span><BookOpen size={22} /></span><div><h3>Your learning library is getting ready.</h3><p>Published resources from your CareerForge administrator will appear here.</p></div></div> : libraryResources.length ? <><div className="resource-grid">{visibleResources.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}</div>{totalPages > 1 && <nav className="resource-pagination" aria-label="Resource pages"><span>Page {page} of {totalPages}</span><div><button type="button" aria-label="Previous page" disabled={page === 1} onClick={() => setPage((currentPage) => currentPage - 1)}><ChevronLeft size={16} /></button>{Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => <button type="button" key={pageNumber} className={page === pageNumber ? "active" : ""} aria-label={`Page ${pageNumber}`} aria-current={page === pageNumber ? "page" : undefined} onClick={() => setPage(pageNumber)}>{pageNumber}</button>)}<button type="button" aria-label="Next page" disabled={page === totalPages} onClick={() => setPage((currentPage) => currentPage + 1)}><ChevronRight size={16} /></button></div></nav>}</> : filtered.length ? <div className="resource-empty"><span><BadgeCheck size={22} /></span><div><h3>Everything here is a CareerForge recommendation.</h3><p>Use the section above to start with your administrator’s suggested learning.</p></div></div> : <div className="resource-empty"><span><Search size={22} /></span><div><h3>No matching resources found.</h3><p>Try a different topic or clear the search to see all published materials.</p></div></div>}
     </section>
 
-    {!loading && resources.length > 0 && <section className="resource-recommendations">
+    {!loading && recommended.length > 0 && <section className="resource-recommendations">
       <div className="resource-section-heading"><div><p className="eyebrow">PICKED FOR YOUR DIRECTION</p><h3>{hasProfileSignal ? "Recommended for you" : "Start here"}</h3></div><p>{hasProfileSignal ? "Matched against your target role and skills." : "Add your target role and skills in your profile for more focused suggestions."}</p></div>
       <div className="resource-recommendation-grid">{recommended.map((item) => <ResourceCard key={item.id} resource={item} compact onToggle={toggle} updatingId={updatingId} />)}</div>
     </section>}
@@ -124,12 +131,16 @@ export function StudentResources() {
 
 function ResourceCard({ resource, compact = false, onToggle, updatingId }) {
   const [Icon, typeLabel] = typeDetails[String(resource.type || "article").toLowerCase()] || typeDetails.article;
-  return <article className={`resource-card${compact ? " compact" : ""}`}>
-    <div className="resource-card-top"><span className="resource-type-icon"><Icon size={compact ? 17 : 19} /></span><span className="resource-type">{typeLabel}</span></div>
+  const isYouTube = /youtube|youtu\.be/i.test(`${resource.providerName || ""} ${resource.resourceUrl || ""}`);
+  const provider = resource.providerName || (isYouTube ? "YouTube" : "CareerForge library");
+  return <article className={`resource-card${compact ? " compact" : ""}${resource.featured ? " featured" : ""}`}>
+    <div className="resource-thumbnail">{resource.thumbnailUrl ? <img src={resource.thumbnailUrl} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <div className={`resource-thumbnail-fallback${isYouTube ? " youtube" : ""}`}><Icon size={compact ? 28 : 36} /><Play size={compact ? 16 : 20} /></div>}<span className="resource-type">{typeLabel}</span>{resource.featured ? <span className="resource-platform-badge"><BadgeCheck size={13} /> CareerForge recommends</span> : isYouTube && <span className="resource-youtube-badge"><Youtube size={13} /> YouTube</span>}</div>
+    <div className="resource-card-top"><span className="resource-type-icon"><Icon size={compact ? 17 : 19} /></span><span className="resource-provider">{provider}</span></div>
     <p className="resource-category">{resource.category || "Learning"}</p>
     <h4>{resource.title}</h4>
     <p className="resource-description">{resource.description || "A curated CareerForge resource to support your next step."}</p>
-    <footer><span>{resource.estimatedMinutes ? <><Clock3 size={14} /> {resource.estimatedMinutes} min</> : "Self-paced"}</span><a href={resource.resourceUrl} target="_blank" rel="noreferrer">Open resource <ExternalLink size={14} /></a></footer>
+    {resource.featured && <p className="resource-recommendation-note"><BadgeCheck size={14} /> {resource.recommendationNote || "Suggested by your CareerForge administrator."}</p>}
+    <footer><span>{resource.estimatedMinutes ? <><Clock3 size={14} /> {resource.estimatedMinutes} min</> : "Self-paced"}</span><a href={resource.resourceUrl} target="_blank" rel="noreferrer">{isYouTube ? "Watch on YouTube" : "Open resource"} <ExternalLink size={14} /></a></footer>
     <div className="resource-card-actions">
       <button type="button" className={resource.saved ? "active" : ""} aria-pressed={Boolean(resource.saved)} disabled={updatingId === `saved-${resource.id}`} onClick={() => onToggle(resource, "saved")}>{resource.saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />} {resource.saved ? "Saved" : "Save"}</button>
       <button type="button" className={resource.completed ? "active complete" : ""} aria-pressed={Boolean(resource.completed)} disabled={updatingId === `completed-${resource.id}`} onClick={() => onToggle(resource, "completed")}><CheckCircle2 size={15} /> {resource.completed ? "Completed" : "Mark complete"}</button>

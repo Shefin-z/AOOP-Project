@@ -178,19 +178,29 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         if (playlistId.isBlank() || title.isBlank()) return false;
         String url = "https://www.youtube.com/playlist?list=" + playlistId;
         String description = clean(snippet.path("description").asText());
+        String providerName = clean(snippet.path("channelTitle").asText());
+        String thumbnailUrl = thumbnail(snippet);
         Integer existing = jdbc.query("select id from learning_resources where source = ? and external_id = ?",
                 rs -> rs.next() ? rs.getInt("id") : null, SOURCE, playlistId);
         if (existing != null) {
-            jdbc.update("update learning_resources set title=?, description=?, category=?, resource_type=?, resource_url=? where id=?",
-                    limit(title, 220), description, limit(topic, 120), "course", url, existing);
+            jdbc.update("update learning_resources set title=?, description=?, category=?, resource_type=?, resource_url=?, thumbnail_url=?, provider_name=? where id=?",
+                    limit(title, 220), description, limit(topic, 120), "course", url, thumbnailUrl, providerName, existing);
             return false;
         }
-        jdbc.update("insert into learning_resources (created_by,source,external_id,title,description,category,resource_type,resource_url,status) values (?,?,?,?,?,?,?,?, 'draft')",
-                adminId, SOURCE, playlistId, limit(title, 220), description, limit(topic, 120), "course", url);
+        jdbc.update("insert into learning_resources (created_by,source,external_id,title,description,category,resource_type,resource_url,thumbnail_url,provider_name,status) values (?,?,?,?,?,?,?,?,?,?, 'draft')",
+                adminId, SOURCE, playlistId, limit(title, 220), description, limit(topic, 120), "course", url, thumbnailUrl, providerName);
         return true;
     }
 
     private String encode(String value) { return URLEncoder.encode(value, StandardCharsets.UTF_8); }
+    private String thumbnail(JsonNode snippet) {
+        JsonNode thumbnails = snippet.path("thumbnails");
+        for (String size : List.of("maxres", "high", "medium", "default")) {
+            String url = clean(thumbnails.path(size).path("url").asText());
+            if (!url.isBlank()) return limit(url, 600);
+        }
+        return null;
+    }
     private String clean(String value) { return value == null ? "" : value.trim(); }
     private String limit(String value, int length) { return value.substring(0, Math.min(value.length(), length)); }
 
