@@ -1,6 +1,7 @@
 package edu.uiu.aoop.careerforge.service;
 
 import edu.uiu.aoop.careerforge.dto.ConnectionResponse;
+import edu.uiu.aoop.careerforge.dto.ConnectedStudentProfileResponse;
 import edu.uiu.aoop.careerforge.dto.MessageResponse;
 import edu.uiu.aoop.careerforge.dto.StudentDirectoryResponse;
 import edu.uiu.aoop.careerforge.model.Role;
@@ -9,6 +10,7 @@ import edu.uiu.aoop.careerforge.model.StudentMessage;
 import edu.uiu.aoop.careerforge.model.User;
 import edu.uiu.aoop.careerforge.repository.StudentConnectionRepository;
 import edu.uiu.aoop.careerforge.repository.StudentMessageRepository;
+import edu.uiu.aoop.careerforge.repository.StudentProfileRepository;
 import edu.uiu.aoop.careerforge.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -23,9 +25,10 @@ public class CommunityChatService {
     private final UserRepository users;
     private final StudentConnectionRepository connections;
     private final StudentMessageRepository messages;
+    private final StudentProfileRepository profiles;
 
-    public CommunityChatService(AccessService access, UserRepository users, StudentConnectionRepository connections, StudentMessageRepository messages) {
-        this.access = access; this.users = users; this.connections = connections; this.messages = messages;
+    public CommunityChatService(AccessService access, UserRepository users, StudentConnectionRepository connections, StudentMessageRepository messages, StudentProfileRepository profiles) {
+        this.access = access; this.users = users; this.connections = connections; this.messages = messages; this.profiles = profiles;
     }
 
     public void openSocket(Long userId) { access.requireStudent(userId); }
@@ -36,7 +39,12 @@ public class CommunityChatService {
         String needle = query == null ? "" : query.trim().toLowerCase();
         return users.findAll().stream()
                 .filter(user -> user.getRole() == Role.STUDENT && !user.getId().equals(userId))
-                .filter(user -> needle.isBlank() || user.getName().toLowerCase().contains(needle) || user.getEmail().toLowerCase().contains(needle))
+                .filter(user -> {
+                    var profile = profiles.findById(user.getId()).orElse(null);
+                    String searchable = user.getId() + " " + user.getName() + " " + user.getEmail() + " "
+                            + (profile == null ? "" : String.join(" ", safe(profile.getUniversity()), safe(profile.getTargetRole())));
+                    return needle.isBlank() || searchable.toLowerCase().contains(needle);
+                })
                 .limit(30)
                 .map(user -> {
                     StudentConnection connection = pair(userId, user.getId()).orElse(null);
@@ -84,6 +92,19 @@ public class CommunityChatService {
         return conversation.stream().map(this::messageResponse).toList();
     }
 
+    @Transactional(readOnly = true)
+    public ConnectedStudentProfileResponse connectedProfile(Long userId, Long connectionId) {
+        access.requireStudent(userId);
+        StudentConnection connection = requireAcceptedConnection(connectionId, userId);
+        User other = users.findById(connection.otherUserId(userId)).orElseThrow();
+        return profiles.findById(other.getId())
+                .map(profile -> new ConnectedStudentProfileResponse(other.getId(), other.getName(), profile.getUniversity(),
+                        profile.getDegree(), profile.getTargetRole(), profile.getLocation(), profile.getSkills(),
+                        profile.getHobbies(), profile.getBio(), profile.getProfilePhotoUrl()))
+                .orElseGet(() -> new ConnectedStudentProfileResponse(other.getId(), other.getName(), null, null,
+                        null, null, null, null, null, null));
+    }
+
     @Transactional
     public MessageResponse send(Long userId, Long connectionId, String text) {
         access.requireStudent(userId);
@@ -92,6 +113,18 @@ public class CommunityChatService {
         if (content.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A message cannot be empty.");
         if (content.length() > 2000) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Messages can contain up to 2,000 characters.");
         return messageResponse(messages.save(new StudentMessage(connection, userId, content)));
+    }
+
+    @Transactional
+    public void deleteMessage(Long userId, Long connectionId, Long messageId) {
+        access.requireStudent(userId); requireAcceptedConnection(connectionId, userId);
+        if (messages.deleteByIdAndConnectionIdAndSenderId(messageId, connectionId, userId) == 0) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only delete messages that you sent.");
+    }
+
+    @Transactional
+    public void clearConversation(Long userId, Long connectionId) {
+        access.requireStudent(userId); StudentConnection connection = requireAcceptedConnection(connectionId, userId);
+        messages.deleteByConnectionId(connection.getId());
     }
 
     @Transactional(readOnly = true)
@@ -117,6 +150,7 @@ public class CommunityChatService {
         return other;
     }
     private java.util.Optional<StudentConnection> pair(Long first, Long second) { return connections.findByUserLowIdAndUserHighId(Math.min(first, second), Math.max(first, second)); }
+    private String safe(String value) { return value == null ? "" : value; }
     private ConnectionResponse connectionResponse(StudentConnection connection, Long currentUserId) {
         User other = users.findById(connection.otherUserId(currentUserId)).orElseThrow();
         return new ConnectionResponse(connection.getId(), other.getId(), other.getName(), connection.getStatus(), connection.getRequestedBy().equals(currentUserId), messages.countByConnectionIdAndSenderIdNotAndReadAtIsNull(connection.getId(), currentUserId), connection.getUpdatedAt());

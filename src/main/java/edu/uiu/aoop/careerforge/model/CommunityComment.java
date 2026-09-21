@@ -21,4 +21,5 @@ public class CommunityComment {
     protected CommunityComment() { }
     public CommunityComment(Long postId, Long userId, String content) { this.postId = postId; this.userId = userId; this.content = content; this.status = "visible"; }
     public Long getId() { return id; } public Long getPostId() { return postId; } public Long getUserId() { return userId; } public String getContent() { return content; } public String getStatus() { return status; } public LocalDateTime getCreatedAt() { return createdAt; }
+    public void remove() { this.status = "removed"; }
 }

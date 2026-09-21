@@ -8,4 +8,6 @@ import java.util.List;
 public interface StudentMessageRepository extends JpaRepository<StudentMessage, Long> {
     List<StudentMessage> findByConnectionIdOrderByCreatedAtAsc(Long connectionId);
     long countByConnectionIdAndSenderIdNotAndReadAtIsNull(Long connectionId, Long senderId);
+    long deleteByIdAndConnectionIdAndSenderId(Long id, Long connectionId, Long senderId);
+    long deleteByConnectionId(Long connectionId);
 }

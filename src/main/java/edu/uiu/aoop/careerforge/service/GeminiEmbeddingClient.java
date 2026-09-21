@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +39,10 @@ public class GeminiEmbeddingClient {
                                  @Value("${gemini.embedding-dimensions:768}") int dimensions,
                                  @Value("${gemini.embedding-min-interval-ms:1100}") long minimumIntervalMs) {
         this.mapper = mapper;
+        SimpleClientHttpRequestFactory requests = new SimpleClientHttpRequestFactory();
+        requests.setConnectTimeout(10_000);
+        requests.setReadTimeout(25_000);
+        this.http = new RestTemplate(requests);
         this.apiKey = apiKey == null ? "" : apiKey.trim();
         this.model = model == null || model.isBlank() ? "gemini-embedding-2" : model.trim();
         this.dimensions = dimensions < 128 ? 768 : Math.min(3072, dimensions);
