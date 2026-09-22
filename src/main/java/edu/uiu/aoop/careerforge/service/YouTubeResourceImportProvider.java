@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -78,7 +79,7 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         if (apiKey.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "YouTube is not configured. Add YOUTUBE_API_KEY and restart the backend.");
         if (topic == null || topic.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a skill to search YouTube.");
         try {
-            List<Candidate> candidates = rankCandidates(search(topic.trim()));
+            List<Candidate> candidates = rankStudentCandidates(searchStudentCandidates(topic.trim()));
             List<Map<String, Object>> results = new ArrayList<>();
             for (Candidate candidate : candidates.stream().limit(STUDENT_RESULT_LIMIT).toList()) {
                 JsonNode item = candidate.item();
@@ -136,23 +137,63 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         return ranked;
     }
 
-    /** Student search adds channel authority to the original relevance, views, engagement and playlist-depth signals. */
-    private List<Candidate> rankStudentCandidates(JsonNode items) throws Exception {
-        List<JsonNode> searchItems = new ArrayList<>();
+    /**
+     * Student search is intentionally restricted to the three learning languages
+     * our students requested.  The Search API is asked separately for English,
+     * Bangla and Hindi, so an unrelated regional result cannot win merely because
+     * it happens to contain the topic word in its title.
+     */
+    private List<StudentSearchCandidate> searchStudentCandidates(String topic) throws Exception {
+        List<StudentSearchCandidate> results = new ArrayList<>();
+        Set<String> seenPlaylistIds = new HashSet<>();
+        addStudentCandidates(results, seenPlaylistIds, searchGlobal(topic), topic, 1d);
+        addStudentCandidates(results, seenPlaylistIds, searchBangla(topic), topic, .98d);
+        addStudentCandidates(results, seenPlaylistIds, searchHindi(topic), topic, .96d);
+        return results;
+    }
+
+    private void addStudentCandidates(List<StudentSearchCandidate> results, Set<String> seenPlaylistIds,
+                                      JsonNode items, String topic, double languagePreference) {
+        int resultCount = Math.max(items.size(), 1);
+        int index = 0;
         for (JsonNode item : items) {
-            if (!item.path("id").path("playlistId").asText().isBlank()) searchItems.add(item);
+            String playlistId = item.path("id").path("playlistId").asText();
+            if (!playlistId.isBlank() && topicMatches(item, topic) && seenPlaylistIds.add(playlistId)) {
+                double searchRelevance = (resultCount - index) / (double) resultCount;
+                results.add(new StudentSearchCandidate(item, searchRelevance, languagePreference));
+            }
+            index++;
         }
+    }
+
+    private boolean topicMatches(JsonNode item, String topic) {
+        String normalizedTopic = topic.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", " ").trim();
+        if (normalizedTopic.isBlank()) return true;
+        String searchable = (clean(item.path("snippet").path("title").asText()) + " "
+                + clean(item.path("snippet").path("description").asText()))
+                .toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", " ");
+        if (searchable.contains(normalizedTopic)) return true;
+        String[] words = normalizedTopic.split("\\s+");
+        int matchedWords = 0;
+        for (String word : words) if (word.length() > 2 && searchable.contains(word)) matchedWords++;
+        return matchedWords >= Math.max(1, words.length - 1);
+    }
+
+    /** Ranks only language-appropriate, topic-matching playlists by real audience signals. */
+    private List<Candidate> rankStudentCandidates(List<StudentSearchCandidate> studentCandidates) throws Exception {
+        List<StudentSearchCandidate> searchItems = studentCandidates.stream()
+                .filter(candidate -> !candidate.item().path("id").path("playlistId").asText().isBlank()).toList();
         if (searchItems.isEmpty()) return List.of();
 
         List<String> playlistIds = searchItems.stream()
-                .map(item -> item.path("id").path("playlistId").asText())
+                .map(candidate -> candidate.item().path("id").path("playlistId").asText())
                 .toList();
         CompletableFuture<Map<String, Integer>> itemCountsFuture = CompletableFuture.supplyAsync(() -> fetch(() -> playlistDetails(playlistIds)));
         Map<String, List<String>> sampledVideos = new HashMap<>();
         Set<String> allVideoIds = new HashSet<>();
         Set<String> channelIds = new HashSet<>();
-        for (JsonNode item : searchItems) {
-            String channelId = item.path("snippet").path("channelId").asText();
+        for (StudentSearchCandidate candidate : searchItems) {
+            String channelId = candidate.item().path("snippet").path("channelId").asText();
             if (!channelId.isBlank()) channelIds.add(channelId);
         }
         CompletableFuture<Map<String, Long>> subscriberCountsFuture = CompletableFuture.supplyAsync(() -> fetch(() -> channelSubscribers(new ArrayList<>(channelIds))));
@@ -169,9 +210,8 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         Map<String, Long> subscriberCounts = subscriberCountsFuture.join();
 
         List<Candidate> ranked = new ArrayList<>();
-        int count = searchItems.size();
-        for (int index = 0; index < count; index++) {
-            JsonNode item = searchItems.get(index);
+        for (StudentSearchCandidate studentCandidate : searchItems) {
+            JsonNode item = studentCandidate.item();
             String playlistId = item.path("id").path("playlistId").asText();
             List<Stats> videoStats = sampledVideos.getOrDefault(playlistId, List.of()).stream()
                     .map(stats::get).filter(java.util.Objects::nonNull).toList();
@@ -179,14 +219,17 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
             double averageEngagement = videoStats.stream()
                     .mapToDouble(stat -> (stat.likes() + stat.comments()) / (double) Math.max(stat.views(), 1L))
                     .average().orElse(0d);
-            double relevance = count == 1 ? 1d : (count - index) / (double) count;
+            double relevance = studentCandidate.searchRelevance();
             double popularity = Math.min(1d, Math.log10(averageViews + 1d) / 7d);
             double engagement = Math.min(1d, Math.log10(averageEngagement * 10000d + 1d) / 4d);
             double depth = Math.min(1d, Math.log10(itemCounts.getOrDefault(playlistId, 0) + 1d) / 3d);
             long subscribers = subscriberCounts.getOrDefault(item.path("snippet").path("channelId").asText(), 0L);
             double channelAuthority = Math.min(1d, Math.log10(subscribers + 1d) / 7d);
-            double score = 0.55d * relevance + 0.20d * popularity + 0.10d * engagement
-                    + 0.10d * channelAuthority + 0.05d * depth;
+            // Viewership and channel authority outrank raw Search API position.
+            // The final small boost keeps English, Bangla and Hindi results ahead
+            // of any fallback result without favouring one of those three.
+            double score = 0.20d * relevance + 0.28d * popularity + 0.12d * engagement
+                    + 0.25d * channelAuthority + 0.10d * depth + 0.05d * studentCandidate.languagePreference();
             ranked.add(new Candidate(item, score));
         }
         ranked.sort(Comparator.comparingDouble(Candidate::score).reversed());
@@ -202,19 +245,19 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
 
     private JsonNode searchGlobal(String topic) throws Exception {
         String query = "part=snippet&type=playlist&order=relevance&maxResults=" + STUDENT_CANDIDATE_LIMIT
-                + "&safeSearch=strict&q=" + encode(topic) + "&key=" + encode(apiKey);
-        return get("search", "global playlist search", query).path("items");
+                + "&safeSearch=strict&relevanceLanguage=en&regionCode=US&q=" + encode(topic + " full course tutorial") + "&key=" + encode(apiKey);
+        return get("search", "English playlist search", query).path("items");
     }
 
     private JsonNode searchBangla(String topic) throws Exception {
         String query = "part=snippet&type=playlist&order=relevance&maxResults=" + STUDENT_CANDIDATE_LIMIT
-                + "&safeSearch=strict&relevanceLanguage=bn&q=" + encode(topic + " Bangla") + "&key=" + encode(apiKey);
+                + "&safeSearch=strict&relevanceLanguage=bn&regionCode=BD&q=" + encode(topic + " Bangla tutorial") + "&key=" + encode(apiKey);
         return get("search", "Bangla playlist search", query).path("items");
     }
 
     private JsonNode searchHindi(String topic) throws Exception {
         String query = "part=snippet&type=playlist&order=relevance&maxResults=" + STUDENT_CANDIDATE_LIMIT
-                + "&safeSearch=strict&relevanceLanguage=hi&q=" + encode(topic + " tutorial Hindi") + "&key=" + encode(apiKey);
+                + "&safeSearch=strict&relevanceLanguage=hi&regionCode=IN&q=" + encode(topic + " Hindi tutorial") + "&key=" + encode(apiKey);
         return get("search", "Hindi playlist search", query).path("items");
     }
 
@@ -252,15 +295,20 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
 
     private Map<String, Stats> videoStats(List<String> ids) throws Exception {
         if (ids.isEmpty()) return Map.of();
-        String query = "part=statistics&id=" + encode(String.join(",", ids)) + "&key=" + encode(apiKey);
-        JsonNode items = get("videos", "video statistics", query).path("items");
         Map<String, Stats> result = new HashMap<>();
-        for (JsonNode item : items) {
-            JsonNode statistics = item.path("statistics");
-            result.put(item.path("id").asText(), new Stats(
-                    statistics.path("viewCount").asLong(0),
-                    statistics.path("likeCount").asLong(0),
-                    statistics.path("commentCount").asLong(0)));
+        // The YouTube API accepts at most 50 video IDs per statistics request.
+        // A three-language student search can collect more than that.
+        for (int start = 0; start < ids.size(); start += 50) {
+            List<String> batch = ids.subList(start, Math.min(start + 50, ids.size()));
+            String query = "part=statistics&id=" + encode(String.join(",", batch)) + "&key=" + encode(apiKey);
+            JsonNode items = get("videos", "video statistics", query).path("items");
+            for (JsonNode item : items) {
+                JsonNode statistics = item.path("statistics");
+                result.put(item.path("id").asText(), new Stats(
+                        statistics.path("viewCount").asLong(0),
+                        statistics.path("likeCount").asLong(0),
+                        statistics.path("commentCount").asLong(0)));
+            }
         }
         return result;
     }
@@ -323,6 +371,7 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
     private String limit(String value, int length) { return value.substring(0, Math.min(value.length(), length)); }
 
     private record Candidate(JsonNode item, double score) {}
+    private record StudentSearchCandidate(JsonNode item, double searchRelevance, double languagePreference) {}
     private record Stats(long views, long likes, long comments) {}
     @FunctionalInterface private interface CheckedSupplier<T> { T get() throws Exception; }
 }
