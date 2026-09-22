@@ -76,7 +76,7 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         if (apiKey.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "YouTube is not configured. Add YOUTUBE_API_KEY and restart the backend.");
         if (topic == null || topic.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a skill to search YouTube.");
         try {
-            List<Candidate> candidates = rankCandidates(search(topic.trim()));
+            List<Candidate> candidates = rankStudentCandidates(search(topic.trim()));
             List<Map<String, Object>> results = new ArrayList<>();
             for (Candidate candidate : candidates.stream().limit(3).toList()) {
                 JsonNode item = candidate.item(); String playlistId = item.path("id").path("playlistId").asText(); JsonNode snippet = item.path("snippet");
@@ -90,8 +90,50 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         catch (Exception exception) { throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "YouTube playlist search could not complete right now."); }
     }
 
-    /** Search keeps YouTube's relevance signal, then we enrich and re-rank those candidates. */
+    /** The administrator import keeps its original, established ranking behaviour. */
     private List<Candidate> rankCandidates(JsonNode items) throws Exception {
+        List<JsonNode> searchItems = new ArrayList<>();
+        for (JsonNode item : items) {
+            if (!item.path("id").path("playlistId").asText().isBlank()) searchItems.add(item);
+        }
+        if (searchItems.isEmpty()) return List.of();
+
+        List<String> playlistIds = searchItems.stream()
+                .map(item -> item.path("id").path("playlistId").asText())
+                .toList();
+        Map<String, Integer> itemCounts = playlistDetails(playlistIds);
+        Map<String, List<String>> sampledVideos = new HashMap<>();
+        Set<String> allVideoIds = new HashSet<>();
+        for (String playlistId : playlistIds) {
+            List<String> ids = playlistVideos(playlistId);
+            sampledVideos.put(playlistId, ids);
+            allVideoIds.addAll(ids);
+        }
+        Map<String, Stats> stats = videoStats(new ArrayList<>(allVideoIds));
+        List<Candidate> ranked = new ArrayList<>();
+        int count = searchItems.size();
+        for (int index = 0; index < count; index++) {
+            JsonNode item = searchItems.get(index);
+            String playlistId = item.path("id").path("playlistId").asText();
+            List<Stats> videoStats = sampledVideos.getOrDefault(playlistId, List.of()).stream()
+                    .map(stats::get).filter(java.util.Objects::nonNull).toList();
+            double averageViews = videoStats.stream().mapToLong(Stats::views).average().orElse(0d);
+            double averageEngagement = videoStats.stream()
+                    .mapToDouble(stat -> (stat.likes() + stat.comments()) / (double) Math.max(stat.views(), 1L))
+                    .average().orElse(0d);
+            double relevance = count == 1 ? 1d : (count - index) / (double) count;
+            double popularity = Math.min(1d, Math.log10(averageViews + 1d) / 7d);
+            double engagement = Math.min(1d, Math.log10(averageEngagement * 10000d + 1d) / 4d);
+            double depth = Math.min(1d, Math.log10(itemCounts.getOrDefault(playlistId, 0) + 1d) / 3d);
+            double score = 0.55d * relevance + 0.25d * popularity + 0.12d * engagement + 0.08d * depth;
+            ranked.add(new Candidate(item, score));
+        }
+        ranked.sort(Comparator.comparingDouble(Candidate::score).reversed());
+        return ranked;
+    }
+
+    /** Student search adds channel authority to the original relevance, views, engagement and playlist-depth signals. */
+    private List<Candidate> rankStudentCandidates(JsonNode items) throws Exception {
         List<JsonNode> searchItems = new ArrayList<>();
         for (JsonNode item : items) {
             if (!item.path("id").path("playlistId").asText().isBlank()) searchItems.add(item);
