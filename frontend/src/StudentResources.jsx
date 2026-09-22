@@ -47,7 +47,6 @@ export function StudentResources() {
     }).catch((requestError) => setError(requestError.message)).finally(() => setLoading(false));
   }, []);
 
-  const featuredResources = useMemo(() => resources.filter((item) => item.featured), [resources]);
   const libraryResources = useMemo(() => resources.filter((item) => !item.featured), [resources]);
   const pageSize = 6;
   const totalPages = Math.max(1, Math.ceil(libraryResources.length / pageSize));
@@ -102,18 +101,11 @@ export function StudentResources() {
 
     {error && <p className="form-error">{error}</p>}
 
-    {!loading && resources.length > 0 && <>
-      {featuredResources.length > 0 && <section className="resource-featured-section">
-        <div className="resource-section-heading"><div><p className="eyebrow"><BadgeCheck size={14} /> CAREERFORGE RECOMMENDS</p><h3>Suggested by your platform</h3></div><p>These are hand-picked by your CareerForge administrator to give you a reliable next step.</p></div>
-        <div className="resource-featured-grid">{featuredResources.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}</div>
-      </section>}
-
-    </>}
-
-    <section className="resource-library">
-      <div className="resource-section-heading"><div><p className="eyebrow">EXPLORE THE LIBRARY</p><h3>{loading ? "Loading resources..." : resources.length ? `${libraryResources.length} resource${libraryResources.length === 1 ? "" : "s"} available` : "No resources published yet"}</h3></div></div>
-      {loading ? <div className="resource-loading"><i /><i /><i /></div> : resources.length === 0 ? <div className="resource-empty"><span><BookOpen size={22} /></span><div><h3>Your learning library is getting ready.</h3><p>Published resources from your CareerForge administrator will appear here.</p></div></div> : libraryResources.length ? <><div className="resource-grid">{visibleResources.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}</div>{totalPages > 1 && <nav className="resource-pagination" aria-label="Resource pages"><span>Page {page} of {totalPages}</span><div><button type="button" aria-label="Previous page" disabled={page === 1} onClick={() => setPage((currentPage) => currentPage - 1)}><ChevronLeft size={16} /></button>{Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => <button type="button" key={pageNumber} className={page === pageNumber ? "active" : ""} aria-label={`Page ${pageNumber}`} aria-current={page === pageNumber ? "page" : undefined} onClick={() => setPage(pageNumber)}>{pageNumber}</button>)}<button type="button" aria-label="Next page" disabled={page === totalPages} onClick={() => setPage((currentPage) => currentPage + 1)}><ChevronRight size={16} /></button></div></nav>}</> : <div className="resource-empty"><span><BadgeCheck size={22} /></span><div><h3>Everything here is a CareerForge recommendation.</h3><p>Use the section above to start with your administrator's suggested learning.</p></div></div>}
-    </section>
+    {!loading && libraryResources.length > 0 && <section className="resource-library">
+      <div className="resource-section-heading"><div><p className="eyebrow">EXPLORE THE LIBRARY</p><h3>{libraryResources.length} resource{libraryResources.length === 1 ? "" : "s"} available</h3></div></div>
+      <div className="resource-grid">{visibleResources.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}</div>
+      {totalPages > 1 && <nav className="resource-pagination" aria-label="Resource pages"><span>Page {page} of {totalPages}</span><div><button type="button" aria-label="Previous page" disabled={page === 1} onClick={() => setPage((currentPage) => currentPage - 1)}><ChevronLeft size={16} /></button>{Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => <button type="button" key={pageNumber} className={page === pageNumber ? "active" : ""} aria-label={`Page ${pageNumber}`} aria-current={page === pageNumber ? "page" : undefined} onClick={() => setPage(pageNumber)}>{pageNumber}</button>)}<button type="button" aria-label="Next page" disabled={page === totalPages} onClick={() => setPage((currentPage) => currentPage + 1)}><ChevronRight size={16} /></button></div></nav>}
+    </section>}
 
     {!loading && recommended.length > 0 && <section className="resource-recommendations">
       <div className="resource-section-heading"><div><p className="eyebrow">PICKED FOR YOUR DIRECTION</p><h3>{hasProfileSignal ? "Recommended for you" : "Start here"}</h3></div><p>{hasProfileSignal ? "Matched against your target role and skills." : "Add your target role and skills in your profile for more focused suggestions."}</p></div>
