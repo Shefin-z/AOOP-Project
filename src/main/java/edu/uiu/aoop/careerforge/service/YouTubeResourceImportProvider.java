@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /** Searches YouTube and imports the three strongest matching public playlists as drafts. */
 @Service
@@ -99,15 +101,26 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         List<String> playlistIds = searchItems.stream()
                 .map(item -> item.path("id").path("playlistId").asText())
                 .toList();
-        Map<String, Integer> itemCounts = playlistDetails(playlistIds);
+        CompletableFuture<Map<String, Integer>> itemCountsFuture = CompletableFuture.supplyAsync(() -> fetch(() -> playlistDetails(playlistIds)));
         Map<String, List<String>> sampledVideos = new HashMap<>();
         Set<String> allVideoIds = new HashSet<>();
-        for (String playlistId : playlistIds) {
-            List<String> ids = playlistVideos(playlistId);
-            sampledVideos.put(playlistId, ids);
-            allVideoIds.addAll(ids);
+        Set<String> channelIds = new HashSet<>();
+        for (JsonNode item : searchItems) {
+            String channelId = item.path("snippet").path("channelId").asText();
+            if (!channelId.isBlank()) channelIds.add(channelId);
         }
+        CompletableFuture<Map<String, Long>> subscriberCountsFuture = CompletableFuture.supplyAsync(() -> fetch(() -> channelSubscribers(new ArrayList<>(channelIds))));
+        List<CompletableFuture<Map.Entry<String, List<String>>>> playlistVideoFutures = playlistIds.stream()
+                .map(playlistId -> CompletableFuture.supplyAsync(() -> Map.entry(playlistId, fetch(() -> playlistVideos(playlistId)))))
+                .toList();
+        for (CompletableFuture<Map.Entry<String, List<String>>> future : playlistVideoFutures) {
+            Map.Entry<String, List<String>> sample = future.join();
+            sampledVideos.put(sample.getKey(), sample.getValue());
+            allVideoIds.addAll(sample.getValue());
+        }
+        Map<String, Integer> itemCounts = itemCountsFuture.join();
         Map<String, Stats> stats = videoStats(new ArrayList<>(allVideoIds));
+        Map<String, Long> subscriberCounts = subscriberCountsFuture.join();
 
         List<Candidate> ranked = new ArrayList<>();
         int count = searchItems.size();
@@ -124,7 +137,10 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
             double popularity = Math.min(1d, Math.log10(averageViews + 1d) / 7d);
             double engagement = Math.min(1d, Math.log10(averageEngagement * 10000d + 1d) / 4d);
             double depth = Math.min(1d, Math.log10(itemCounts.getOrDefault(playlistId, 0) + 1d) / 3d);
-            double score = 0.55d * relevance + 0.25d * popularity + 0.12d * engagement + 0.08d * depth;
+            long subscribers = subscriberCounts.getOrDefault(item.path("snippet").path("channelId").asText(), 0L);
+            double channelAuthority = Math.min(1d, Math.log10(subscribers + 1d) / 7d);
+            double score = 0.42d * relevance + 0.22d * popularity + 0.13d * engagement
+                    + 0.15d * channelAuthority + 0.08d * depth;
             ranked.add(new Candidate(item, score));
         }
         ranked.sort(Comparator.comparingDouble(Candidate::score).reversed());
@@ -143,6 +159,17 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         JsonNode items = get("playlists", "playlist details", query).path("items");
         Map<String, Integer> result = new HashMap<>();
         for (JsonNode item : items) result.put(item.path("id").asText(), item.path("contentDetails").path("itemCount").asInt(0));
+        return result;
+    }
+
+    private Map<String, Long> channelSubscribers(List<String> ids) throws Exception {
+        if (ids.isEmpty()) return Map.of();
+        String query = "part=statistics&id=" + encode(String.join(",", ids)) + "&key=" + encode(apiKey);
+        JsonNode items = get("channels", "channel statistics", query).path("items");
+        Map<String, Long> result = new HashMap<>();
+        for (JsonNode item : items) {
+            result.put(item.path("id").asText(), item.path("statistics").path("subscriberCount").asLong(0));
+        }
         return result;
     }
 
@@ -212,6 +239,10 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
     }
 
     private String encode(String value) { return URLEncoder.encode(value, StandardCharsets.UTF_8); }
+    private <T> T fetch(CheckedSupplier<T> supplier) {
+        try { return supplier.get(); }
+        catch (Exception exception) { throw new CompletionException(exception); }
+    }
     private String thumbnail(JsonNode snippet) {
         JsonNode thumbnails = snippet.path("thumbnails");
         for (String size : List.of("maxres", "high", "medium", "default")) {
@@ -225,4 +256,5 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
 
     private record Candidate(JsonNode item, double score) {}
     private record Stats(long views, long likes, long comments) {}
+    @FunctionalInterface private interface CheckedSupplier<T> { T get() throws Exception; }
 }
