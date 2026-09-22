@@ -32,6 +32,8 @@ import java.util.concurrent.CompletionException;
 public class YouTubeResourceImportProvider implements ResourceImportProvider {
     private static final String SOURCE = "YouTube Playlist Search";
     private static final int CANDIDATE_LIMIT = 10;
+    private static final int STUDENT_CANDIDATE_LIMIT = 8;
+    private static final int STUDENT_RESULT_LIMIT = 5;
     private static final int SAMPLE_VIDEO_LIMIT = 5;
 
     private final JdbcTemplate jdbc;
@@ -76,9 +78,12 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         if (apiKey.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "YouTube is not configured. Add YOUTUBE_API_KEY and restart the backend.");
         if (topic == null || topic.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a skill to search YouTube.");
         try {
-            List<Candidate> candidates = rankStudentCandidates(search(topic.trim()));
+            String skill = topic.trim();
+            CompletableFuture<List<Candidate>> globalCandidates = CompletableFuture.supplyAsync(() -> fetch(() -> rankStudentCandidates(searchGlobal(skill))));
+            CompletableFuture<List<Candidate>> banglaCandidates = CompletableFuture.supplyAsync(() -> fetch(() -> rankStudentCandidates(searchBangla(skill))));
+            List<Candidate> candidates = selectStudentCandidates(globalCandidates.join(), banglaCandidates.join());
             List<Map<String, Object>> results = new ArrayList<>();
-            for (Candidate candidate : candidates.stream().limit(3).toList()) {
+            for (Candidate candidate : candidates) {
                 JsonNode item = candidate.item(); String playlistId = item.path("id").path("playlistId").asText(); JsonNode snippet = item.path("snippet");
                 Map<String, Object> playlist = new LinkedHashMap<>();
                 playlist.put("id", playlistId); playlist.put("title", clean(snippet.path("title").asText())); playlist.put("description", clean(snippet.path("description").asText()));
@@ -88,6 +93,24 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
             return results;
         } catch (ResponseStatusException exception) { throw exception; }
         catch (Exception exception) { throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "YouTube playlist search could not complete right now."); }
+    }
+
+    private List<Candidate> selectStudentCandidates(List<Candidate> global, List<Candidate> bangla) {
+        List<Candidate> selected = new ArrayList<>();
+        Set<String> seenPlaylistIds = new HashSet<>();
+        addUniqueCandidates(selected, seenPlaylistIds, global, 3);
+        addUniqueCandidates(selected, seenPlaylistIds, bangla, STUDENT_RESULT_LIMIT);
+        addUniqueCandidates(selected, seenPlaylistIds, global, STUDENT_RESULT_LIMIT);
+        return selected;
+    }
+
+    private void addUniqueCandidates(List<Candidate> destination, Set<String> seenPlaylistIds,
+                                     List<Candidate> candidates, int maximum) {
+        for (Candidate candidate : candidates) {
+            if (destination.size() >= maximum) return;
+            String playlistId = candidate.item().path("id").path("playlistId").asText();
+            if (!playlistId.isBlank() && seenPlaylistIds.add(playlistId)) destination.add(candidate);
+        }
     }
 
     /** The administrator import keeps its original, established ranking behaviour. */
@@ -193,6 +216,18 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         String query = "part=snippet&type=playlist&order=relevance&maxResults=" + CANDIDATE_LIMIT
                 + "&safeSearch=strict&q=" + encode(topic) + "&regionCode=BD&key=" + encode(apiKey);
         return get("search", "playlist search", query).path("items");
+    }
+
+    private JsonNode searchGlobal(String topic) throws Exception {
+        String query = "part=snippet&type=playlist&order=relevance&maxResults=" + STUDENT_CANDIDATE_LIMIT
+                + "&safeSearch=strict&relevanceLanguage=en&q=" + encode(topic + " tutorial English") + "&key=" + encode(apiKey);
+        return get("search", "global playlist search", query).path("items");
+    }
+
+    private JsonNode searchBangla(String topic) throws Exception {
+        String query = "part=snippet&type=playlist&order=relevance&maxResults=" + STUDENT_CANDIDATE_LIMIT
+                + "&safeSearch=strict&relevanceLanguage=bn&q=" + encode(topic + " Bangla") + "&key=" + encode(apiKey);
+        return get("search", "Bangla playlist search", query).path("items");
     }
 
     private Map<String, Integer> playlistDetails(List<String> ids) throws Exception {
