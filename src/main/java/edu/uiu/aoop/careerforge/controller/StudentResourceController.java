@@ -28,7 +28,7 @@ public class StudentResourceController {
     @GetMapping("/search")
     public Map<String, Object> search(@RequestParam String skill, @RequestHeader(name = "X-User-Id", required = false) Long studentId) {
         Map<String, Object> result = new HashMap<>(); result.put("suggestions", resources.featuredSuggestions(studentId, skill));
-        try { result.put("videos", youtube.searchPlaylists(skill)); }
+        try { result.put("videos", youtube.searchVideos(skill)); }
         catch (ResponseStatusException exception) { result.put("videos", List.of()); result.put("youtubeMessage", exception.getReason()); }
         return result;
     }
