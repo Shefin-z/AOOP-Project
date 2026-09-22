@@ -607,6 +607,7 @@ button:focus-visible, .import-file:focus-within, .upload-button:focus-within { o
 .skill-result-grid .video-result { min-height: 420px; padding-bottom: 20px; border: 1px solid #c9dbe8; border-top: 3px solid #e23a3a; border-radius: 16px; background: linear-gradient(180deg, #fff 0 80%, #f8fbfd 100%); box-shadow: 0 10px 24px #123b590d; }
 .skill-result-grid .video-result:hover { border-color: #e23a3a; box-shadow: 0 16px 30px #123b5918; transform: translateY(-4px); }
 .skill-result-grid .video-result .resource-thumbnail { height: auto; aspect-ratio: 16 / 9; }
+.skill-result-grid .video-result .resource-thumbnail img { object-fit: contain; background: #08131d; }
 .skill-result-grid .video-result .resource-youtube-badge { top: 13px; left: 13px; padding: 6px 10px; border-color: #ffe0e0; box-shadow: 0 4px 12px #4b111133; font-size: 10px; }
 .skill-result-grid .video-result .resource-card-top { margin-top: 17px; }
 .skill-result-grid .video-result h4 { display: -webkit-box; min-height: 45px; margin-top: 14px; overflow: hidden; color: #092e49; font-size: 17px; font-weight: 850; line-height: 1.3; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
