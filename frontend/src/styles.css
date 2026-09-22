@@ -591,9 +591,6 @@ button:focus-visible, .import-file:focus-within, .upload-button:focus-within { o
 .skill-resource-finder form button { min-width: 160px; border: 0; border-radius: 10px; background: #153d5a; color: #fff; font: inherit; font-weight: 800; }
 .skill-resource-finder form button:hover:not(:disabled) { background: #0b2e48; }
 .skill-resource-finder form button:disabled { cursor: wait; opacity: .7; }
-.skill-quick { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 20px; }
-.skill-quick span { color: #667483; font-size: 11px; font-weight: 800; }
-.skill-quick button { border: 0; border-radius: 999px; padding: 7px 12px; background: #e7f0f6; color: #153d5a; font: inherit; font-size: 11px; font-weight: 800; }
 .skill-empty, .skill-searching { display: grid; justify-items: center; gap: 8px; min-height: 170px; margin-top: 24px; padding: 30px; border-radius: 16px; background: #f5f7f9; color: #153d5a; text-align: center; }
 .skill-empty b, .skill-searching b { color: #102c43; }
 .skill-empty span, .skill-searching span { max-width: 520px; color: #697887; font-size: 13px; line-height: 1.5; }
