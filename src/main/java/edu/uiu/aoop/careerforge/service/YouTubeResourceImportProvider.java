@@ -310,7 +310,10 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
     }
     private String thumbnail(JsonNode snippet) {
         JsonNode thumbnails = snippet.path("thumbnails");
-        for (String size : List.of("maxres", "high", "medium", "default")) {
+        // The YouTube Search API's "high" image is often 4:3, whereas its
+        // "medium" image is the normal 16:9 player thumbnail. Prefer it so
+        // resource cards show the complete video artwork without cropping.
+        for (String size : List.of("maxres", "medium", "high", "default")) {
             String url = clean(thumbnails.path(size).path("url").asText());
             if (!url.isBlank()) return limit(url, 600);
         }
