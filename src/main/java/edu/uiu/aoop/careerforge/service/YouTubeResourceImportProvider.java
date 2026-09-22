@@ -167,10 +167,10 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
     }
 
     /**
-     * Student search is intentionally restricted to the three learning languages
-     * our students requested.  The Search API is asked separately for English,
-     * Bangla and Hindi, so an unrelated regional result cannot win merely because
-     * it happens to contain the topic word in its title.
+     * A single global, English-first learning search gives the broadest pool of
+     * reputable courses. Repeating separate language calls costs 300 quota units
+     * per student click and quickly makes the feature unavailable for everyone.
+     * A Bangla or Hindi query is used only if the primary search has no match.
      */
     private List<StudentSearchCandidate> searchStudentCandidates(String topic) throws Exception {
         List<StudentSearchCandidate> results = new ArrayList<>();
@@ -178,10 +178,14 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         ResponseStatusException lastFailure = null;
         try { addStudentCandidates(results, seenPlaylistIds, searchGlobal(topic), topic, 1d); }
         catch (ResponseStatusException exception) { lastFailure = exception; }
-        try { addStudentCandidates(results, seenPlaylistIds, searchBangla(topic), topic, .98d); }
-        catch (ResponseStatusException exception) { lastFailure = exception; }
-        try { addStudentCandidates(results, seenPlaylistIds, searchHindi(topic), topic, .96d); }
-        catch (ResponseStatusException exception) { lastFailure = exception; }
+        if (results.isEmpty()) {
+            try { addStudentCandidates(results, seenPlaylistIds, searchBangla(topic), topic, .98d); }
+            catch (ResponseStatusException exception) { lastFailure = exception; }
+        }
+        if (results.isEmpty()) {
+            try { addStudentCandidates(results, seenPlaylistIds, searchHindi(topic), topic, .96d); }
+            catch (ResponseStatusException exception) { lastFailure = exception; }
+        }
         if (results.isEmpty() && lastFailure != null) throw lastFailure;
         return results;
     }
@@ -331,7 +335,6 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         if (ids.isEmpty()) return Map.of();
         Map<String, Stats> result = new HashMap<>();
         // The YouTube API accepts at most 50 video IDs per statistics request.
-        // A three-language student search can collect more than that.
         for (int start = 0; start < ids.size(); start += 50) {
             List<String> batch = ids.subList(start, Math.min(start + 50, ids.size()));
             String query = "part=statistics&id=" + encode(String.join(",", batch)) + "&key=" + encode(apiKey);
