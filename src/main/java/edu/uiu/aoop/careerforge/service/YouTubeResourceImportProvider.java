@@ -26,6 +26,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** Searches YouTube and imports the three strongest matching public playlists as drafts. */
 @Service
@@ -36,11 +37,13 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
     private static final int STUDENT_CANDIDATE_LIMIT = 6;
     private static final int STUDENT_RESULT_LIMIT = 5;
     private static final int SAMPLE_VIDEO_LIMIT = 5;
+    private static final long STUDENT_SEARCH_CACHE_MILLIS = 6L * 60L * 60L * 1000L;
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
     private final HttpClient client;
     private final String apiKey;
+    private final Map<String, CachedStudentSearch> studentSearchCache = new ConcurrentHashMap<>();
 
     public YouTubeResourceImportProvider(JdbcTemplate jdbc, ObjectMapper mapper,
                                          @Value("${youtube.api-key:}") String apiKey) {
@@ -79,6 +82,10 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         if (apiKey.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "YouTube is not configured. Add YOUTUBE_API_KEY and restart the backend.");
         if (topic == null || topic.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a skill to search YouTube.");
         try {
+            String normalizedTopic = topic.trim().toLowerCase(Locale.ROOT);
+            CachedStudentSearch cached = studentSearchCache.get(normalizedTopic);
+            if (cached != null && !cached.isExpired()) return cached.results();
+
             List<Candidate> candidates = rankStudentCandidates(searchStudentCandidates(topic.trim()));
             List<Map<String, Object>> results = new ArrayList<>();
             for (Candidate candidate : candidates.stream().limit(STUDENT_RESULT_LIMIT).toList()) {
@@ -90,7 +97,11 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
                 playlist.put("providerName", clean(snippet.path("channelTitle").asText())); playlist.put("thumbnailUrl", thumbnail(snippet));
                 playlist.put("resourceUrl", "https://www.youtube.com/playlist?list=" + playlistId); results.add(playlist);
             }
-            return results;
+            List<Map<String, Object>> immutableResults = List.copyOf(results);
+            if (!immutableResults.isEmpty()) {
+                studentSearchCache.put(normalizedTopic, new CachedStudentSearch(immutableResults, System.currentTimeMillis()));
+            }
+            return immutableResults;
         } catch (ResponseStatusException exception) { throw exception; }
         catch (Exception exception) { throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "YouTube playlist search could not complete right now."); }
     }
@@ -146,9 +157,14 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
     private List<StudentSearchCandidate> searchStudentCandidates(String topic) throws Exception {
         List<StudentSearchCandidate> results = new ArrayList<>();
         Set<String> seenPlaylistIds = new HashSet<>();
-        addStudentCandidates(results, seenPlaylistIds, searchGlobal(topic), topic, 1d);
-        addStudentCandidates(results, seenPlaylistIds, searchBangla(topic), topic, .98d);
-        addStudentCandidates(results, seenPlaylistIds, searchHindi(topic), topic, .96d);
+        ResponseStatusException lastFailure = null;
+        try { addStudentCandidates(results, seenPlaylistIds, searchGlobal(topic), topic, 1d); }
+        catch (ResponseStatusException exception) { lastFailure = exception; }
+        try { addStudentCandidates(results, seenPlaylistIds, searchBangla(topic), topic, .98d); }
+        catch (ResponseStatusException exception) { lastFailure = exception; }
+        try { addStudentCandidates(results, seenPlaylistIds, searchHindi(topic), topic, .96d); }
+        catch (ResponseStatusException exception) { lastFailure = exception; }
+        if (results.isEmpty() && lastFailure != null) throw lastFailure;
         return results;
     }
 
@@ -372,6 +388,9 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
 
     private record Candidate(JsonNode item, double score) {}
     private record StudentSearchCandidate(JsonNode item, double searchRelevance, double languagePreference) {}
+    private record CachedStudentSearch(List<Map<String, Object>> results, long createdAt) {
+        private boolean isExpired() { return System.currentTimeMillis() - createdAt >= STUDENT_SEARCH_CACHE_MILLIS; }
+    }
     private record Stats(long views, long likes, long comments) {}
     @FunctionalInterface private interface CheckedSupplier<T> { T get() throws Exception; }
 }

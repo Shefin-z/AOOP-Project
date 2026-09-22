@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, BookOpen, Bookmark, BookmarkCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock3, ExternalLink, FileText, LayoutTemplate, LoaderCircle, Play, PlayCircle, Search, Sparkles, Youtube } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BadgeCheck, BookOpen, Bookmark, BookmarkCheck, CheckCircle2, Clock3, ExternalLink, FileText, LayoutTemplate, LoaderCircle, Play, PlayCircle, Search, Sparkles, Youtube } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -17,17 +17,9 @@ const typeDetails = {
   template: [LayoutTemplate, "Template"],
 };
 
-function resourceScore(resource, profile) {
-  const terms = `${profile.targetRole || ""} ${profile.skills || ""}`.toLowerCase().split(/[,\s/]+/).filter((term) => term.length > 2);
-  const searchable = `${resource.title || ""} ${resource.category || ""} ${resource.description || ""}`.toLowerCase();
-  return terms.reduce((score, term) => score + (searchable.includes(term) ? 1 : 0), 0);
-}
-
 export function StudentResources() {
   const current = JSON.parse(localStorage.getItem("careerforge_session") || "null");
   const [resources, setResources] = useState([]);
-  const [profile, setProfile] = useState({});
-  const [page, setPage] = useState(1);
   const [updatingId, setUpdatingId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -38,21 +30,9 @@ export function StudentResources() {
   useEffect(() => {
     if (!current?.id) { setError("Please sign in again."); setLoading(false); return; }
     const headers = { "X-User-Id": current.id };
-    Promise.all([
-      fetch(`${API_BASE_URL}/resources`, { headers }).then(responseBody),
-      fetch(`${API_BASE_URL}/profiles/${current.id}`, { headers }).then(responseBody),
-    ]).then(([resourceItems, studentProfile]) => {
-      setResources(resourceItems);
-      setProfile(studentProfile || {});
-    }).catch((requestError) => setError(requestError.message)).finally(() => setLoading(false));
+    fetch(`${API_BASE_URL}/resources`, { headers }).then(responseBody)
+      .then(setResources).catch((requestError) => setError(requestError.message)).finally(() => setLoading(false));
   }, []);
-
-  const libraryResources = useMemo(() => resources.filter((item) => !item.featured), [resources]);
-  const pageSize = 6;
-  const totalPages = Math.max(1, Math.ceil(libraryResources.length / pageSize));
-  const visibleResources = libraryResources.slice((page - 1) * pageSize, page * pageSize);
-  const recommended = useMemo(() => [...resources].filter((item) => !item.featured).sort((left, right) => resourceScore(right, profile) - resourceScore(left, profile)).slice(0, 3), [resources, profile]);
-  const hasProfileSignal = Boolean(profile.targetRole || profile.skills);
 
   async function toggle(resource, field) {
     const key = `${field}-${resource.id}`;
@@ -98,17 +78,6 @@ export function StudentResources() {
     </section>
 
     {error && <p className="form-error">{error}</p>}
-
-    {!loading && libraryResources.length > 0 && <section className="resource-library">
-      <div className="resource-section-heading"><div><p className="eyebrow">EXPLORE THE LIBRARY</p><h3>{libraryResources.length} resource{libraryResources.length === 1 ? "" : "s"} available</h3></div></div>
-      <div className="resource-grid">{visibleResources.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}</div>
-      {totalPages > 1 && <nav className="resource-pagination" aria-label="Resource pages"><span>Page {page} of {totalPages}</span><div><button type="button" aria-label="Previous page" disabled={page === 1} onClick={() => setPage((currentPage) => currentPage - 1)}><ChevronLeft size={16} /></button>{Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => <button type="button" key={pageNumber} className={page === pageNumber ? "active" : ""} aria-label={`Page ${pageNumber}`} aria-current={page === pageNumber ? "page" : undefined} onClick={() => setPage(pageNumber)}>{pageNumber}</button>)}<button type="button" aria-label="Next page" disabled={page === totalPages} onClick={() => setPage((currentPage) => currentPage + 1)}><ChevronRight size={16} /></button></div></nav>}
-    </section>}
-
-    {!loading && recommended.length > 0 && <section className="resource-recommendations">
-      <div className="resource-section-heading"><div><p className="eyebrow">PICKED FOR YOUR DIRECTION</p><h3>{hasProfileSignal ? "Recommended for you" : "Start here"}</h3></div><p>{hasProfileSignal ? "Matched against your target role and skills." : "Add your target role and skills in your profile for more focused suggestions."}</p></div>
-      <div className="resource-recommendation-grid">{recommended.map((item) => <ResourceCard key={item.id} resource={item} compact onToggle={toggle} updatingId={updatingId} />)}</div>
-    </section>}
   </section>;
 }
 
