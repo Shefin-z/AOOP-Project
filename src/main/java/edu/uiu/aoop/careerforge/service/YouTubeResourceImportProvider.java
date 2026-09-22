@@ -32,7 +32,7 @@ import java.util.concurrent.CompletionException;
 public class YouTubeResourceImportProvider implements ResourceImportProvider {
     private static final String SOURCE = "YouTube Playlist Search";
     private static final int CANDIDATE_LIMIT = 10;
-    private static final int STUDENT_CANDIDATE_LIMIT = 8;
+    private static final int STUDENT_CANDIDATE_LIMIT = 6;
     private static final int STUDENT_RESULT_LIMIT = 5;
     private static final int SAMPLE_VIDEO_LIMIT = 5;
 
@@ -80,8 +80,9 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         try {
             String skill = topic.trim();
             CompletableFuture<List<Candidate>> globalCandidates = CompletableFuture.supplyAsync(() -> fetch(() -> rankStudentCandidates(searchGlobal(skill))));
+            CompletableFuture<List<Candidate>> hindiCandidates = CompletableFuture.supplyAsync(() -> fetch(() -> rankStudentCandidates(searchHindi(skill))));
             CompletableFuture<List<Candidate>> banglaCandidates = CompletableFuture.supplyAsync(() -> fetch(() -> rankStudentCandidates(searchBangla(skill))));
-            List<Candidate> candidates = selectStudentCandidates(globalCandidates.join(), banglaCandidates.join());
+            List<Candidate> candidates = selectStudentCandidates(globalCandidates.join(), hindiCandidates.join(), banglaCandidates.join());
             List<Map<String, Object>> results = new ArrayList<>();
             for (Candidate candidate : candidates) {
                 JsonNode item = candidate.item(); String playlistId = item.path("id").path("playlistId").asText(); JsonNode snippet = item.path("snippet");
@@ -95,12 +96,14 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         catch (Exception exception) { throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "YouTube playlist search could not complete right now."); }
     }
 
-    private List<Candidate> selectStudentCandidates(List<Candidate> global, List<Candidate> bangla) {
+    private List<Candidate> selectStudentCandidates(List<Candidate> global, List<Candidate> hindi, List<Candidate> bangla) {
         List<Candidate> selected = new ArrayList<>();
         Set<String> seenPlaylistIds = new HashSet<>();
-        addUniqueCandidates(selected, seenPlaylistIds, global, 3);
+        addUniqueCandidates(selected, seenPlaylistIds, global, 2);
+        addUniqueCandidates(selected, seenPlaylistIds, hindi, 3);
         addUniqueCandidates(selected, seenPlaylistIds, bangla, STUDENT_RESULT_LIMIT);
         addUniqueCandidates(selected, seenPlaylistIds, global, STUDENT_RESULT_LIMIT);
+        addUniqueCandidates(selected, seenPlaylistIds, hindi, STUDENT_RESULT_LIMIT);
         return selected;
     }
 
@@ -228,6 +231,12 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         String query = "part=snippet&type=playlist&order=relevance&maxResults=" + STUDENT_CANDIDATE_LIMIT
                 + "&safeSearch=strict&relevanceLanguage=bn&q=" + encode(topic + " Bangla") + "&key=" + encode(apiKey);
         return get("search", "Bangla playlist search", query).path("items");
+    }
+
+    private JsonNode searchHindi(String topic) throws Exception {
+        String query = "part=snippet&type=playlist&order=relevance&maxResults=" + STUDENT_CANDIDATE_LIMIT
+                + "&safeSearch=strict&relevanceLanguage=hi&q=" + encode(topic + " tutorial Hindi") + "&key=" + encode(apiKey);
+        return get("search", "Hindi playlist search", query).path("items");
     }
 
     private Map<String, Integer> playlistDetails(List<String> ids) throws Exception {
