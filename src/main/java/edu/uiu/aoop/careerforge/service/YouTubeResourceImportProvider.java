@@ -79,8 +79,8 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
     }
 
     public List<Map<String, Object>> searchPlaylists(String topic) {
-        if (apiKey.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "YouTube is not configured. Add YOUTUBE_API_KEY and restart the backend.");
         if (topic == null || topic.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a skill to search YouTube.");
+        if (apiKey.isBlank()) return fallbackPlaylistSearch(topic.trim());
         try {
             String normalizedTopic = topic.trim().toLowerCase(Locale.ROOT);
             CachedStudentSearch cached = studentSearchCache.get(normalizedTopic);
@@ -102,8 +102,26 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
                 studentSearchCache.put(normalizedTopic, new CachedStudentSearch(immutableResults, System.currentTimeMillis()));
             }
             return immutableResults;
-        } catch (ResponseStatusException exception) { throw exception; }
+        } catch (ResponseStatusException exception) { return fallbackPlaylistSearch(topic.trim()); }
         catch (Exception exception) { throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "YouTube playlist search could not complete right now."); }
+    }
+
+    /**
+     * Keeps the student journey usable if YouTube temporarily rejects API calls
+     * (for example, while the daily API quota resets). This is deliberately a
+     * clearly-labelled handoff to YouTube's live playlist-only search rather
+     * than pretending a stale or unranked item is one of our recommendations.
+     */
+    private List<Map<String, Object>> fallbackPlaylistSearch(String topic) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", "youtube-live-search-" + topic.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-"));
+        result.put("title", "See current " + topic + " playlists on YouTube");
+        result.put("description", "YouTube's ranking service is temporarily busy. Open its live playlist results to choose a course now.");
+        result.put("providerName", "YouTube");
+        result.put("fallback", true);
+        result.put("resourceUrl", "https://www.youtube.com/results?search_query="
+                + encode(topic + " full course tutorial") + "&sp=EgIQAw%3D%3D");
+        return List.of(result);
     }
 
     /** The administrator import keeps its original, established ranking behaviour. */
