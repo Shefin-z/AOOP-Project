@@ -15,6 +15,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -49,7 +50,10 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
                                          @Value("${youtube.api-key:}") String apiKey) {
         this.jdbc = jdbc;
         this.mapper = mapper;
-        this.client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+        this.client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(8))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
         this.apiKey = apiKey == null ? "" : apiKey.trim();
     }
 
@@ -135,15 +139,21 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
         List<String> playlistIds = searchItems.stream()
                 .map(item -> item.path("id").path("playlistId").asText())
                 .toList();
-        Map<String, Integer> itemCounts = playlistDetails(playlistIds);
+        CompletableFuture<Map<String, Integer>> itemCountsFuture = CompletableFuture.supplyAsync(
+                () -> fetch(() -> playlistDetails(playlistIds)));
         Map<String, List<String>> sampledVideos = new HashMap<>();
         Set<String> allVideoIds = new HashSet<>();
-        for (String playlistId : playlistIds) {
-            List<String> ids = playlistVideos(playlistId);
-            sampledVideos.put(playlistId, ids);
-            allVideoIds.addAll(ids);
+        List<CompletableFuture<Map.Entry<String, List<String>>>> playlistVideoFutures = playlistIds.stream()
+                .map(playlistId -> CompletableFuture.supplyAsync(
+                        () -> Map.entry(playlistId, fetch(() -> playlistVideos(playlistId)))))
+                .toList();
+        for (CompletableFuture<Map.Entry<String, List<String>>> future : playlistVideoFutures) {
+            Map.Entry<String, List<String>> sample = future.join();
+            sampledVideos.put(sample.getKey(), sample.getValue());
+            allVideoIds.addAll(sample.getValue());
         }
         Map<String, Stats> stats = videoStats(new ArrayList<>(allVideoIds));
+        Map<String, Integer> itemCounts = itemCountsFuture.join();
         List<Candidate> ranked = new ArrayList<>();
         int count = searchItems.size();
         for (int index = 0; index < count; index++) {
@@ -353,6 +363,7 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
     private JsonNode get(String endpoint, String operation, String query) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("https://www.googleapis.com/youtube/v3/" + endpoint + "?" + query))
+                .timeout(Duration.ofSeconds(15))
                 .GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() == 400 || response.statusCode() == 401
