@@ -37,7 +37,27 @@ if not defined MAVEN_CMD (
   if exist "%PROJECT_ROOT%..\Software Lab Project\backend\mvnw.cmd" set "MAVEN_CMD=%PROJECT_ROOT%..\Software Lab Project\backend\mvnw.cmd"
 )
 if not defined MAVEN_CMD (
-  echo [ERROR] Maven was not found. Install Apache Maven and add it to PATH.
+  rem Keep a private Maven copy outside the repository. This makes the project
+  rem runnable on a new PC without asking the user to configure PATH.
+  set "MAVEN_VERSION=3.9.9"
+  set "CAREERFORGE_MAVEN_HOME=%LOCALAPPDATA%\CareerForge\tools\apache-maven-3.9.9"
+  if exist "%CAREERFORGE_MAVEN_HOME%\bin\mvn.cmd" set "MAVEN_CMD=%CAREERFORGE_MAVEN_HOME%\bin\mvn.cmd"
+)
+if not defined MAVEN_CMD (
+  echo Maven was not found. Downloading a private Maven copy for CareerForge...
+  set "CAREERFORGE_TOOLS=%LOCALAPPDATA%\CareerForge\tools"
+  set "CAREERFORGE_MAVEN_ZIP=%CAREERFORGE_TOOLS%\apache-maven-3.9.9-bin.zip"
+  if not exist "%CAREERFORGE_TOOLS%" mkdir "%CAREERFORGE_TOOLS%"
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; Invoke-WebRequest -UseBasicParsing -Uri 'https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.zip' -OutFile '%CAREERFORGE_MAVEN_ZIP%'; Expand-Archive -LiteralPath '%CAREERFORGE_MAVEN_ZIP%' -DestinationPath '%CAREERFORGE_TOOLS%' -Force; Remove-Item -LiteralPath '%CAREERFORGE_MAVEN_ZIP%' -Force"
+  if errorlevel 1 (
+    echo [ERROR] Maven could not be downloaded. Check your Internet connection and run this file again.
+    pause
+    exit /b 1
+  )
+  if exist "%CAREERFORGE_MAVEN_HOME%\bin\mvn.cmd" set "MAVEN_CMD=%CAREERFORGE_MAVEN_HOME%\bin\mvn.cmd"
+)
+if not defined MAVEN_CMD (
+  echo [ERROR] Maven setup did not finish correctly. Run this file again.
   pause
   exit /b 1
 )

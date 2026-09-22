@@ -84,8 +84,8 @@ public class AdminDashboardService {
                     adminId, request.title(), nullable(request.description()), request.category(), request.difficulty(), valueOr(request.durationMinutes(), 15), valueOr(request.passingPercentage(), 60.0), request.status());
             id = lastId();
         } else if ("resources".equals(kind)) {
-            jdbc.update("insert into learning_resources (created_by,title,description,category,resource_type,resource_url,estimated_minutes,status) values (?,?,?,?,?,?,?,?)",
-                    adminId, request.title(), nullable(request.description()), request.category(), request.type(), request.resourceUrl(), request.estimatedMinutes(), request.status());
+            jdbc.update("insert into learning_resources (created_by,title,description,category,resource_type,resource_url,thumbnail_url,provider_name,featured,recommendation_note,estimated_minutes,status) values (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    adminId, request.title(), nullable(request.description()), request.category(), request.type(), request.resourceUrl(), nullable(request.thumbnailUrl()), nullable(request.providerName()), Boolean.TRUE.equals(request.featured()), nullable(request.recommendationNote()), request.estimatedMinutes(), request.status());
             id = lastId();
         } else if ("events".equals(kind)) {
             jdbc.update("insert into events (created_by,title,description,category,location,event_url,starts_at,ends_at,capacity,status) values (?,?,?,?,?,?,?,?,?,?)",
@@ -103,8 +103,8 @@ public class AdminDashboardService {
             updated = jdbc.update("update assessments set title=?,description=?,category=?,difficulty=?,duration_minutes=?,passing_percentage=?,status=? where id=?",
                     request.title(), nullable(request.description()), request.category(), request.difficulty(), valueOr(request.durationMinutes(), 15), valueOr(request.passingPercentage(), 60.0), request.status(), id);
         } else if ("resources".equals(kind)) {
-            updated = jdbc.update("update learning_resources set title=?,description=?,category=?,resource_type=?,resource_url=?,estimated_minutes=?,status=? where id=?",
-                    request.title(), nullable(request.description()), request.category(), request.type(), request.resourceUrl(), request.estimatedMinutes(), request.status(), id);
+            updated = jdbc.update("update learning_resources set title=?,description=?,category=?,resource_type=?,resource_url=?,thumbnail_url=?,provider_name=?,featured=?,recommendation_note=?,estimated_minutes=?,status=? where id=?",
+                    request.title(), nullable(request.description()), request.category(), request.type(), request.resourceUrl(), nullable(request.thumbnailUrl()), nullable(request.providerName()), Boolean.TRUE.equals(request.featured()), nullable(request.recommendationNote()), request.estimatedMinutes(), request.status(), id);
         } else if ("events".equals(kind)) {
             updated = jdbc.update("update events set title=?,description=?,category=?,location=?,event_url=?,starts_at=?,ends_at=?,capacity=?,status=? where id=?",
                     request.title(), nullable(request.description()), request.category(), nullable(request.location()), nullable(request.eventUrl()), time(request.startsAt()), time(request.endsAt()), request.capacity(), request.status(), id);
@@ -128,7 +128,7 @@ public class AdminDashboardService {
     private String selectSql(String kind) {
         return switch (kind) {
             case "assessments" -> "select id,title,description,category,difficulty,duration_minutes as durationMinutes,passing_percentage as passingPercentage,status,created_at as createdAt from assessments order by created_at desc";
-            case "resources" -> "select id,title,description,category,resource_type as type,resource_url as resourceUrl,estimated_minutes as estimatedMinutes,status,created_at as createdAt from learning_resources order by created_at desc";
+            case "resources" -> "select id,title,description,category,resource_type as type,resource_url as resourceUrl,thumbnail_url as thumbnailUrl,provider_name as providerName,featured,recommendation_note as recommendationNote,estimated_minutes as estimatedMinutes,status,created_at as createdAt from learning_resources order by featured desc, created_at desc";
             case "events" -> "select id,title,description,category,location,event_url as eventUrl,starts_at as startsAt,ends_at as endsAt,capacity,status,created_at as createdAt from events order by starts_at desc";
             default -> throw invalidKind();
         };

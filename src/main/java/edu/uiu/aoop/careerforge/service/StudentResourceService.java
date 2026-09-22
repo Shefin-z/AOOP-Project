@@ -37,14 +37,31 @@ public class StudentResourceService {
         access.requireStudent(studentId);
         return jdbc.queryForList("""
                 select r.id, r.title, r.description, r.category, r.resource_type as type,
-                       r.resource_url as resourceUrl, r.estimated_minutes as estimatedMinutes,
+                       r.resource_url as resourceUrl, r.thumbnail_url as thumbnailUrl,
+                       coalesce(nullif(r.provider_name, ''), case when r.resource_url like '%youtube.com%' or r.resource_url like '%youtu.be%' then 'YouTube' else 'CareerForge library' end) as providerName,
+                       r.featured, r.recommendation_note as recommendationNote, r.estimated_minutes as estimatedMinutes,
                        r.created_at as createdAt, coalesce(p.saved, false) as saved,
                        case when p.completed_at is not null or coalesce(p.progress_percentage, 0) >= 100 then true else false end as completed
                 from learning_resources r
                 left join resource_progress p on p.resource_id = r.id and p.user_id = ?
                 where r.status = 'published'
-                order by r.created_at desc
+                order by r.featured desc, r.created_at desc
                 """, studentId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> featuredSuggestions(Long studentId, String skill) {
+        access.requireStudent(studentId);
+        String term = "%" + skill.trim().toLowerCase() + "%";
+        return jdbc.queryForList("""
+                select r.id, r.title, r.description, r.category, r.resource_type as type, r.resource_url as resourceUrl,
+                       r.thumbnail_url as thumbnailUrl, r.provider_name as providerName, r.featured, r.recommendation_note as recommendationNote,
+                       r.estimated_minutes as estimatedMinutes, coalesce(p.saved, false) as saved,
+                       case when p.completed_at is not null or coalesce(p.progress_percentage, 0) >= 100 then true else false end as completed
+                from learning_resources r left join resource_progress p on p.resource_id=r.id and p.user_id=?
+                where r.status='published' and r.featured=true and (lower(r.title) like ? or lower(r.category) like ? or lower(coalesce(r.description,'')) like ?)
+                order by r.created_at desc
+                """, studentId, term, term, term);
     }
 
     @Transactional
