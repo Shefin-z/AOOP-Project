@@ -339,7 +339,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 /* -------------------------------------------------------------------------
    Reference UI alignment
-   This maps the current CareerForge screens onto the shared CareerCube-style
+   This maps the current CareerForge screens onto the shared CareerForge-style
    visual language used by the supplied reference components.
    ------------------------------------------------------------------------- */
 :root {
@@ -369,8 +369,6 @@ body {
 .fin-home .brand, .public-page .brand, .auth-page .brand, .workspace .brand { color: var(--ink); }
 .brand-mark, .sidebar .brand-mark { border-radius: 13px; background: var(--ink); color: #fff; box-shadow: 6px 7px 14px rgba(30, 36, 48, .16); }
 .brand > span:last-child span { color: var(--cobalt); }
-.theme-toggle { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid rgba(30,36,48,.1); border-radius: 12px; background: rgba(255,255,255,.62); color: var(--ink); box-shadow: 4px 5px 12px rgba(80, 69, 53, .08); transition: transform .2s ease, background .2s ease, box-shadow .2s ease; }
-.theme-toggle:hover { background: #fff; box-shadow: 7px 9px 18px rgba(80, 69, 53, .13); transform: translateY(-2px); }
 .button { min-height: 44px; border-radius: 18px; padding: 10px 18px; background: var(--ink); color: #fff; box-shadow: 7px 9px 18px rgba(30, 36, 48, .16), inset 1px 1px 1px rgba(255,255,255,.14); }
 .button:hover { background: var(--cobalt); box-shadow: 9px 12px 23px rgba(37, 99, 235, .22); }
 .button.quiet { border-color: rgba(30,36,48,.1); background: rgba(251,249,244,.8); color: var(--ink); box-shadow: 5px 6px 13px rgba(85,76,64,.08); }
@@ -472,25 +470,6 @@ body {
 .auth-form h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
 .auth-form input { min-height: 46px; border-radius: 15px; background: rgba(255,255,255,.65); }
 .auth-form .button { background: var(--cobalt); }
-
-/* Dark mode supplied by the reference ThemeToggle. */
-:root[data-theme="dark"] { color-scheme: dark; --canvas: #000; --paper: #0d0d0e; --surface: #111113; --ink: #f8fbff; --cobalt: #93c5fd; --coral: #ff9f7f; --jade: #76c6a4; --plum: #93c5fd; --muted: #a7adba; }
-:root[data-theme="dark"] body { background: #000; color: var(--ink); }
-:root[data-theme="dark"] .fin-home, :root[data-theme="dark"] .public-page, :root[data-theme="dark"] .workspace, :root[data-theme="dark"] .auth-page { background: #000; }
-:root[data-theme="dark"] .sidebar, :root[data-theme="dark"] .workspace-header { border-color: rgba(255,255,255,.1); background: rgba(0,0,0,.84); }
-:root[data-theme="dark"] .fin-header::before, :root[data-theme="dark"] .public-header::before { background: linear-gradient(to bottom, rgba(0,0,0,.92), transparent); }
-:root[data-theme="dark"] .fin-home .fin-hero { background: transparent; }
-:root[data-theme="dark"] .fin-home .fin-benefits, :root[data-theme="dark"] .fin-home .fin-impact-board, :root[data-theme="dark"] .fin-home .fin-path article, :root[data-theme="dark"] .metric-grid article, :root[data-theme="dark"] .content-card, :root[data-theme="dark"] .data-form, :root[data-theme="dark"] .empty-panel, :root[data-theme="dark"] .job-card, :root[data-theme="dark"] .learning-builder, :root[data-theme="dark"] .learning-paths, :root[data-theme="dark"] .cv-preview { border-color: rgba(255,255,255,.1); background: #0d0d0e; box-shadow: 13px 16px 28px rgba(0,0,0,.72); }
-:root[data-theme="dark"] .welcome, :root[data-theme="dark"] .content-intro { border-color: rgba(255,255,255,.1); background: #111113; box-shadow: 13px 16px 28px rgba(0,0,0,.72); }
-:root[data-theme="dark"] .workspace-search, :root[data-theme="dark"] .data-form input, :root[data-theme="dark"] .data-form textarea, :root[data-theme="dark"] .data-form select, :root[data-theme="dark"] .auth-form input { border-color: rgba(255,255,255,.14); background: #111113; color: var(--ink); }
-:root[data-theme="dark"] .theme-toggle, :root[data-theme="dark"] .button.quiet, :root[data-theme="dark"] .account-menu, :root[data-theme="dark"] .search-results { border-color: rgba(255,255,255,.14); background: #111113; color: var(--ink); }
-:root[data-theme="dark"] .sidebar nav button:hover, :root[data-theme="dark"] .signout:hover { background: #1b1b1e; }
-:root[data-theme="dark"] .sidebar nav button.active { background: #f8fbff; color: #0d0d0e; box-shadow: none; }
-:root[data-theme="dark"] .sidebar nav button.active svg { color: #0d0d0e; }
-:root[data-theme="dark"] .auth-card { border-color: rgba(255,255,255,.1); background: #0d0d0e; box-shadow: 25px 31px 70px rgba(0,0,0,.86); }
-:root[data-theme="dark"] .auth-form { background: #0d0d0e; }
-:root[data-theme="dark"] .hybrid-photo-card { border-color: rgba(255,255,255,.08); background: #050505; }
-:root[data-theme="dark"] .hybrid-photo-card img { background: #050505; }
 
 @media (max-width: 980px) {
   .sidebar { background: rgba(251,249,244,.82); }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BadgeCheck, BookOpen, Bookmark, BookmarkCheck, CheckCircle2, Clock3, ExternalLink, FileText, LayoutTemplate, LoaderCircle, Play, PlayCircle, Search, Sparkles, Youtube } from "lucide-react";
+import { BadgeCheck, BookOpen, Bookmark, BookmarkCheck, CheckCircle2, Clock3, ExternalLink, FileText, LayoutTemplate, LoaderCircle, Play, PlayCircle, Search, Youtube } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -12,7 +12,7 @@ async function responseBody(response) {
 const typeDetails = {
   article: [BookOpen, "Article"],
   video: [PlayCircle, "Video"],
-  course: [Sparkles, "Course"],
+  course: [BookOpen, "Course"],
   pdf: [FileText, "PDF"],
   template: [LayoutTemplate, "Template"],
 };
@@ -59,9 +59,14 @@ export function StudentResources() {
   }
 
   return <section className="student-resources">
+    <header className="student-page-heading">
+      <p>MY CAREERFORGE</p>
+      <h2>Learning resources</h2>
+      <span>Focused material selected for the roles you want.</span>
+    </header>
     <header className="resources-hero">
       <div>
-        <p className="eyebrow"><Sparkles size={14} /> LEARNING LIBRARY</p>
+        <p className="eyebrow"><BookOpen size={14} /> LEARNING LIBRARY</p>
         <h2>Build skills for your next move.</h2>
         <p>Explore administrator-curated career guides, practical learning materials, and templates in one focused library.</p>
       </div>
@@ -69,9 +74,10 @@ export function StudentResources() {
     </header>
 
     <section className="skill-resource-finder">
-      <p className="eyebrow"><Youtube size={15} /> SKILL RESOURCE FINDER</p><h3>What skill do you want to gain?</h3><p>Search a skill for the five best matching YouTube playlists. A matching resource selected by your CareerForge administrator always appears first.</p>
-      <form onSubmit={findSkill}><label><Search size={20} /><input value={skill} onChange={(event) => setSkill(event.target.value)} placeholder="e.g. React, SQL, Figma, Python, public speaking" /></label><button disabled={searching || !skill.trim()} type="submit">Search playlists</button></form>
-      {searching ? <div className="skill-searching" role="status"><LoaderCircle size={37} /><b>Finding the best YouTube playlists for {skill}...</b><span>Checking CareerForge recommendations first, then ranking the strongest matching playlists.</span></div> : !searchResults ? <div className="skill-empty"><Youtube size={27} /><b>Search the skill you want to learn</b><span>CareerForge will show matching administrator suggestions before the best YouTube playlists.</span></div> : <div className="skill-results">
+      <p className="eyebrow"><Youtube size={15} /> SKILL RESOURCE FINDER</p><h3>What skill do you want to gain?</h3><p>Search a skill to get current YouTube learning resources. A resource suggested by your admin for the same skill always appears first.</p>
+      <form onSubmit={findSkill}><label><Search size={20} /><input value={skill} onChange={(event) => setSkill(event.target.value)} placeholder="e.g. React, SQL, Figma, Python, public speaking" /></label><button disabled={searching || !skill.trim()} type="submit"><Search size={16} /> Search videos</button></form>
+      <div className="resource-quick-search"><b>TRY:</b>{["React", "SQL", "Python", "Figma", "Public speaking"].map((item) => <button type="button" key={item} onClick={(event) => findSkill(event, item)}>{item}</button>)}</div>
+      {searching ? <div className="skill-searching" role="status"><LoaderCircle size={37} /><b>Finding the best YouTube resources for {skill}...</b><span>Checking CareerForge recommendations first, then ranking the strongest matching resources.</span></div> : !searchResults ? <div className="skill-empty"><Youtube size={27} /><b>Search the skill you want to learn</b><span>CareerForge will show current YouTube resources, with matching admin suggestions first.</span></div> : <div className="skill-results">
         {(searchResults.suggestions?.length > 0 || searchResults.videos?.length > 0) && <><div className="skill-result-heading"><BadgeCheck size={17} /><div><b>{searchResults.suggestions?.length > 0 ? "CareerForge pick and top playlists" : hasYouTubeFallback ? "Open current YouTube playlists" : "Best matching YouTube playlists"}</b><span>{searchResults.suggestions?.length > 0 ? "Your administrator's matching pick is first; the strongest ranked playlists follow." : hasYouTubeFallback ? "YouTube's live ranking is temporarily unavailable; this opens its current playlist-only results." : `${searchResults.videos.length} highest-ranked playlist${searchResults.videos.length === 1 ? "" : "s"} for ${skill}`}</span></div></div><div className="resource-grid skill-result-grid">{searchResults.suggestions?.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}{searchResults.videos?.map((item) => <article className="resource-card video-result" key={item.id}><div className="resource-thumbnail">{item.thumbnailUrl ? <img src={item.thumbnailUrl} alt="" /> : <div className="resource-thumbnail-fallback youtube"><Youtube size={32} /></div>}<span className="resource-youtube-badge"><Youtube size={13} /> {item.fallback ? "Live YouTube search" : "YouTube playlist"}</span></div><div className="resource-card-top"><span className="resource-provider">{item.providerName}</span></div><h4>{item.title}</h4><p className="resource-description">{item.description || "A ranked YouTube playlist for this skill."}</p><footer><span>{item.fallback ? "Playlist search" : "Playlist"}</span><a href={item.resourceUrl} target="_blank" rel="noreferrer">{item.fallback ? "View playlists" : "Open playlist"} <ExternalLink size={14} /></a></footer></article>)}</div></>}
         {!searchResults.suggestions?.length && !searchResults.videos?.length && <div className="skill-empty"><Search size={27} /><b>{searchResults.youtubeMessage ? "YouTube results are unavailable" : "No matching result found"}</b><span>{searchResults.youtubeMessage || "Try a broader skill name."}</span></div>}
         {searchResults.youtubeMessage && searchResults.videos?.length > 0 && <p className="skill-youtube-message">{searchResults.youtubeMessage}</p>}
