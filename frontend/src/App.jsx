@@ -3,10 +3,10 @@ import {
   ArrowRight, BarChart3, BookOpen, BriefcaseBusiness, Building2, CalendarDays,
   ChevronRight, CircleUserRound, ClipboardCheck, FileText, GraduationCap, LayoutDashboard,
   Download, MapPin, MessageCircle, Pencil, Plus, RefreshCw, Save, Search, Settings, Star, Upload,
-  ShieldCheck, Sparkles, Target, Trash2, Users,
+  ShieldCheck, Sparkles, Target, Trash2, Users, Moon, Sun,
 } from "lucide-react";
 import { AdminApplications, AdminCommunity, AdminContentManager, AdminOverview, AdminStudents } from "./AdminDashboard";
-import studentSuccessPhoto from "./assets/hero-student-success.png";
+import studentSuccessPhoto from "./assets/hero-campus-graduates.jpg";
 import { StudentResources } from "./StudentResources";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
@@ -26,8 +26,16 @@ function useRoute() {
   return [route, (to) => { window.location.hash = to; }];
 }
 
-function Brand({ onClick }) { return <button className="brand" onClick={onClick}><span className="brand-mark"><Sparkles size={16} /></span><span>Career<span>Forge</span></span></button>; }
+function Brand({ onClick }) { return <button className="brand" onClick={onClick} aria-label="CareerForge home"><span className="brand-mark">CF</span><span>Career<span>Forge</span></span></button>; }
 function Button({ children, className = "", ...props }) { return <button className={`button ${className}`} {...props}>{children}</button>; }
+function ThemeToggle() {
+  const [dark, setDark] = useState(() => document.documentElement.dataset.theme === "dark" || localStorage.getItem("careerforge_theme") === "dark");
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    localStorage.setItem("careerforge_theme", dark ? "dark" : "light");
+  }, [dark]);
+  return <button type="button" className="theme-toggle" onClick={() => setDark((value) => !value)} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"} title={dark ? "Switch to light mode" : "Switch to dark mode"}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button>;
+}
 function EmptyPanel({ title, copy }) { return <section className="empty-panel"><span><Sparkles size={21} /></span><h3>{title}</h3><p>{copy}</p></section>; }
 
 function LegacyLanding({ go }) {
@@ -69,7 +77,7 @@ function Landing({ go }) {
   </main>;
 }
 
-function FinpayLanding({ go }) {
+function ArchiveFinpayLanding({ go }) {
   const benefits = [[RefreshCw, "Free career moves", "Create CV versions, explore roles, and make every application easier to manage."], [BriefcaseBusiness, "Multiple pathways", "Keep job matches, applications, documents, and professional goals in a single account."], [ShieldCheck, "Your work stays secure", "Your information is connected to your CareerForge profile and available when you need it."]];
   const scrollToSection = (id) => { const target = document.getElementById(id); if (!target) return; const targetTop = window.scrollY + target.getBoundingClientRect().top; const centeredTop = targetTop - Math.max(20, (window.innerHeight - target.offsetHeight) / 2); window.scrollTo({ top: Math.max(0, centeredTop), behavior: "smooth" }); };
   useEffect(() => {
@@ -80,13 +88,192 @@ function FinpayLanding({ go }) {
     return () => { window.removeEventListener("scroll", updateMotion); window.removeEventListener("resize", updateMotion); };
   }, []);
   return <main className="fin-home">
-    <header className="fin-header"><Brand onClick={() => go("/")} /><nav><button type="button" onClick={() => scrollToSection("fin-product")}>People</button><button type="button" onClick={() => scrollToSection("fin-path")}>Skills</button><button type="button" onClick={() => scrollToSection("fin-impact")}>Opportunities</button></nav><div className="fin-actions"><Button className="quiet" onClick={() => go("/login/student")}>Log in</Button><Button onClick={() => go("/register")}>Get started</Button></div></header>
+     <header className="fin-header"><Brand onClick={() => go("/")} /><nav><button type="button" onClick={() => scrollToSection("fin-product")}>People</button><button type="button" onClick={() => scrollToSection("fin-path")}>Skills</button><button type="button" onClick={() => scrollToSection("fin-impact")}>Opportunities</button></nav><div className="fin-actions"><ThemeToggle /><Button className="quiet" onClick={() => go("/login/student")}>Log in</Button><Button onClick={() => go("/register")}>Get started</Button></div></header>
     <section className="fin-hero"><div className="fin-hero-copy" data-fin-reveal="left"><p className="fin-kicker">A BRIGHTER TOMORROW STARTS HERE</p><h1>Your future,<br />built <em>together.</em></h1><p>CareerForge brings students, skills, CVs, and meaningful opportunities together in one focused career workspace.</p><div className="fin-start"><input aria-label="Your email address" type="email" placeholder="Your university email" /><Button onClick={() => go("/register")}>Get started <ArrowRight size={15} /></Button></div><small>Designed for students ready to take their next step with confidence.</small><div className="fin-capabilities"><b>YOUR WORKSPACE INCLUDES</b><span><CircleUserRound size={15} /> Profile &amp; goals</span><span><FileText size={15} /> CV versions</span><span><BriefcaseBusiness size={15} /> Real opportunities</span></div></div><div className="fin-preview" data-fin-reveal="right" aria-label="Student success and readiness collage"><div className="hybrid-success-collage"><figure className="hybrid-photo-card"><img src={studentSuccessPhoto} alt="University student building her career at a laptop" /><figcaption><span><Sparkles size={14} /> STUDENT SUCCESS STORY</span><b>Your potential, in motion.</b></figcaption></figure><article className="hybrid-readiness-card"><small>CAREER READINESS</small><div className="hybrid-score-ring"><i className="hybrid-orbit-line hybrid-orbit-line-one" aria-hidden="true" /><i className="hybrid-orbit-line hybrid-orbit-line-two" aria-hidden="true" /><strong>72<span>/100</span></strong><b>Great progress</b></div><footer><span><GraduationCap size={14} /> Skills</span><span><MessageCircle size={14} /> Community</span></footer></article><article className="hybrid-microcard hybrid-cv-card"><span><FileText size={18} /></span><div><small>CV READY</small><b>Portfolio refreshed</b></div><i><Sparkles size={14} /></i></article><article className="hybrid-microcard hybrid-job-card"><span><BriefcaseBusiness size={18} /></span><div><small>JOB MATCHES</small><b>12 opportunities</b><em>90% fit</em></div></article><button className="hybrid-collage-action" type="button" onClick={() => go("/login/student")}>Build your workspace <ArrowRight size={15} /></button></div></div></section>
     <section className="fin-benefits" id="fin-product"><div className="fin-benefit-intro" data-fin-reveal="left"><p className="fin-kicker">FUTURE-READY CAREERS</p><h2>An experience that grows<br />with your <em>ambition.</em></h2></div><p data-fin-reveal="fade">We designed one career system that works for you now and stays useful as your confidence grows.</p><div className="fin-benefit-grid">{benefits.map(([Icon, title, copy], index) => <article data-fin-reveal="up" data-fin-delay={index} key={title}><span><Icon size={24} /></span><h3>{title}</h3><p>{copy}</p></article>)}</div></section>
     <section className="fin-impact" id="fin-impact"><div className="fin-impact-copy" data-fin-reveal="left"><p className="fin-kicker">WHY CAREERFORGE</p><h2>A clear picture of<br />where you are going.</h2><p>Simple tools make it easier to take action today and keep moving tomorrow.</p><Button onClick={() => go("/register")}>Create your account <ArrowRight size={15} /></Button></div><div className="fin-impact-board" data-fin-reveal="right"><div className="fin-board-head"><span>APPLICATION ACTIVITY</span><b>Career momentum</b><small>Last 6 months</small></div><div className="fin-chart"><i /><i /><i /><i /><i /><i /></div><div className="fin-board-stats"><article><b>01</b><span>Profile built<br /><small>Tell your story clearly</small></span></article><article><b>02</b><span>CV prepared<br /><small>Keep the right version ready</small></span></article><article><b>03</b><span>Applications tracked<br /><small>Know what happens next</small></span></article></div></div></section>
     <section className="fin-path" id="fin-path"><div className="fin-path-heading" data-fin-reveal="up"><p className="fin-kicker">HOW IT WORKS</p><h2>Build a career system<br />that works for <em>you.</em></h2></div><div className="fin-path-steps">{[["01", "Create your profile", "Add your study, skills, direction, and the details that make you stand out."], ["02", "Prepare your CV", "Create a polished version or upload the document you already trust."], ["03", "Apply with clarity", "Browse published jobs and use the right CV for each opportunity."]].map(([number, title, copy], index) => <article data-fin-reveal="up" data-fin-delay={index} key={number}><b>{number}</b><h3>{title}</h3><p>{copy}</p><button onClick={() => go(number === "01" ? "/register" : "/login/student")} aria-label={`Open ${title}`}><ArrowRight size={18} /></button></article>)}</div></section>
     <section className="fin-cta" data-fin-reveal="up"><div><p className="fin-kicker">START BUILDING MOMENTUM</p><h2>Your next chapter<br />starts with a plan.</h2><p>Create your free student workspace and turn uncertainty into an organised next step.</p><Button onClick={() => go("/register")}>Get started for free <ArrowRight size={16} /></Button></div><aside className="fin-next-planner" aria-label="Your next three career steps"><header><span><CalendarDays size={15} /> YOUR NEXT 3 STEPS</span><small>This week</small></header><article><b>01</b><div><strong>Complete your profile</strong><small>80% complete</small><i><em style={{ width: "80%" }} /></i></div></article><article><b>02</b><div><strong>Polish your CV</strong><small>Version 02 is ready</small><i><em style={{ width: "100%" }} /></i></div><span className="planner-ready">Ready</span></article><article><b>03</b><div><strong>Explore job matches</strong><small>12 opportunities waiting</small><i><em style={{ width: "48%" }} /></i></div></article><footer><span>KEEP MOVING FORWARD</span><ArrowRight size={15} /></footer></aside></section>
     <footer className="fin-footer" data-fin-reveal="up"><Brand onClick={() => go("/")} /><span>CareerForge · Advanced Object Oriented Programming Laboratory</span><button onClick={() => go("/login/admin")}>Administrator sign in</button></footer>
+  </main>;
+}
+
+function FinpayLanding({ go }) {
+  const featureCards = [
+    [Target, "Get direction", "Turn your profile into a practical focus.", "blue"],
+    [BriefcaseBusiness, "Find real opportunities", "See roles that fit where you are heading.", "jade"],
+    [Users, "Move with people", "Connect with students on a similar path.", "coral"],
+  ];
+  const journeySteps = [
+    ["01", "Shape your story", "Add your education, strengths, and target role in one focused profile."],
+    ["02", "Prepare with confidence", "Create CV versions and keep your best work ready for every application."],
+    ["03", "Take the next step", "Discover relevant opportunities and track every application in one place."],
+  ];
+  const scrollToSection = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  return <main className="landing-v2">
+    <header className="landing-v2-header">
+      <div className="landing-v2-nav">
+        <Brand onClick={() => go("/")} />
+        <nav aria-label="Landing page navigation">
+          <button type="button" onClick={() => scrollToSection("platform")}>Platform</button>
+          <button type="button" onClick={() => scrollToSection("how-it-works")}>How it works</button>
+          <button type="button" onClick={() => scrollToSection("community")}>Community</button>
+          <button type="button" onClick={() => scrollToSection("resources")}>Resources</button>
+        </nav>
+        <div className="landing-v2-actions">
+          <ThemeToggle />
+          <button className="landing-v2-admin" type="button" onClick={() => go("/login/admin")}>Admin</button>
+          <button className="landing-v2-login" type="button" onClick={() => go("/login/student")}>Log in</button>
+          <Button className="landing-v2-primary" onClick={() => go("/register")}>Get started <ArrowRight size={16} /></Button>
+        </div>
+      </div>
+    </header>
+
+    <div className="landing-v2-content">
+      <section className="landing-v2-hero" id="platform">
+        <div className="landing-v2-copy">
+          <p className="landing-v2-eyebrow">ONE CAREER SPACE</p>
+          <h1>Your career.<br /><span>Finally</span> in focus.</h1>
+          <p className="landing-v2-lede">See the skills to build, opportunities worth chasing and people who can help you get there—all in one personal career space.</p>
+          <div className="landing-v2-hero-actions">
+            <Button className="landing-v2-primary landing-v2-workspace" onClick={() => go("/register")}>Create your free workspace <ArrowRight size={16} /></Button>
+            <button className="landing-v2-explore" type="button" onClick={() => scrollToSection("how-it-works")}>Explore the journey <span aria-hidden="true">↓</span></button>
+          </div>
+          <div className="landing-v2-proof">
+            <div className="landing-v2-avatars" aria-hidden="true"><i>SA</i><i>MI</i><i>NK</i><i>+</i></div>
+            <p><b>Built for real student journeys.</b><span>From campus confidence to your next big move.</span></p>
+          </div>
+        </div>
+        <figure className="landing-v2-photo">
+          <img src={studentSuccessPhoto} alt="University graduates celebrating together on campus" />
+        </figure>
+      </section>
+
+      <section className="landing-v2-feature-row" aria-label="CareerForge highlights">
+        <article className="landing-v2-feature-intro">
+          <p>ONE CAREER SPACE</p>
+          <h2>Made for your<br />next move.</h2>
+        </article>
+        {featureCards.map(([Icon, title, copy, tone]) => <article className="landing-v2-feature" key={title}>
+          <span className={`landing-v2-feature-icon ${tone}`}><Icon size={20} /></span>
+          <div><h3>{title}</h3><p>{copy}</p></div>
+        </article>)}
+      </section>
+
+      <section className="landing-v2-journey" id="how-it-works">
+        <div className="landing-v2-journey-heading">
+          <p className="landing-v2-eyebrow">HOW IT WORKS</p>
+          <h2>One clear place to<br /><span>move forward.</span></h2>
+          <p>Keep the important parts of your career journey connected, from your first profile detail to your next application.</p>
+        </div>
+        <div className="landing-v2-step-list">
+          {journeySteps.map(([number, title, copy]) => <article key={number}>
+            <b>{number}</b><div><h3>{title}</h3><p>{copy}</p></div><ArrowRight size={18} />
+          </article>)}
+        </div>
+      </section>
+
+      <section className="landing-v2-cta">
+        <div><p>START WITH YOUR NEXT STEP</p><h2>Your future deserves focus.</h2><span>Create your free workspace and build momentum at your own pace.</span></div>
+        <Button className="landing-v2-primary" onClick={() => go("/register")}>Get started for free <ArrowRight size={16} /></Button>
+      </section>
+
+      <section className="landing-v2-embedded community-v2" id="community">
+        <section className="community-v2-hero">
+          <div className="community-v2-copy">
+            <p className="community-v2-kicker"><span>03</span> BETTER, TOGETHER</p>
+            <h1>Your people.<br />Your pace.<br /><em>Your next chapter.</em></h1>
+            <p>Find students who get the journey. Share a question, make a connection, and keep each other moving.</p>
+            <Button className="community-v2-button" onClick={() => go("/login/student")}>Find your community <ArrowRight size={16} /></Button>
+          </div>
+          <div className="community-v2-visual" aria-label="Community connections preview">
+            <i className="community-v2-orbit one" aria-hidden="true" /><i className="community-v2-orbit two" aria-hidden="true" />
+            <article className="community-v2-connection"><span className="community-v2-icon blue"><Users size={27} /></span><div><b>A shared ambition.<br />A new connection.</b><small>Find your people on CareerForge</small></div><i>✓</i></article>
+            <article className="community-v2-conversation"><p><MessageCircle size={15} /> GOOD CONVERSATIONS START HERE</p><h2>What are you<br />working toward?</h2><span>Connect. Share. Grow.</span><b>✓</b></article>
+            <article className="community-v2-resource"><span className="community-v2-icon coral"><BookOpen size={23} /></span><div><b>A little inspiration goes a long way.</b><small>Explore learning resources &amp; events</small></div><ArrowRight size={22} /></article>
+          </div>
+        </section>
+      </section>
+
+      <section className="landing-v2-embedded resources-v2" id="resources">
+        <section className="resources-v2-shell">
+          <header className="resources-v2-heading">
+            <div><p className="resources-v2-kicker"><span>04</span> KEEP MOVING, WITH CLARITY</p><h1>Resources for the<br /><em>road ahead.</em></h1></div>
+            <p>Useful guides, learning paths and campus opportunities—all collected in one calm place.</p>
+          </header>
+          <section className="resources-v2-cards" aria-label="CareerForge resources">
+            <article className="resources-v2-card"><span className="resources-v2-icon"><BookOpen size={23} /></span><p>LEARNING LIBRARY</p><h2>Build the skills your next role needs.</h2><div>Explore focused resources that make each next learning step easier to choose.</div></article>
+            <article className="resources-v2-card"><span className="resources-v2-icon"><FileText size={23} /></span><p>CAREER GUIDES</p><h2>Turn questions into a practical plan.</h2><div>Save useful career guidance, then return to it whenever you are ready.</div></article>
+            <article className="resources-v2-cta"><p>ONE PLACE. EVERY NEXT STEP.</p><h2>Ready when<br />you are.</h2><span>See the full collection of learning resources and events.</span><Button className="resources-v2-open" onClick={() => go("/login/student")}>Open resource library <ArrowRight size={16} /></Button></article>
+          </section>
+        </section>
+      </section>
+    </div>
+  </main>;
+}
+
+function ResourcesLanding({ go }) {
+  const cards = [
+    [BookOpen, "LEARNING LIBRARY", "Build the skills your next role needs.", "Explore focused resources that make each next learning step easier to choose."],
+    [FileText, "CAREER GUIDES", "Turn questions into a practical plan.", "Save useful career guidance, then return to it whenever you are ready."],
+  ];
+  return <main className="resources-v2">
+    <section className="resources-v2-shell">
+      <header className="resources-v2-heading">
+        <div>
+          <p className="resources-v2-kicker"><span>04</span> KEEP MOVING, WITH CLARITY</p>
+          <h1>Resources for the<br /><em>road ahead.</em></h1>
+        </div>
+        <p>Useful guides, learning paths and campus opportunities—all collected in one calm place.</p>
+      </header>
+      <section className="resources-v2-cards" aria-label="CareerForge resources">
+        {cards.map(([Icon, eyebrow, title, copy]) => <article className="resources-v2-card" key={eyebrow}>
+          <span className="resources-v2-icon"><Icon size={23} /></span>
+          <p>{eyebrow}</p>
+          <h2>{title}</h2>
+          <div>{copy}</div>
+        </article>)}
+        <article className="resources-v2-cta">
+          <p>ONE PLACE. EVERY NEXT STEP.</p>
+          <h2>Ready when<br />you are.</h2>
+          <span>See the full collection of learning resources and events.</span>
+          <Button className="resources-v2-open" onClick={() => go("/login/student")}>Open resource library <ArrowRight size={16} /></Button>
+        </article>
+      </section>
+    </section>
+  </main>;
+}
+
+function CommunityLanding({ go }) {
+  return <main className="community-v2">
+    <div className="community-v2-topline" aria-hidden="true" />
+    <section className="community-v2-hero">
+      <div className="community-v2-copy">
+        <p className="community-v2-kicker"><span>03</span> BETTER, TOGETHER</p>
+        <h1>Your people.<br />Your pace.<br /><em>Your next chapter.</em></h1>
+        <p>Find students who get the journey. Share a question, make a connection, and keep each other moving.</p>
+        <Button className="community-v2-button" onClick={() => go("/login/student")}>Find your community <ArrowRight size={16} /></Button>
+      </div>
+      <div className="community-v2-visual" aria-label="Community connections preview">
+        <i className="community-v2-orbit one" aria-hidden="true" /><i className="community-v2-orbit two" aria-hidden="true" />
+        <article className="community-v2-connection">
+          <span className="community-v2-icon blue"><Users size={27} /></span>
+          <div><b>A shared ambition.<br />A new connection.</b><small>Find your people on CareerForge</small></div>
+          <i>✓</i>
+        </article>
+        <article className="community-v2-conversation">
+          <p><MessageCircle size={15} /> GOOD CONVERSATIONS START HERE</p>
+          <h2>What are you<br />working toward?</h2>
+          <span>Connect. Share. Grow.</span><b>✓</b>
+        </article>
+        <article className="community-v2-resource">
+          <span className="community-v2-icon coral"><BookOpen size={23} /></span>
+          <div><b>A little inspiration goes a long way.</b><small>Explore learning resources &amp; events</small></div>
+          <ArrowRight size={22} />
+        </article>
+      </div>
+    </section>
   </main>;
 }
 
@@ -550,7 +737,7 @@ function Workspace({ role, section, go }) {
     : section === "jobs" ? admin ? <AdminJobs /> : <StudentJobs />
     : <EmptyPanel title={placeholder[section]?.[0] || label} copy={placeholder[section]?.[1] || "This section is ready for Spring Boot API data."} />;
   const signOut = () => { localStorage.removeItem("careerforge_session"); go("/"); };
-  return <main className="workspace"><aside className="sidebar"><Brand onClick={() => go("/")} /><div className="sidebar-role">{admin ? "ADMIN WORKSPACE" : "STUDENT WORKSPACE"}</div><nav>{items.map(([id, name, Icon]) => <button className={id === section ? "active" : ""} onClick={() => go(`/${role}/${id}`)} key={id}><Icon size={17} />{name}</button>)}</nav><button className="signout" onClick={signOut}>Sign out</button></aside><div className="workspace-main"><header className="workspace-header"><div><p className="breadcrumb">{admin ? "ADMINISTRATION" : "CAREERFORGE"}</p><h1>{label}</h1></div><div className="top-actions"><div className="workspace-search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search workspace" aria-label="Search workspace" />{matches.length > 0 && <div className="search-results">{matches.map(([id, name, Icon]) => <button key={id} onClick={() => { go(`/${role}/${id}`); setQuery(""); }}><Icon size={15} />{name}</button>)}</div>}{query && matches.length === 0 && <div className="search-results no-results">No matching workspace section.</div>}</div><div className="account-control"><button className="avatar" onClick={() => setAccountOpen(!accountOpen)} aria-label="Open account menu">{current?.name?.slice(0, 1)?.toUpperCase() || (admin ? "A" : "S")}</button>{accountOpen && <div className="account-menu"><b>{current?.name || (admin ? "Administrator" : "Student")}</b><small>{current?.email || "Local session"}</small>{!admin && <button onClick={() => { go("/student/profile"); setAccountOpen(false); }}>My profile</button>}<button onClick={signOut}>Sign out</button></div>}</div></div></header>{content}</div></main>;
+  return <main className="workspace"><aside className="sidebar"><Brand onClick={() => go("/")} /><div className="sidebar-role">{admin ? "ADMIN WORKSPACE" : "STUDENT WORKSPACE"}</div><nav>{items.map(([id, name, Icon]) => <button className={id === section ? "active" : ""} onClick={() => go(`/${role}/${id}`)} key={id}><Icon size={17} />{name}</button>)}</nav><button className="signout" onClick={signOut}>Sign out</button></aside><div className="workspace-main"><header className="workspace-header"><div><p className="breadcrumb">{admin ? "ADMINISTRATION" : "CAREERFORGE"}</p><h1>{label}</h1></div><div className="top-actions"><ThemeToggle /><div className="workspace-search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search workspace" aria-label="Search workspace" />{matches.length > 0 && <div className="search-results">{matches.map(([id, name, Icon]) => <button key={id} onClick={() => { go(`/${role}/${id}`); setQuery(""); }}><Icon size={15} />{name}</button>)}</div>}{query && matches.length === 0 && <div className="search-results no-results">No matching workspace section.</div>}</div><div className="account-control"><button className="avatar" onClick={() => setAccountOpen(!accountOpen)} aria-label="Open account menu">{current?.name?.slice(0, 1)?.toUpperCase() || (admin ? "A" : "S")}</button>{accountOpen && <div className="account-menu"><b>{current?.name || (admin ? "Administrator" : "Student")}</b><small>{current?.email || "Local session"}</small>{!admin && <button onClick={() => { go("/student/profile"); setAccountOpen(false); }}>My profile</button>}<button onClick={signOut}>Sign out</button></div>}</div></div></header>{content}</div></main>;
 }
 
 function App() {
@@ -590,6 +777,8 @@ function App() {
   const pieces = route.split("/").filter(Boolean);
   if (pieces[0] === "login") return <Login role={pieces[1] === "admin" ? "admin" : "student"} register={false} go={go} />;
   if (pieces[0] === "register") return <Login role="student" register go={go} />;
+  if (pieces[0] === "resources") return <ResourcesLanding go={go} />;
+  if (pieces[0] === "community") return <CommunityLanding go={go} />;
   if (pieces[0] === "student" || pieces[0] === "admin") return <Workspace role={pieces[0]} section={pieces[1] || "overview"} go={go} />;
   return <FinpayLanding go={go} />;
 }
