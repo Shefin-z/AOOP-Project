@@ -38,8 +38,9 @@ public class LearningPathService {
     private final LearningAttemptRepository attempts;
     private final AccessService access;
     private final GeminiLearningService gemini;
+    private final GroqLearningService groq;
     private final ObjectMapper mapper;
-    public LearningPathService(LearningPathRepository paths, LearningLevelRepository levels, LearningAttemptRepository attempts, AccessService access, GeminiLearningService gemini, ObjectMapper mapper) { this.paths = paths; this.levels = levels; this.attempts = attempts; this.access = access; this.gemini = gemini; this.mapper = mapper; }
+    public LearningPathService(LearningPathRepository paths, LearningLevelRepository levels, LearningAttemptRepository attempts, AccessService access, GeminiLearningService gemini, GroqLearningService groq, ObjectMapper mapper) { this.paths = paths; this.levels = levels; this.attempts = attempts; this.access = access; this.gemini = gemini; this.groq = groq; this.mapper = mapper; }
 
     @Transactional(readOnly = true)
     public List<LearningPathResponse> list(Long userId) { access.requireStudent(userId); return paths.findByUserIdOrderByCreatedAtDesc(userId).stream().map(path -> response(path, userId)).toList(); }
@@ -49,14 +50,20 @@ public class LearningPathService {
         for (int number = 1; number <= request.levelCount(); number++) levels.save(new LearningLevel(path, number));
         return response(path, userId);
     }
-    public LearningRecommendationResponse recommend(Long userId, String topic, String pathType) { access.requireStudent(userId); GeminiLearningService.Recommendation recommendation = gemini.recommend(topic.trim(), pathType); return new LearningRecommendationResponse(recommendation.recommendedLevels(), recommendation.reason()); }
+    public LearningRecommendationResponse recommend(Long userId, String topic, String pathType) { access.requireStudent(userId); GeminiLearningService.Recommendation recommendation; try { recommendation = gemini.recommend(topic.trim(), pathType); } catch (ResponseStatusException exception) { recommendation = groq.recommend(topic.trim(), pathType); } return new LearningRecommendationResponse(recommendation.recommendedLevels(), recommendation.reason()); }
     public LearningPathResponse get(Long userId, Long pathId) { access.requireStudent(userId); return response(path(userId, pathId), userId); }
     public void delete(Long userId, Long pathId) { access.requireStudent(userId); paths.delete(path(userId, pathId)); }
     public LearningQuizResponse quiz(Long userId, Long pathId, int levelNumber) {
         access.requireStudent(userId); LearningPath path = path(userId, pathId); LearningLevel level = level(path, levelNumber); int unlocked = nextUnlocked(path, userId);
         if (levelNumber > unlocked) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Pass the previous level with at least 70% to unlock this one.");
-        if (level.getQuestionSet() == null || questions(level).path("assessmentVersion").asInt() < 2) { GeminiLearningService.GeneratedQuiz generated; try { generated = gemini.generateQuiz(path.getTopic(), path.getPathType(), levelNumber, path.getLevelCount()); } catch (ResponseStatusException exception) { if (exception.getReason() != null && exception.getReason().contains("not configured")) throw exception; generated = fallbackQuiz(path.getTopic(), levelNumber); } try { level.setQuestionSet(mapper.writeValueAsString(Map.of("assessmentVersion", 2, "title", generated.title(), "summary", generated.summary(), "questions", generated.questions()))); levels.save(level); } catch (Exception exception) { throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not save the generated questions."); } }
+        if (level.getQuestionSet() == null || questions(level).path("assessmentVersion").asInt() < 2) { GeminiLearningService.GeneratedQuiz generated; try { generated = gemini.generateQuiz(path.getTopic(), path.getPathType(), levelNumber, path.getLevelCount()); } catch (ResponseStatusException geminiFailure) { try { generated = groq.generateQuiz(path.getTopic(), path.getPathType(), levelNumber, path.getLevelCount()); } catch (ResponseStatusException groqFailure) { generated = fallbackQuiz(path.getTopic(), levelNumber); } } try { level.setQuestionSet(mapper.writeValueAsString(Map.of("assessmentVersion", 2, "title", generated.title(), "summary", generated.summary(), "questions", generated.questions()))); levels.save(level); } catch (Exception exception) { throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not save the generated questions."); } }
         return quizResponse(level);
+    }
+    public LearningQuizResponse regenerate(Long userId, Long pathId, int levelNumber) {
+        access.requireStudent(userId); LearningPath path = path(userId, pathId); LearningLevel level = level(path, levelNumber);
+        if (levelNumber > nextUnlocked(path, userId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Pass the previous level with at least 70% to unlock this one.");
+        level.setQuestionSet(null); levels.save(level);
+        return quiz(userId, pathId, levelNumber);
     }
     public LearningAttemptResponse submit(Long userId, Long pathId, int levelNumber, LearningAttemptRequest request) {
         access.requireStudent(userId); LearningPath path = path(userId, pathId); LearningLevel level = level(path, levelNumber); int unlocked = nextUnlocked(path, userId);
@@ -105,12 +112,14 @@ public class LearningPathService {
         return matches >= Math.min(2, keywords.size());
     }
     private GeminiLearningService.GeneratedQuiz fallbackQuiz(String topic, int levelNumber) {
+        String[] focusAreas = {"core concepts", "variables and data", "control flow", "methods and problem solving", "object-oriented design", "collections and data handling", "errors and exceptions", "files and persistence", "performance and clean code", "real project practice"};
+        String focus = focusAreas[Math.floorMod(levelNumber - 1 + (int) (System.currentTimeMillis() / 1000L), focusAreas.length)];
         ArrayNode items = mapper.createArrayNode();
-        items.add(objectiveQuestion("MCQ", "Which is the best first step when learning " + topic + "?", "", List.of("Understand the core concepts and practise small examples", "Skip directly to advanced topics", "Memorise answers without practising", "Avoid feedback"), 0, "A strong foundation and short practice cycles build reliable skill."));
-        items.add(objectiveQuestion("MCQ", "Which habit helps you improve in " + topic + " most consistently?", "", List.of("Practise regularly and review mistakes", "Only study once before an exam", "Ignore errors", "Copy solutions without understanding them"), 0, "Consistent practice and review reveal what to improve next."));
+        items.add(objectiveQuestion("MCQ", "Which is the best approach for building " + focus + " in " + topic + "?", "", List.of("Understand the idea and practise it with small examples", "Skip directly to unrelated advanced topics", "Memorise answers without practising", "Avoid feedback"), 0, "A strong foundation and short practice cycles build reliable skill."));
+        items.add(objectiveQuestion("MCQ", "Which habit helps you improve your " + focus + " in " + topic + " most consistently?", "", List.of("Practise regularly and review mistakes", "Only study once before an exam", "Ignore errors", "Copy solutions without understanding them"), 0, "Consistent practice and review reveal what to improve next."));
         items.add(objectiveQuestion("DEBUGGING", "Review this code. What should be fixed first?", "int total = 10;\nint average = total / 0;\nSystem.out.println(average);", List.of("Avoid division by zero", "Rename the variable", "Remove the print statement", "Add another variable"), 0, "Division by zero causes a runtime error and must be guarded."));
-        items.add(objectiveQuestion("SCENARIO", "You are building a small " + topic + " project and the result is not what you expected. What is the best next action?", "", List.of("Reproduce the issue, inspect the inputs, and test one change at a time", "Change many things at once", "Ignore the result", "Start over without checking the cause"), 0, "A small, repeatable investigation makes problems easier to solve."));
-        ObjectNode shortAnswer = items.addObject(); shortAnswer.put("type", "SHORT_ANSWER"); shortAnswer.put("prompt", "In your own words, explain one useful concept you have learned about " + topic + " and give a practical example."); shortAnswer.putArray("expectedKeywords").add("concept").add("example").add("practice"); shortAnswer.put("sampleAnswer", "A good answer names a concept, explains it clearly, and shows how it can be used in practice."); shortAnswer.put("explanation", "Strong explanations connect a concept to a real example and practical use.");
+        items.add(objectiveQuestion("SCENARIO", "You are building a small " + topic + " project focused on " + focus + " and the result is not what you expected. What is the best next action?", "", List.of("Reproduce the issue, inspect the inputs, and test one change at a time", "Change many things at once", "Ignore the result", "Start over without checking the cause"), 0, "A small, repeatable investigation makes problems easier to solve."));
+        ObjectNode shortAnswer = items.addObject(); shortAnswer.put("type", "SHORT_ANSWER"); shortAnswer.put("prompt", "In your own words, explain one useful " + focus + " concept in " + topic + " and give a practical example."); shortAnswer.putArray("expectedKeywords").add("concept").add("example").add("practice"); shortAnswer.put("sampleAnswer", "A good answer names a concept, explains it clearly, and shows how it can be used in practice."); shortAnswer.put("explanation", "Strong explanations connect a concept to a real example and practical use.");
         return new GeminiLearningService.GeneratedQuiz(topic + " foundations", "Gemini is temporarily busy, so this level uses a focused practice set while keeping your progress available.", items);
     }
     private ObjectNode objectiveQuestion(String type, String prompt, String codeSnippet, List<String> options, int answerIndex, String explanation) {
