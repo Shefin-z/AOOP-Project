@@ -297,6 +297,8 @@ function LearningPaths() {
   const [result, setResult] = useState(null);
   const [loadingLevel, setLoadingLevel] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletingPath, setDeletingPath] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
   const [timerExpired, setTimerExpired] = useState(false);
   const headers = { "Content-Type": "application/json", "X-User-Id": current?.id || "" };
@@ -311,7 +313,20 @@ function LearningPaths() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!notice) return undefined;
+    const dismiss = window.setTimeout(() => setNotice(""), 5000);
+    return () => window.clearTimeout(dismiss);
+  }, [notice]);
   useEffect(() => { if (result) window.scrollTo({ top: 0, behavior: "smooth" }); }, [result]);
+  useEffect(() => {
+    if (!deleteTarget) return undefined;
+    const handleEscape = (event) => {
+      if (event.key === "Escape" && !deletingPath) setDeleteTarget(null);
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [deleteTarget, deletingPath]);
   useEffect(() => {
     if (!quiz) { setTimeLeft(null); setTimerExpired(false); return undefined; }
     setTimeLeft(Math.max(60, quiz.questions.length * 36));
@@ -348,15 +363,18 @@ function LearningPaths() {
     } catch (error) { setNotice(error.message); } finally { setCreating(false); }
   }
 
-  async function deletePath(path) {
-    if (!window.confirm(`Delete the ${path.topic} learning path and all of its progress?`)) return;
+  async function deletePath() {
+    const path = deleteTarget;
+    if (!path || deletingPath) return;
+    setDeletingPath(true);
     setNotice("");
     try {
       await responseBody(await fetch(`${API_BASE_URL}/learning-paths/${path.id}`, { method: "DELETE", headers }));
       const remaining = paths.filter((item) => item.id !== path.id);
       setPaths(remaining); setActiveId(remaining[0]?.id || null); setQuiz(null); setResult(null);
+      setDeleteTarget(null);
       setNotice("Learning path deleted.");
-    } catch (error) { setNotice(error.message); }
+    } catch (error) { setNotice(error.message); } finally { setDeletingPath(false); }
   }
 
   async function openLevel(number) {
@@ -425,10 +443,12 @@ function LearningPaths() {
 
     {notice && <p className={/(created|recommends|ready|deleted)/.test(notice) ? "form-success" : "form-error"}>{notice}</p>}
 
+    {deleteTarget && <div className="learning-delete-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !deletingPath) setDeleteTarget(null); }}><section className="learning-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-learning-path-title" aria-describedby="delete-learning-path-warning"><header className="learning-delete-header"><div className="learning-delete-heading"><div className="learning-delete-icon"><Trash2 size={19} /></div><div><p className="eyebrow">Delete learning path</p><h3 id="delete-learning-path-title">Delete this learning path?</h3></div></div><button className="learning-delete-close" type="button" aria-label="Close delete confirmation" onClick={() => setDeleteTarget(null)} disabled={deletingPath}>×</button></header><div className="learning-delete-path"><span>Path to remove</span><strong>{deleteTarget.topic}</strong></div><div className="learning-delete-warning" id="delete-learning-path-warning"><b>This action cannot be undone.</b><p>All completed levels, scores, and assessment progress for this path will be permanently removed.</p></div><div className="learning-delete-actions"><button className="learning-delete-cancel" type="button" onClick={() => setDeleteTarget(null)} disabled={deletingPath} autoFocus>Cancel</button><button className="learning-delete-confirm" type="button" onClick={deletePath} disabled={deletingPath}><Trash2 size={15} />{deletingPath ? "Deleting..." : "Delete permanently"}</button></div></section></div>}
+
     {composerOpen && <section className="assessment-composer"><div className="composer-heading"><div><p className="eyebrow">New learning path</p><h3>Choose what you want to master</h3></div><button type="button" aria-label="Close learning path form" onClick={() => setComposerOpen(false)}>×</button></div><div className="learning-layout"><form className="data-form learning-builder" onSubmit={create}><div className="learning-type"><button type="button" className={pathType === "skill" ? "selected" : ""} onClick={() => setPathType("skill")}>Learn a skill</button><button type="button" className={pathType === "job" ? "selected" : ""} onClick={() => setPathType("job")}>Prepare for a job</button></div><label>{pathType === "skill" ? "Skill" : "Job role"}<input value={topic} onChange={(event) => setTopic(event.target.value)} placeholder={pathType === "skill" ? "e.g. Java, React, UI/UX" : "e.g. Junior Software Engineer"} required /></label><div className="level-picker"><div><b>{levelCount} levels</b><small>One level unlocks at a time. You need 70% to continue.</small></div><input type="range" min="1" max="50" value={levelCount} onChange={(event) => setLevelCount(event.target.value)} /><output>{levelCount}</output></div><div className="composer-actions"><Button className="quiet" type="button" onClick={recommendation} disabled={recommending}>{recommending ? "Asking Gemini..." : "Recommend levels"}<Sparkles size={14} /></Button><Button type="submit" disabled={creating}>{creating ? "Creating path..." : "Create path"}<ArrowRight size={15} /></Button></div></form><aside className="learning-guide"><p className="eyebrow">A focused rhythm</p><ol><li><b>01</b><span>Pick one skill or role that matters now.</span></li><li><b>02</b><span>Get five Gemini-generated questions per level.</span></li><li><b>03</b><span>Pass at 70% and keep moving forward.</span></li></ol></aside></div></section>}
 
     <section className="assessment-roadmap"><div className="roadmap-heading"><div><p className="eyebrow">Your roadmap</p><h3>{active ? active.topic : "No path selected"}</h3></div>{paths.length > 0 && <span>{paths.length} active {paths.length === 1 ? "path" : "paths"}</span>}</div>
-      {paths.length ? <div className="path-tabs">{paths.map((path) => <article className={`path-tab${path.id === activeId ? " active" : ""}`} key={path.id}><button type="button" onClick={() => { setActiveId(path.id); setResult(null); }}><small>{path.pathType === "job" ? "JOB TARGET" : "SKILL"}</small><b>{path.topic}</b><span>Level {Math.min(path.nextUnlockedLevel, path.levelCount)} of {path.levelCount}</span></button><button className="path-delete" type="button" onClick={() => deletePath(path)} aria-label={`Delete ${path.topic} learning path`} title="Delete learning path"><Trash2 size={14} /></button></article>)}</div> : <div className="roadmap-empty"><span><Target size={20} /></span><div><b>Your first learning path is waiting.</b><p>Set a topic, choose your number of levels, and let Gemini prepare the practice.</p></div><Button type="button" onClick={() => setComposerOpen(true)}>Create path <ArrowRight size={14} /></Button></div>}
+      {paths.length ? <div className="path-tabs">{paths.map((path) => <article className={`path-tab${path.id === activeId ? " active" : ""}`} key={path.id}><button type="button" onClick={() => { setActiveId(path.id); setResult(null); }}><small>{path.pathType === "job" ? "JOB TARGET" : "SKILL"}</small><b>{path.topic}</b><span>Level {Math.min(path.nextUnlockedLevel, path.levelCount)} of {path.levelCount}</span></button><button className="path-delete" type="button" onClick={() => setDeleteTarget(path)} aria-label={`Delete ${path.topic} learning path`} title="Delete learning path"><Trash2 size={14} /></button></article>)}</div> : <div className="roadmap-empty"><span><Target size={20} /></span><div><b>Your first learning path is waiting.</b><p>Set a topic, choose your number of levels, and let Gemini prepare the practice.</p></div><Button type="button" onClick={() => setComposerOpen(true)}>Create path <ArrowRight size={14} /></Button></div>}
       {active && <div className="level-grid">{active.levels.map((level) => <button key={level.number} type="button" className={`learning-level ${level.status}`} disabled={level.status === "locked" || loadingLevel} onClick={() => openLevel(level.number)}><span>{level.status === "completed" ? "✓" : level.status === "locked" ? "🔒" : level.number}</span><b>Level {level.number}</b><small>{level.status === "completed" ? `${level.bestScore}% best score` : level.status === "available" ? loadingLevel ? "Generating questions..." : "Start challenge" : "Pass previous level"}</small>{level.status === "available" && <em>Current</em>}</button>)}</div>}
     </section>
   </section>;
@@ -775,7 +795,7 @@ function App() {
         toast.appendChild(close);
       }
       window.clearTimeout(timeouts.get(toast));
-      timeouts.set(toast, window.setTimeout(() => dismiss(toast), 4500));
+      timeouts.set(toast, window.setTimeout(() => dismiss(toast), 5000));
     };
     const findToasts = () => document.querySelectorAll(".form-success, .form-error").forEach(prepareToast);
     const observer = new MutationObserver(findToasts);
