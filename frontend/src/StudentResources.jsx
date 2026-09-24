@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BadgeCheck, BookOpen, Bookmark, BookmarkCheck, CheckCircle2, Clock3, ExternalLink, FileText, LayoutTemplate, LoaderCircle, Play, PlayCircle, Search, Sparkles, Youtube } from "lucide-react";
+import { BadgeCheck, BookOpen, Bookmark, BookmarkCheck, CheckCircle2, Clock3, ExternalLink, FileText, LayoutTemplate, LoaderCircle, Play, PlayCircle, Search, Youtube } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -12,7 +12,7 @@ async function responseBody(response) {
 const typeDetails = {
   article: [BookOpen, "Article"],
   video: [PlayCircle, "Video"],
-  course: [Sparkles, "Course"],
+  course: [BookOpen, "Course"],
   pdf: [FileText, "PDF"],
   template: [LayoutTemplate, "Template"],
 };
@@ -26,7 +26,18 @@ export function StudentResources() {
   const [skill, setSkill] = useState("");
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
+  const playlistProgressKey = `careerforge_playlist_progress_${current?.id || "guest"}`;
+  const [playlistProgress, setPlaylistProgress] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(playlistProgressKey) || "{}");
+      return saved && typeof saved === "object" ? saved : {};
+    } catch { return {}; }
+  });
   const hasYouTubeFallback = Boolean(searchResults?.videos?.some((item) => item.fallback));
+  const savedResources = resources.filter((resource) => resource.saved);
+  const savedPlaylists = Object.values(playlistProgress)
+    .filter((entry) => entry?.saved && entry.playlist)
+    .map((entry) => ({ playlist: entry.playlist, progress: entry }));
 
   useEffect(() => {
     if (!current?.id) { setError("Please sign in again."); setLoading(false); return; }
@@ -42,7 +53,9 @@ export function StudentResources() {
       const progress = await fetch(`${API_BASE_URL}/resources/${resource.id}/${field}`, {
         method: "PUT", headers: { "X-User-Id": current.id },
       }).then(responseBody);
-      setResources((items) => items.map((item) => item.id === resource.id ? { ...item, ...progress } : item));
+      const applyProgress = (item) => item.id === resource.id ? { ...item, ...progress } : item;
+      setResources((items) => items.map(applyProgress));
+      setSearchResults((results) => results ? { ...results, suggestions: results.suggestions?.map(applyProgress) || [] } : results);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -60,10 +73,34 @@ export function StudentResources() {
     catch (requestError) { setError(requestError.message); } finally { setSearching(false); }
   }
 
+  function updatePlaylistProgress(playlist, action) {
+    setPlaylistProgress((items) => {
+      const previous = items[playlist.id] || {};
+      const totalVideos = Math.max(0, Number(playlist.videoCount ?? previous.totalVideos ?? 0));
+      const watchedVideos = Math.min(totalVideos, Math.max(0, Number(previous.watchedVideos || 0)));
+      let nextProgress = {
+        ...previous,
+        playlist: { ...playlist, videoCount: totalVideos || playlist.videoCount || 0 },
+        totalVideos,
+        watchedVideos,
+        saved: Boolean(previous.saved),
+        completed: Boolean(previous.completed),
+      };
+      if (action === "saved") nextProgress.saved = !nextProgress.saved;
+      if (action === "watched" && totalVideos > 0 && watchedVideos < totalVideos) nextProgress.watchedVideos = watchedVideos + 1;
+      if (action === "completed" && totalVideos > 0 && nextProgress.watchedVideos >= totalVideos) nextProgress.completed = true;
+      if (action === "reset") { nextProgress.watchedVideos = 0; nextProgress.completed = false; }
+      const next = { ...items, [playlist.id]: nextProgress };
+      if (!nextProgress.saved && !nextProgress.watchedVideos && !nextProgress.completed) delete next[playlist.id];
+      try { localStorage.setItem(playlistProgressKey, JSON.stringify(next)); } catch { }
+      return next;
+    });
+  }
+
   return <section className="student-resources">
     <header className="resources-hero">
       <div>
-        <p className="eyebrow"><Sparkles size={14} /> LEARNING LIBRARY</p>
+        <p className="eyebrow"><BookOpen size={14} /> LEARNING LIBRARY</p>
         <h2>Build skills for your next move.</h2>
         <p>Explore administrator-curated career guides, practical learning materials, and templates in one focused library.</p>
       </div>
@@ -74,10 +111,20 @@ export function StudentResources() {
       <p className="eyebrow"><Youtube size={15} /> SKILL RESOURCE FINDER</p><h3>What skill do you want to gain?</h3><p>Search a skill for the five best matching YouTube playlists. A matching resource selected by your CareerForge administrator always appears first.</p>
       <form onSubmit={findSkill}><label><Search size={20} /><input value={skill} onChange={(event) => setSkill(event.target.value)} placeholder="e.g. React, SQL, Figma, Python, public speaking" /></label><button disabled={searching} type="submit">Search playlists</button></form>
       {searching ? <div className="skill-searching" role="status"><LoaderCircle size={37} /><b>Finding the best YouTube playlists for {skill}...</b><span>Checking CareerForge recommendations first, then ranking the strongest matching playlists.</span></div> : !searchResults ? <div className="skill-empty"><Youtube size={27} /><b>Search the skill you want to learn</b><span>CareerForge will show matching administrator suggestions before the best YouTube playlists.</span></div> : <div className="skill-results">
-        {(searchResults.suggestions?.length > 0 || searchResults.videos?.length > 0) && <><div className="skill-result-heading"><BadgeCheck size={17} /><div><b>{searchResults.suggestions?.length > 0 ? "CareerForge pick and top playlists" : hasYouTubeFallback ? "Open current YouTube playlists" : "Best matching YouTube playlists"}</b><span>{searchResults.suggestions?.length > 0 ? "Your administrator's matching pick is first; the strongest ranked playlists follow." : hasYouTubeFallback ? "YouTube's live ranking is temporarily unavailable; this opens its current playlist-only results." : `${searchResults.videos.length} highest-ranked playlist${searchResults.videos.length === 1 ? "" : "s"} for ${skill}`}</span></div></div><div className="resource-grid skill-result-grid">{searchResults.suggestions?.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}{searchResults.videos?.map((item) => <article className="resource-card video-result" key={item.id}><div className="resource-thumbnail">{item.thumbnailUrl ? <img src={item.thumbnailUrl} alt="" /> : <div className="resource-thumbnail-fallback youtube"><Youtube size={32} /></div>}<span className="resource-youtube-badge"><Youtube size={13} /> {item.fallback ? "Live YouTube search" : "YouTube playlist"}</span></div><div className="resource-card-top"><span className="resource-provider">{item.providerName}</span></div><h4>{item.title}</h4><p className="resource-description">{item.description || "A ranked YouTube playlist for this skill."}</p><footer><span>{item.fallback ? "Playlist search" : "Playlist"}</span><a href={item.resourceUrl} target="_blank" rel="noreferrer">{item.fallback ? "View playlists" : "Open playlist"} <ExternalLink size={14} /></a></footer></article>)}</div></>}
+        {(searchResults.suggestions?.length > 0 || searchResults.videos?.length > 0) && <><div className="skill-result-heading"><BadgeCheck size={17} /><div><b>{searchResults.suggestions?.length > 0 ? "CareerForge pick and top playlists" : hasYouTubeFallback ? "Open current YouTube playlists" : "Best matching YouTube playlists"}</b><span>{searchResults.suggestions?.length > 0 ? "Your administrator's matching pick is first; the strongest ranked playlists follow." : hasYouTubeFallback ? "YouTube's live ranking is temporarily unavailable; this opens its current playlist-only results." : `${searchResults.videos.length} highest-ranked playlist${searchResults.videos.length === 1 ? "" : "s"} for ${skill}`}</span></div></div><div className="resource-grid skill-result-grid">{searchResults.suggestions?.map((item) => <ResourceCard key={item.id} resource={item} onToggle={toggle} updatingId={updatingId} />)}{searchResults.videos?.map((item) => <PlaylistCard key={item.id} playlist={item} progress={playlistProgress[item.id]} onToggle={updatePlaylistProgress} />)}</div></>}
         {!searchResults.suggestions?.length && !searchResults.videos?.length && <div className="skill-empty"><Search size={27} /><b>{searchResults.youtubeMessage ? "YouTube results are unavailable" : "No matching result found"}</b><span>{searchResults.youtubeMessage || "Try a broader skill name."}</span></div>}
         {searchResults.youtubeMessage && searchResults.videos?.length > 0 && <p className="skill-youtube-message">{searchResults.youtubeMessage}</p>}
       </div>}
+    </section>
+
+    <section className="saved-resource-library">
+      <div className="resource-section-heading"><div><p className="eyebrow"><BookmarkCheck size={14} /> SAVED FOR LATER</p><h3>Your saved resources</h3></div><span>{savedResources.length + savedPlaylists.length} saved</span></div>
+      {savedResources.length + savedPlaylists.length > 0 ? <div className="resource-grid saved-resource-grid">{savedResources.map((resource) => <ResourceCard key={`resource-${resource.id}`} resource={resource} onToggle={toggle} updatingId={updatingId} />)}{savedPlaylists.map(({ playlist, progress }) => <PlaylistCard key={`playlist-${playlist.id}`} playlist={playlist} progress={progress} onToggle={updatePlaylistProgress} />)}</div> : <div className="saved-resource-empty"><Bookmark size={23} /><div><b>Save something to keep it here.</b><span>Resources and playlists you save will stay in this section for later.</span></div></div>}
+    </section>
+
+    <section className="resource-library">
+      <div className="resource-section-heading"><div><p className="eyebrow"><BookOpen size={14} /> PUBLISHED LIBRARY</p><h3>Explore all resources</h3></div><span>{loading ? "Loading" : `${resources.length} available`}</span></div>
+      {loading ? <div className="resource-loading"><i /><i /><i /></div> : resources.length ? <div className="resource-grid">{resources.map((resource) => <ResourceCard key={resource.id} resource={resource} onToggle={toggle} updatingId={updatingId} />)}</div> : <div className="saved-resource-empty"><BookOpen size={23} /><div><b>No published resources yet.</b><span>Your administrator's learning resources will appear here.</span></div></div>}
     </section>
 
     {error && <p className="form-error">{error}</p>}
@@ -100,5 +147,27 @@ function ResourceCard({ resource, compact = false, onToggle, updatingId }) {
       <button type="button" className={resource.saved ? "active" : ""} aria-pressed={Boolean(resource.saved)} disabled={updatingId === `saved-${resource.id}`} onClick={() => onToggle(resource, "saved")}>{resource.saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />} {resource.saved ? "Saved" : "Save"}</button>
       <button type="button" className={resource.completed ? "active complete" : ""} aria-pressed={Boolean(resource.completed)} disabled={updatingId === `completed-${resource.id}`} onClick={() => onToggle(resource, "completed")}><CheckCircle2 size={15} /> {resource.completed ? "Completed" : "Mark complete"}</button>
     </div>
+  </article>;
+}
+
+function PlaylistCard({ playlist, progress = {}, onToggle }) {
+  const saved = Boolean(progress.saved); const completed = Boolean(progress.completed);
+  const totalVideos = Math.max(0, Number(playlist.videoCount ?? progress.totalVideos ?? 0));
+  const watchedVideos = Math.min(totalVideos, Math.max(0, Number(progress.watchedVideos || 0)));
+  const allVideosWatched = totalVideos > 0 && watchedVideos >= totalVideos;
+  const completionPercent = totalVideos ? Math.round((watchedVideos / totalVideos) * 100) : 0;
+  return <article className={`resource-card video-result${completed ? " playlist-complete" : ""}`}>
+    <div className="resource-thumbnail">{playlist.thumbnailUrl ? <img src={playlist.thumbnailUrl} alt="" /> : <div className="resource-thumbnail-fallback youtube"><Youtube size={32} /></div>}<span className="resource-youtube-badge"><Youtube size={13} /> {playlist.fallback ? "Live YouTube search" : "YouTube playlist"}</span></div>
+    <div className="resource-card-top"><span className="resource-provider">{playlist.providerName}</span></div>
+    <h4>{playlist.title}</h4>
+    <p className="resource-description">{playlist.description || "A ranked YouTube playlist for this skill."}</p>
+    <div className="playlist-progress" aria-label={totalVideos ? `${watchedVideos} of ${totalVideos} videos watched` : "Playlist progress is unavailable"}>{totalVideos ? <><div><span>{completed ? "Playlist completed" : `${watchedVideos} of ${totalVideos} videos watched`}</span><b>{completed ? "100%" : `${completionPercent}%`}</b></div><i><em style={{ width: `${completed ? 100 : completionPercent}%` }} /></i>{allVideosWatched && !completed && <small>All videos watched — ready to mark complete.</small>}</> : <small>{playlist.fallback ? "Choose a playlist on YouTube to track its videos." : "Video count is unavailable for this playlist."}</small>}</div>
+    <footer><span>{playlist.fallback ? "Playlist search" : totalVideos ? `${totalVideos} videos` : "Playlist"}</span><a href={playlist.resourceUrl} target="_blank" rel="noreferrer">{playlist.fallback ? "View playlists" : "Open playlist"} <ExternalLink size={14} /></a></footer>
+    <div className="resource-card-actions playlist-actions">
+      <button type="button" className={saved ? "active" : ""} aria-pressed={saved} onClick={() => onToggle(playlist, "saved")}>{saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />} {saved ? "Saved" : "Save"}</button>
+      {totalVideos > 0 && !completed && <button type="button" disabled={allVideosWatched} onClick={() => onToggle(playlist, "watched")}><CheckCircle2 size={15} /> {allVideosWatched ? "All videos watched" : "Mark video watched"}</button>}
+      {totalVideos > 0 && <button type="button" className={completed ? "active complete" : ""} aria-pressed={completed} disabled={!allVideosWatched || completed} onClick={() => onToggle(playlist, "completed")}><CheckCircle2 size={15} /> {completed ? "Completed" : "Mark complete"}</button>}
+    </div>
+    {totalVideos > 0 && (watchedVideos > 0 || completed) && <button type="button" className="playlist-reset" onClick={() => onToggle(playlist, "reset")}>Reset playlist progress</button>}
   </article>;
 }

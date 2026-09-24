@@ -26,9 +26,11 @@ public class CommunityChatService {
     private final StudentConnectionRepository connections;
     private final StudentMessageRepository messages;
     private final StudentProfileRepository profiles;
+    private final ChatPresenceService presence;
+    private final ProfileService profileService;
 
-    public CommunityChatService(AccessService access, UserRepository users, StudentConnectionRepository connections, StudentMessageRepository messages, StudentProfileRepository profiles) {
-        this.access = access; this.users = users; this.connections = connections; this.messages = messages; this.profiles = profiles;
+    public CommunityChatService(AccessService access, UserRepository users, StudentConnectionRepository connections, StudentMessageRepository messages, StudentProfileRepository profiles, ChatPresenceService presence, ProfileService profileService) {
+        this.access = access; this.users = users; this.connections = connections; this.messages = messages; this.profiles = profiles; this.presence = presence; this.profileService = profileService;
     }
 
     public void openSocket(Long userId) { access.requireStudent(userId); }
@@ -100,7 +102,7 @@ public class CommunityChatService {
         return profiles.findById(other.getId())
                 .map(profile -> new ConnectedStudentProfileResponse(other.getId(), other.getName(), profile.getUniversity(),
                         profile.getDegree(), profile.getTargetRole(), profile.getLocation(), profile.getSkills(),
-                        profile.getHobbies(), profile.getBio(), profile.getProfilePhotoUrl()))
+                        profile.getHobbies(), profile.getBio(), profileService.publicPhotoUrl(other.getId(), profile.getProfilePhotoUrl())))
                 .orElseGet(() -> new ConnectedStudentProfileResponse(other.getId(), other.getName(), null, null,
                         null, null, null, null, null, null));
     }
@@ -133,6 +135,15 @@ public class CommunityChatService {
         return List.of(connection.getUserLowId(), connection.getUserHighId());
     }
 
+    @Transactional(readOnly = true)
+    public List<Long> connectedStudents(Long userId) {
+        access.requireStudent(userId);
+        return connections.findAllForUser(userId).stream()
+                .filter(connection -> "accepted".equals(connection.getStatus()))
+                .map(connection -> connection.otherUserId(userId))
+                .toList();
+    }
+
     private StudentConnection requireConnection(Long connectionId, Long userId) {
         StudentConnection connection = connections.findById(connectionId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Connection not found."));
         if (!connection.includes(userId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This connection does not belong to you.");
@@ -153,7 +164,8 @@ public class CommunityChatService {
     private String safe(String value) { return value == null ? "" : value; }
     private ConnectionResponse connectionResponse(StudentConnection connection, Long currentUserId) {
         User other = users.findById(connection.otherUserId(currentUserId)).orElseThrow();
-        return new ConnectionResponse(connection.getId(), other.getId(), other.getName(), connection.getStatus(), connection.getRequestedBy().equals(currentUserId), messages.countByConnectionIdAndSenderIdNotAndReadAtIsNull(connection.getId(), currentUserId), connection.getUpdatedAt());
+        String profilePhotoUrl = profiles.findById(other.getId()).map(profile -> profileService.publicPhotoUrl(other.getId(), profile.getProfilePhotoUrl())).orElse(null);
+        return new ConnectionResponse(connection.getId(), other.getId(), other.getName(), connection.getStatus(), connection.getRequestedBy().equals(currentUserId), messages.countByConnectionIdAndSenderIdNotAndReadAtIsNull(connection.getId(), currentUserId), connection.getUpdatedAt(), presence.isOnline(other.getId()), presence.lastActiveAt(other.getId()), profilePhotoUrl);
     }
     private MessageResponse messageResponse(StudentMessage message) {
         User sender = users.findById(message.getSenderId()).orElseThrow();

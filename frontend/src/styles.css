@@ -1763,9 +1763,18 @@ body, .fin-home, .workspace { background: var(--fin-paper); }
 .student-workspace .path-track b,
 .student-workspace .path-track small { transition: color .3s ease, opacity .3s ease; }
 .student-workspace .path-track .done i {
-  background: rgba(29, 115, 116, .14);
-  color: var(--student-teal);
+  background: var(--student-teal);
+  color: #fff;
+  font-weight: 900;
+  box-shadow: 0 0 0 4px rgba(29, 115, 116, .1);
   animation: studentPathComplete .48s cubic-bezier(.2, .8, .25, 1) both;
+}
+.student-workspace .path-track .done b { color: var(--student-teal); font-weight: 850; }
+.student-workspace .path-track .done small { color: var(--student-teal); font-weight: 750; }
+.student-workspace .path-track > span.done:not(:last-child)::after {
+  top: 13px;
+  height: 3px;
+  background: var(--student-teal);
 }
 .student-workspace .path-track .active i {
   background: var(--student-teal);
@@ -3032,3 +3041,235 @@ body, .fin-home, .workspace { background: var(--fin-paper); }
   box-shadow: 0 0 0 3px rgba(29, 115, 116, .11);
 }
 .student-workspace .skill-resource-finder form input::placeholder { color: rgba(60, 96, 113, .62); }
+
+/* Messenger-style student chat: readable bubbles, real socket presence, and a stable photo crop. */
+.student-workspace .student-chat-page .community-chat {
+  min-height: 560px;
+  grid-template-rows: auto minmax(330px, 1fr) auto;
+}
+.student-workspace .student-chat-page .community-chat > header { align-items: flex-start; }
+.student-workspace .student-chat-page .community-chat h3 { margin: 4px 0 0; }
+.student-workspace .student-chat-page .conversation-presence,
+.student-workspace .student-chat-page .connection-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 5px 0 0;
+  color: rgba(60, 96, 113, .72) !important;
+  font-size: 10px !important;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.student-workspace .student-chat-page .connection-presence {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+.student-workspace .student-chat-page .presence-dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #d35555;
+  box-shadow: 0 0 0 1px rgba(211, 85, 85, .14);
+}
+.student-workspace .student-chat-page .presence-dot.online {
+  background: #2f6fe4;
+  box-shadow: 0 0 0 1px rgba(47, 111, 228, .17), 0 0 0 4px rgba(47, 111, 228, .1);
+  animation: chatPresencePulse 1.8s ease-in-out infinite;
+}
+.student-workspace .student-chat-page .connection-avatar { overflow: hidden; }
+.student-workspace .student-chat-page .connection-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.student-workspace .student-chat-page .chat-live.online {
+  background: #eaf1ff !important;
+  color: #2f6fe4 !important;
+}
+.student-workspace .student-chat-page .chat-live.offline {
+  background: #fff0f0 !important;
+  color: #c34f4f !important;
+}
+.student-workspace .student-chat-page .message-list {
+  min-height: 0;
+  max-height: none;
+  justify-content: flex-end;
+  padding: 22px 4px;
+  scroll-behavior: smooth;
+}
+.student-workspace .student-chat-page .message-list > .muted { margin: auto; text-align: center; }
+.student-workspace .student-chat-page .message-list article {
+  display: grid;
+  width: fit-content;
+  min-width: 88px;
+  max-width: min(78%, 540px);
+  gap: 4px;
+  padding: 10px 13px;
+  box-sizing: border-box;
+  box-shadow: 0 6px 14px rgba(25, 79, 87, .08);
+  animation: chatMessageIn .28s cubic-bezier(.2, .8, .2, 1) both;
+}
+.student-workspace .student-chat-page .message-list article.mine { animation-name: chatMessageMineIn; }
+.student-workspace .student-chat-page .message-list article small { margin: 0; letter-spacing: .01em; }
+.student-workspace .student-chat-page .message-list article p,
+.student-workspace .student-chat-page .message-list article.mine p,
+.student-workspace .student-chat-page .message-list article.theirs p {
+  min-width: 0;
+  margin: 0 !important;
+  color: inherit !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+  overflow-wrap: anywhere;
+}
+.student-workspace .student-chat-page .message-list article.mine { background: #1d7374 !important; }
+.student-workspace .student-chat-page .message-list article.theirs { background: #edf4f4 !important; }
+.student-workspace .student-chat-page .connected-profile { overflow: hidden; }
+.student-workspace .student-chat-page .connected-profile .profile-avatar {
+  display: grid;
+  width: 88px;
+  height: 88px;
+  margin: 4px auto 15px;
+  overflow: hidden;
+  place-items: center;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: #e4f2f1 !important;
+  box-shadow: 0 9px 20px rgba(25, 79, 87, .13);
+}
+.student-workspace .student-chat-page .connected-profile .profile-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.student-workspace .student-chat-page .connected-profile .profile-avatar > span {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: #1d7374;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+@keyframes chatMessageIn {
+  from { opacity: 0; transform: translateX(-12px) scale(.97); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes chatMessageMineIn {
+  from { opacity: 0; transform: translateX(12px) scale(.97); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes chatPresencePulse {
+  50% { box-shadow: 0 0 0 1px rgba(47, 111, 228, .17), 0 0 0 6px rgba(47, 111, 228, 0); }
+}
+@media (max-width: 700px) {
+  .student-workspace .student-chat-page .community-chat { min-height: 500px; }
+  .student-workspace .student-chat-page .message-list article { max-width: 88%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .student-workspace .student-chat-page .message-list article,
+  .student-workspace .student-chat-page .presence-dot.online { animation: none; }
+  .student-workspace .student-chat-page .message-list { scroll-behavior: auto; }
+}
+
+/* Resource library: saved material stays visible below the finder, with honest playlist progress. */
+.student-workspace .saved-resource-library,
+.student-workspace .resource-library {
+  padding: 25px;
+  border: 1px solid rgba(60, 96, 113, .16);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, .86);
+  box-shadow: 0 12px 28px rgba(25, 79, 87, .055);
+}
+.student-workspace .saved-resource-library .resource-section-heading,
+.student-workspace .resource-library .resource-section-heading { padding: 0; }
+.student-workspace .saved-resource-library .eyebrow,
+.student-workspace .saved-resource-library .eyebrow svg { color: #1d7374 !important; }
+.student-workspace .saved-resource-library .resource-section-heading > span,
+.student-workspace .resource-library .resource-section-heading > span {
+  border: 1px solid rgba(29, 115, 116, .15);
+  background: #e4f2f1;
+  color: #1d7374;
+}
+.student-workspace .saved-resource-empty {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 96px;
+  padding: 20px;
+  border: 1px dashed rgba(60, 96, 113, .25);
+  border-radius: 13px;
+  background: #f4f9f9;
+  color: #1d7374;
+}
+.student-workspace .saved-resource-empty > svg {
+  flex: 0 0 auto;
+  color: #1d7374;
+}
+.student-workspace .saved-resource-empty > div { display: grid; gap: 4px; }
+.student-workspace .saved-resource-empty b { color: #3c6071; font-size: 13px; }
+.student-workspace .saved-resource-empty span { color: rgba(60, 96, 113, .72); font-size: 11px; line-height: 1.5; }
+.student-workspace .saved-resource-grid { margin-top: 2px; }
+.student-workspace .playlist-progress {
+  display: grid;
+  gap: 7px;
+  margin: 14px 20px 0;
+  padding: 10px;
+  border: 1px solid rgba(60, 96, 113, .12);
+  border-radius: 10px;
+  background: #f4f9f9;
+}
+.student-workspace .playlist-progress > div { display: flex; justify-content: space-between; gap: 8px; }
+.student-workspace .playlist-progress span,
+.student-workspace .playlist-progress small { color: rgba(60, 96, 113, .76); font-size: 10px; font-weight: 700; line-height: 1.35; }
+.student-workspace .playlist-progress b { color: #1d7374; font-size: 10px; }
+.student-workspace .playlist-progress i {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(60, 96, 113, .13);
+}
+.student-workspace .playlist-progress i em {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #1d7374;
+  transition: width .28s ease;
+}
+.student-workspace .playlist-progress small { color: #1d7374; }
+.student-workspace .video-result.playlist-complete { border-color: rgba(29, 115, 116, .42) !important; }
+.student-workspace .video-result.playlist-complete .playlist-progress { border-color: rgba(29, 115, 116, .25); background: #e4f2f1; }
+.student-workspace .playlist-actions { flex-wrap: wrap; }
+.student-workspace .playlist-actions button { min-width: min-content; }
+.student-workspace .playlist-actions button:disabled {
+  cursor: not-allowed;
+  border-color: rgba(60, 96, 113, .14) !important;
+  background: #f1f4f5 !important;
+  color: rgba(60, 96, 113, .45) !important;
+}
+.student-workspace .playlist-reset {
+  align-self: flex-start;
+  margin: -8px 20px 19px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #55748a;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: underline;
+}
+.student-workspace .playlist-reset:hover { color: #1d7374; }
+@media (max-width: 620px) {
+  .student-workspace .saved-resource-library,
+  .student-workspace .resource-library { padding: 19px; }
+}
