@@ -26,9 +26,9 @@ public class GeminiLearningService {
     public Recommendation recommend(String topic, String pathType) {
         JsonNode response = ask("""
                 You are a learning-path coach. A student wants to prepare for the %s '%s'.
-                Recommend a realistic number of progressive learning levels from 1 to 50.
+                Assess the topic's breadth, prerequisites, and practical depth before recommending a realistic number of progressive learning levels from 1 to 50. Do not default to a fixed number; the level count must fit this specific topic and its job-readiness needs.
                 Return JSON only: {"recommendedLevels": number, "reason": "one concise sentence"}.
-                """.formatted(pathType, topic));
+                """.formatted(pathType, topic), Duration.ofSeconds(20), 1);
         return new Recommendation(clamp(response.path("recommendedLevels").asInt(10)), response.path("reason").asText("A focused, progressive practice plan."));
     }
 
@@ -54,7 +54,9 @@ public class GeminiLearningService {
         return new GeneratedQuiz(response.path("title").asText("Level " + levelNumber), response.path("summary").asText("Practice and pass to unlock the next level."), questions);
     }
 
-    private JsonNode ask(String prompt) {
+    private JsonNode ask(String prompt) { return ask(prompt, Duration.ofSeconds(40), 3); }
+
+    private JsonNode ask(String prompt, Duration requestTimeout, int maxAttempts) {
         if (apiKey == null || apiKey.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Gemini is not configured. Add GEMINI_API_KEY to the backend environment and restart it.");
         ObjectNode request = mapper.createObjectNode();
         ArrayNode contents = request.putArray("contents");
@@ -62,11 +64,11 @@ public class GeminiLearningService {
         ObjectNode generationConfig = request.putObject("generationConfig"); generationConfig.put("temperature", 0.25); generationConfig.put("responseMimeType", "application/json");
         try {
             HttpRequest httpRequest = HttpRequest.newBuilder(URI.create("https://generativelanguage.googleapis.com/v1beta/models/" + model.trim() + ":generateContent"))
-                    .timeout(Duration.ofSeconds(40)).header("Content-Type", "application/json").header("x-goog-api-key", apiKey.trim())
+                    .timeout(requestTimeout).header("Content-Type", "application/json").header("x-goog-api-key", apiKey.trim())
                     .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(request))).build();
-            for (int attempt = 0; attempt < 3; attempt++) {
+            for (int attempt = 0; attempt < maxAttempts; attempt++) {
                 HttpResponse<String> response = http.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() == 503 && attempt < 2) {
+                if (response.statusCode() == 503 && attempt < maxAttempts - 1) {
                     Thread.sleep((attempt + 1L) * 1500L);
                     continue;
                 }

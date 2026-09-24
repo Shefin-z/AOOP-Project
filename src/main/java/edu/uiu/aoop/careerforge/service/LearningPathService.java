@@ -50,7 +50,17 @@ public class LearningPathService {
         for (int number = 1; number <= request.levelCount(); number++) levels.save(new LearningLevel(path, number));
         return response(path, userId);
     }
-    public LearningRecommendationResponse recommend(Long userId, String topic, String pathType) { access.requireStudent(userId); GeminiLearningService.Recommendation recommendation; try { recommendation = gemini.recommend(topic.trim(), pathType); } catch (ResponseStatusException exception) { recommendation = groq.recommend(topic.trim(), pathType); } return new LearningRecommendationResponse(recommendation.recommendedLevels(), recommendation.reason()); }
+    public LearningRecommendationResponse recommend(Long userId, String topic, String pathType) {
+        access.requireStudent(userId);
+        String normalizedTopic = topic.trim();
+        GeminiLearningService.Recommendation recommendation;
+        try {
+            recommendation = gemini.recommend(normalizedTopic, pathType);
+        } catch (ResponseStatusException exception) {
+            recommendation = quickRecommendation(normalizedTopic, pathType);
+        }
+        return new LearningRecommendationResponse(recommendation.recommendedLevels(), recommendation.reason());
+    }
     public LearningPathResponse get(Long userId, Long pathId) { access.requireStudent(userId); return response(path(userId, pathId), userId); }
     public void delete(Long userId, Long pathId) { access.requireStudent(userId); paths.delete(path(userId, pathId)); }
     public LearningQuizResponse quiz(Long userId, Long pathId, int levelNumber) {
@@ -105,6 +115,11 @@ public class LearningPathService {
         return new LearningQuizResponse(level.getLevelNumber(), root.path("title").asText("Level " + level.getLevelNumber()), root.path("summary").asText(), questions);
     }
     private int parseOptionIndex(String answer) { try { return Integer.parseInt(answer); } catch (Exception exception) { return -1; } }
+    private GeminiLearningService.Recommendation quickRecommendation(String topic, String pathType) {
+        int words = topic.isBlank() ? 1 : topic.trim().split("\\s+").length;
+        int levels = "job".equalsIgnoreCase(pathType) ? 12 : words > 2 ? 12 : 10;
+        return new GeminiLearningService.Recommendation(levels, "A focused " + levels + "-level plan gives you clear milestones while keeping the practice manageable.");
+    }
     private boolean matchesKeywords(String answer, JsonNode keywords) {
         if (answer == null || answer.isBlank() || !keywords.isArray()) return false;
         String normalized = answer.toLowerCase(); int matches = 0;
