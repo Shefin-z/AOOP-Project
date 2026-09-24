@@ -353,6 +353,16 @@ function LearningPaths() {
     } catch (error) { setNotice(error.message); } finally { setLoadingLevel(false); }
   }
 
+  async function regenerateQuestions() {
+    if (!active || !quiz || !window.confirm("Generate a fresh question set for this level?")) return;
+    setLoadingLevel(true); setNotice("");
+    try {
+      const item = await responseBody(await fetch(`${API_BASE_URL}/learning-paths/${active.id}/levels/${quiz.levelNumber}/regenerate`, { method: "POST", headers }));
+      setQuiz(item); setAnswers(Array(item.questions.length).fill(""));
+      setNotice("Fresh questions are ready.");
+    } catch (error) { setNotice(error.message); } finally { setLoadingLevel(false); }
+  }
+
   async function submit(event, timedOut = false) {
     event?.preventDefault();
     if (!quiz || (!timedOut && answers.some((answer) => !String(answer || "").trim()))) return setNotice("Answer every question before submitting.");
@@ -385,7 +395,7 @@ function LearningPaths() {
 
   if (quiz) return <section className="assessment-quiz-page">
     <form className="quiz-card" onSubmit={submit}>
-      <header><button type="button" className="assessment-back" onClick={() => setQuiz(null)}>← Back to levels</button><p className="eyebrow">Level {quiz.levelNumber} assessment</p><h2>{quiz.title}</h2><p>{quiz.summary}</p><div className="quiz-format"><span>Mixed format</span><small>MCQ · Debugging · Scenario · Short answer</small></div><div className="quiz-progress"><span>Answer every question</span><b>{answers.filter((answer) => String(answer || "").trim()).length} / {quiz.questions.length} answered</b></div><div className={`quiz-timer${timerUrgent ? " urgent" : ""}`} aria-live="polite"><span>Time left</span><strong>{timerText}</strong><small>{quiz.questions.length} questions · {Math.ceil((quiz.questions.length * 36) / 60)} min limit</small></div></header>
+      <header><div className="quiz-top-actions"><button type="button" className="assessment-back" onClick={() => setQuiz(null)}>← Back to levels</button><button type="button" className="refresh-questions" onClick={regenerateQuestions} disabled={loadingLevel}>↻ Generate new questions</button></div><p className="eyebrow">Level {quiz.levelNumber} assessment</p><h2>{quiz.title}</h2><p>{quiz.summary}</p><div className="quiz-format"><span>Mixed format</span><small>MCQ · Debugging · Scenario · Short answer</small></div><div className="quiz-progress"><span>Answer every question</span><b>{answers.filter((answer) => String(answer || "").trim()).length} / {quiz.questions.length} answered</b></div><div className={`quiz-timer${timerUrgent ? " urgent" : ""}`} aria-live="polite"><span>Time left</span><strong>{timerText}</strong><small>{quiz.questions.length} questions · {Math.ceil((quiz.questions.length * 36) / 60)} min limit</small></div></header>
       <div className="quiz-questions">{quiz.questions.map((question) => <section className={`quiz-question ${question.type?.toLowerCase() || "mcq"}`} key={question.index}><div className="question-type"><span>{question.type === "SHORT_ANSWER" ? "Short answer" : question.type === "DEBUGGING" ? "Debugging" : question.type === "SCENARIO" ? "Scenario" : "Multiple choice"}</span></div><p className="quiz-question-title"><span>{question.index + 1}</span>{question.prompt}</p>{question.codeSnippet && <pre className="question-code"><code>{question.codeSnippet}</code></pre>}{question.type === "SHORT_ANSWER" ? <div className="short-answer"><textarea value={answers[question.index] || ""} onChange={(event) => setAnswers((currentAnswers) => currentAnswers.map((answer, index) => index === question.index ? event.target.value : answer))} rows="5" maxLength="1000" placeholder="Write a concise answer in your own words..." /><small>{question.answerHint}</small></div> : <div>{(question.options || []).map((option, optionIndex) => <label key={option}><input type="radio" name={`question-${question.index}`} checked={answers[question.index] === String(optionIndex)} onChange={() => setAnswers((currentAnswers) => currentAnswers.map((answer, index) => index === question.index ? String(optionIndex) : answer))} /><i>{String.fromCharCode(65 + optionIndex)}</i><span>{option}</span></label>)}</div>}</section>)}</div>
       <footer><p>Pass mark <b>70%</b></p><Button type="submit" disabled={loadingLevel}>{loadingLevel ? "Checking your answers..." : "Submit assessment"}<ClipboardCheck size={15} /></Button></footer>
     </form>
