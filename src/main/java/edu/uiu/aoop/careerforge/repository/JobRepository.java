@@ -13,6 +13,7 @@ import java.time.LocalDate;
 public interface JobRepository extends JpaRepository<Job, Long> {
     List<Job> findAllByOrderByLastVerifiedAtDescCreatedAtDescIdDesc();
     List<Job> findByStatusAndExpiryDateGreaterThanEqualOrderByLastVerifiedAtDescCreatedAtDescIdDesc(String status, LocalDate date);
+    List<Job> findByStatusAndExpiryDateBefore(String status, LocalDate date);
     Optional<Job> findBySourceAndExternalId(String source, String externalId);
     long countBySourceIgnoreCaseAndStatus(String source, String status);
     long countBySourceIgnoreCaseAndValidationStatus(String source, String validationStatus);
