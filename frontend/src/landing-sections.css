@@ -5,5 +5,7 @@
 .landing-v2 .landing-v2-embedded.resources-v2 { min-height: 0; }
 .landing-v2 .landing-v2-embedded .resources-v2-shell { width: min(100% - 96px, 1460px); padding: 60px 0 66px; }
 
+:root[data-theme="dark"] .landing-v2 .landing-v2-embedded.community-v2 { background: #111b2a; }
+
 @media (max-width: 900px) { .landing-v2 .landing-v2-embedded .community-v2-hero { padding: 58px 44px; }.landing-v2 .landing-v2-embedded .resources-v2-shell { width: min(100% - 72px, 1460px); } }
 @media (max-width: 620px) { .landing-v2 .landing-v2-embedded { margin-top: 18px; border-radius: 13px; }.landing-v2 .landing-v2-embedded .community-v2-hero { min-height: 0; padding: 43px 24px; }.landing-v2 .landing-v2-embedded .resources-v2-shell { width: min(100% - 44px, 1460px); padding: 43px 0; } }
