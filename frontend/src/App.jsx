@@ -3,10 +3,13 @@ import {
   ArrowRight, BarChart3, BookOpen, BriefcaseBusiness, Building2, CalendarDays,
   ChevronRight, CircleUserRound, ClipboardCheck, FileText, GraduationCap, LayoutDashboard,
   Download, MapPin, MessageCircle, Pencil, Plus, RefreshCw, Save, Search, Settings, Star, Upload,
-  ShieldCheck, Sparkles, Target, Trash2, Users, Moon, Sun,
+  ShieldCheck, Sparkles, Target, Trash2, Users,
 } from "lucide-react";
 import { AdminApplications, AdminCommunity, AdminContentManager, AdminOverview, AdminStudents } from "./AdminDashboard";
-import studentSuccessPhoto from "./assets/hero-campus-graduates.jpg";
+import adminCareerServicesPhoto from "./assets/auth-admin-career-services.png";
+import registerStudentPhoto from "./assets/auth-register-student.png";
+import studentLoginPhoto from "./assets/auth-student-login.png";
+import jobSearchStudentPhoto from "./assets/hero-bangladeshi-job-search.png";
 import { StudentResources } from "./StudentResources";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
@@ -23,19 +26,14 @@ function useRoute() {
   const read = () => window.location.hash.replace("#", "") || "/";
   const [route, setRoute] = useState(read);
   useEffect(() => { const update = () => setRoute(read()); window.addEventListener("hashchange", update); return () => window.removeEventListener("hashchange", update); }, []);
-  return [route, (to) => { window.location.hash = to; }];
+  return [route, (to) => {
+    window.location.hash = to;
+    if (to === "/") window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  }];
 }
 
-function Brand({ onClick }) { return <button className="brand" onClick={onClick} aria-label="CareerForge home"><span className="brand-mark">CF</span><span>Career<span>Forge</span></span></button>; }
+function Brand({ onClick }) { return <button className="brand" type="button" onClick={onClick} aria-label="CareerForge home"><span className="brand-wordmark">career<span>forge</span></span></button>; }
 function Button({ children, className = "", ...props }) { return <button className={`button ${className}`} {...props}>{children}</button>; }
-function ThemeToggle() {
-  const [dark, setDark] = useState(() => document.documentElement.dataset.theme === "dark" || localStorage.getItem("careerforge_theme") === "dark");
-  useEffect(() => {
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
-    localStorage.setItem("careerforge_theme", dark ? "dark" : "light");
-  }, [dark]);
-  return <button type="button" className="theme-toggle" onClick={() => setDark((value) => !value)} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"} title={dark ? "Switch to light mode" : "Switch to dark mode"}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button>;
-}
 function EmptyPanel({ title, copy }) { return <section className="empty-panel"><span><Sparkles size={21} /></span><h3>{title}</h3><p>{copy}</p></section>; }
 
 function LegacyLanding({ go }) {
@@ -77,7 +75,8 @@ function Landing({ go }) {
   </main>;
 }
 
-function ArchiveFinpayLanding({ go }) {
+/* Previous landing retained in source history; the current implementation is below. */
+/*
   const benefits = [[RefreshCw, "Free career moves", "Create CV versions, explore roles, and make every application easier to manage."], [BriefcaseBusiness, "Multiple pathways", "Keep job matches, applications, documents, and professional goals in a single account."], [ShieldCheck, "Your work stays secure", "Your information is connected to your CareerForge profile and available when you need it."]];
   const scrollToSection = (id) => { const target = document.getElementById(id); if (!target) return; const targetTop = window.scrollY + target.getBoundingClientRect().top; const centeredTop = targetTop - Math.max(20, (window.innerHeight - target.offsetHeight) / 2); window.scrollTo({ top: Math.max(0, centeredTop), behavior: "smooth" }); };
   useEffect(() => {
@@ -88,7 +87,7 @@ function ArchiveFinpayLanding({ go }) {
     return () => { window.removeEventListener("scroll", updateMotion); window.removeEventListener("resize", updateMotion); };
   }, []);
   return <main className="fin-home">
-     <header className="fin-header"><Brand onClick={() => go("/")} /><nav><button type="button" onClick={() => scrollToSection("fin-product")}>People</button><button type="button" onClick={() => scrollToSection("fin-path")}>Skills</button><button type="button" onClick={() => scrollToSection("fin-impact")}>Opportunities</button></nav><div className="fin-actions"><ThemeToggle /><Button className="quiet" onClick={() => go("/login/student")}>Log in</Button><Button onClick={() => go("/register")}>Get started</Button></div></header>
+    <header className="fin-header"><Brand onClick={() => go("/")} /><nav><button type="button" onClick={() => scrollToSection("fin-product")}>People</button><button type="button" onClick={() => scrollToSection("fin-path")}>Skills</button><button type="button" onClick={() => scrollToSection("fin-impact")}>Opportunities</button></nav><div className="fin-actions"><Button className="quiet" onClick={() => go("/login/student")}>Log in</Button><Button onClick={() => go("/register")}>Get started</Button></div></header>
     <section className="fin-hero"><div className="fin-hero-copy" data-fin-reveal="left"><p className="fin-kicker">A BRIGHTER TOMORROW STARTS HERE</p><h1>Your future,<br />built <em>together.</em></h1><p>CareerForge brings students, skills, CVs, and meaningful opportunities together in one focused career workspace.</p><div className="fin-start"><input aria-label="Your email address" type="email" placeholder="Your university email" /><Button onClick={() => go("/register")}>Get started <ArrowRight size={15} /></Button></div><small>Designed for students ready to take their next step with confidence.</small><div className="fin-capabilities"><b>YOUR WORKSPACE INCLUDES</b><span><CircleUserRound size={15} /> Profile &amp; goals</span><span><FileText size={15} /> CV versions</span><span><BriefcaseBusiness size={15} /> Real opportunities</span></div></div><div className="fin-preview" data-fin-reveal="right" aria-label="Student success and readiness collage"><div className="hybrid-success-collage"><figure className="hybrid-photo-card"><img src={studentSuccessPhoto} alt="University student building her career at a laptop" /><figcaption><span><Sparkles size={14} /> STUDENT SUCCESS STORY</span><b>Your potential, in motion.</b></figcaption></figure><article className="hybrid-readiness-card"><small>CAREER READINESS</small><div className="hybrid-score-ring"><i className="hybrid-orbit-line hybrid-orbit-line-one" aria-hidden="true" /><i className="hybrid-orbit-line hybrid-orbit-line-two" aria-hidden="true" /><strong>72<span>/100</span></strong><b>Great progress</b></div><footer><span><GraduationCap size={14} /> Skills</span><span><MessageCircle size={14} /> Community</span></footer></article><article className="hybrid-microcard hybrid-cv-card"><span><FileText size={18} /></span><div><small>CV READY</small><b>Portfolio refreshed</b></div><i><Sparkles size={14} /></i></article><article className="hybrid-microcard hybrid-job-card"><span><BriefcaseBusiness size={18} /></span><div><small>JOB MATCHES</small><b>12 opportunities</b><em>90% fit</em></div></article><button className="hybrid-collage-action" type="button" onClick={() => go("/login/student")}>Build your workspace <ArrowRight size={15} /></button></div></div></section>
     <section className="fin-benefits" id="fin-product"><div className="fin-benefit-intro" data-fin-reveal="left"><p className="fin-kicker">FUTURE-READY CAREERS</p><h2>An experience that grows<br />with your <em>ambition.</em></h2></div><p data-fin-reveal="fade">We designed one career system that works for you now and stays useful as your confidence grows.</p><div className="fin-benefit-grid">{benefits.map(([Icon, title, copy], index) => <article data-fin-reveal="up" data-fin-delay={index} key={title}><span><Icon size={24} /></span><h3>{title}</h3><p>{copy}</p></article>)}</div></section>
     <section className="fin-impact" id="fin-impact"><div className="fin-impact-copy" data-fin-reveal="left"><p className="fin-kicker">WHY CAREERFORGE</p><h2>A clear picture of<br />where you are going.</h2><p>Simple tools make it easier to take action today and keep moving tomorrow.</p><Button onClick={() => go("/register")}>Create your account <ArrowRight size={15} /></Button></div><div className="fin-impact-board" data-fin-reveal="right"><div className="fin-board-head"><span>APPLICATION ACTIVITY</span><b>Career momentum</b><small>Last 6 months</small></div><div className="fin-chart"><i /><i /><i /><i /><i /><i /></div><div className="fin-board-stats"><article><b>01</b><span>Profile built<br /><small>Tell your story clearly</small></span></article><article><b>02</b><span>CV prepared<br /><small>Keep the right version ready</small></span></article><article><b>03</b><span>Applications tracked<br /><small>Know what happens next</small></span></article></div></div></section>
@@ -97,190 +96,131 @@ function ArchiveFinpayLanding({ go }) {
     <footer className="fin-footer" data-fin-reveal="up"><Brand onClick={() => go("/")} /><span>CareerForge · Advanced Object Oriented Programming Laboratory</span><button onClick={() => go("/login/admin")}>Administrator sign in</button></footer>
   </main>;
 }
+*/
 
 function FinpayLanding({ go }) {
-  const featureCards = [
-    [Target, "Get direction", "Turn your profile into a practical focus.", "blue"],
-    [BriefcaseBusiness, "Find real opportunities", "See roles that fit where you are heading.", "jade"],
-    [Users, "Move with people", "Connect with students on a similar path.", "coral"],
+  const scrollToSection = (id) => {
+    const section = document.getElementById(id);
+    if (!section) return;
+    const sectionTop = window.scrollY + section.getBoundingClientRect().top;
+    const availableSpace = window.innerHeight - section.offsetHeight;
+    const topInset = id === "student-tools" ? 72 : Math.max(24, availableSpace / 2);
+    window.scrollTo({ top: Math.max(0, sectionTop - topInset), left: 0, behavior: "smooth" });
+  };
+  const steps = [
+    ["01", "Set your direction", "Build a profile around the skills, goals, and experience that matter to you."],
+    ["02", "Prepare your evidence", "Create CV versions and keep the right document ready for each application."],
+    ["03", "Move with clarity", "Discover opportunities, apply with confidence, and keep every next step visible."],
   ];
-  const journeySteps = [
-    ["01", "Shape your story", "Add your education, strengths, and target role in one focused profile."],
-    ["02", "Prepare with confidence", "Create CV versions and keep your best work ready for every application."],
-    ["03", "Take the next step", "Discover relevant opportunities and track every application in one place."],
-  ];
-  const scrollToSection = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  useEffect(() => {
+    const items = [...document.querySelectorAll(".cf-landing .cf-reveal")];
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { items.forEach((item) => item.classList.add("is-visible")); return undefined; }
+    const updateMotion = () => { const triggerLine = window.innerHeight * .7; const atPageEnd = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4; items.forEach((item) => { const box = item.getBoundingClientRect(); item.classList.toggle("is-visible", (box.top <= triggerLine && box.bottom >= 0) || (atPageEnd && box.top < window.innerHeight)); }); };
+    updateMotion(); window.addEventListener("scroll", updateMotion, { passive: true }); window.addEventListener("resize", updateMotion);
+    return () => { window.removeEventListener("scroll", updateMotion); window.removeEventListener("resize", updateMotion); };
+  }, []);
 
-  return <main className="landing-v2">
-    <header className="landing-v2-header">
-      <div className="landing-v2-nav">
-        <Brand onClick={() => go("/")} />
-        <nav aria-label="Landing page navigation">
-          <button type="button" onClick={() => scrollToSection("platform")}>Platform</button>
-          <button type="button" onClick={() => scrollToSection("how-it-works")}>How it works</button>
-          <button type="button" onClick={() => scrollToSection("community")}>Community</button>
-          <button type="button" onClick={() => scrollToSection("resources")}>Resources</button>
-        </nav>
-        <div className="landing-v2-actions">
-          <ThemeToggle />
-          <button className="landing-v2-admin" type="button" onClick={() => go("/login/admin")}>Admin</button>
-          <button className="landing-v2-login" type="button" onClick={() => go("/login/student")}>Log in</button>
-          <Button className="landing-v2-primary" onClick={() => go("/register")}>Get started <ArrowRight size={16} /></Button>
-        </div>
+  return <main className="cf-landing">
+    <header className="cf-header cf-reveal cf-fade">
+      <Brand onClick={() => go("/")} />
+      <nav aria-label="Main navigation">
+        <button type="button" onClick={() => scrollToSection("how-it-works")}>How it works</button>
+        <button type="button" onClick={() => scrollToSection("student-tools")}>Student tools</button>
+        <button type="button" onClick={() => scrollToSection("why-careerforge")}>Why CareerForge</button>
+      </nav>
+      <div className="cf-header-actions">
+        <button className="cf-login" type="button" onClick={() => go("/login/student")}>Sign in</button>
+        <Button onClick={() => go("/register")}>Create workspace <ArrowRight size={15} /></Button>
       </div>
     </header>
 
-    <div className="landing-v2-content">
-      <section className="landing-v2-hero" id="platform">
-        <div className="landing-v2-copy">
-          <p className="landing-v2-eyebrow">ONE CAREER SPACE</p>
-          <h1>Your career.<br /><span>Finally</span> in focus.</h1>
-          <p className="landing-v2-lede">See the skills to build, opportunities worth chasing and people who can help you get there—all in one personal career space.</p>
-          <div className="landing-v2-hero-actions">
-            <Button className="landing-v2-primary landing-v2-workspace" onClick={() => go("/register")}>Create your free workspace <ArrowRight size={16} /></Button>
-            <button className="landing-v2-explore" type="button" onClick={() => scrollToSection("how-it-works")}>Explore the journey <span aria-hidden="true">↓</span></button>
-          </div>
-          <div className="landing-v2-proof">
-            <div className="landing-v2-avatars" aria-hidden="true"><i>SA</i><i>MI</i><i>NK</i><i>+</i></div>
-            <p><b>Built for real student journeys.</b><span>From campus confidence to your next big move.</span></p>
-          </div>
+    <section className="cf-hero">
+      <div className="cf-hero-copy cf-reveal cf-from-left">
+              <p className="cf-eyebrow">Career tools for focused students</p>
+        <h1>Turn your next step<br />into a <em>clear plan.</em></h1>
+        <p className="cf-lede">CareerForge brings your profile, CVs, opportunities, and applications into one calm workspace—so you can spend less time organising and more time moving forward.</p>
+        <div className="cf-hero-actions">
+          <Button onClick={() => go("/register")}>Create your workspace <ArrowRight size={16} /></Button>
+          <button className="cf-text-action" type="button" onClick={() => scrollToSection("how-it-works")}>See how it works <ArrowRight size={15} /></button>
         </div>
-        <figure className="landing-v2-photo">
-          <img src={studentSuccessPhoto} alt="University graduates celebrating together on campus" />
-        </figure>
-      </section>
-
-      <section className="landing-v2-feature-row" aria-label="CareerForge highlights">
-        <article className="landing-v2-feature-intro">
-          <p>ONE CAREER SPACE</p>
-          <h2>Made for your<br />next move.</h2>
-        </article>
-        {featureCards.map(([Icon, title, copy, tone]) => <article className="landing-v2-feature" key={title}>
-          <span className={`landing-v2-feature-icon ${tone}`}><Icon size={20} /></span>
-          <div><h3>{title}</h3><p>{copy}</p></div>
-        </article>)}
-      </section>
-
-      <section className="landing-v2-journey" id="how-it-works">
-        <div className="landing-v2-journey-heading">
-          <p className="landing-v2-eyebrow">HOW IT WORKS</p>
-          <h2>One clear place to<br /><span>move forward.</span></h2>
-          <p>Keep the important parts of your career journey connected, from your first profile detail to your next application.</p>
+        <div className="cf-hero-proof" aria-label="CareerForge highlights">
+          <span><ShieldCheck size={16} /> One secure workspace</span>
+          <span><FileText size={16} /> CVs ready to use</span>
+          <span><BriefcaseBusiness size={16} /> Real opportunities</span>
         </div>
-        <div className="landing-v2-step-list">
-          {journeySteps.map(([number, title, copy]) => <article key={number}>
-            <b>{number}</b><div><h3>{title}</h3><p>{copy}</p></div><ArrowRight size={18} />
-          </article>)}
-        </div>
-      </section>
-
-      <section className="landing-v2-cta">
-        <div><p>START WITH YOUR NEXT STEP</p><h2>Your future deserves focus.</h2><span>Create your free workspace and build momentum at your own pace.</span></div>
-        <Button className="landing-v2-primary" onClick={() => go("/register")}>Get started for free <ArrowRight size={16} /></Button>
-      </section>
-
-      <section className="landing-v2-embedded community-v2" id="community">
-        <section className="community-v2-hero">
-          <div className="community-v2-copy">
-            <p className="community-v2-kicker"><span>03</span> BETTER, TOGETHER</p>
-            <h1>Your people.<br />Your pace.<br /><em>Your next chapter.</em></h1>
-            <p>Find students who get the journey. Share a question, make a connection, and keep each other moving.</p>
-            <Button className="community-v2-button" onClick={() => go("/login/student")}>Find your community <ArrowRight size={16} /></Button>
-          </div>
-          <div className="community-v2-visual" aria-label="Community connections preview">
-            <i className="community-v2-orbit one" aria-hidden="true" /><i className="community-v2-orbit two" aria-hidden="true" />
-            <article className="community-v2-connection"><span className="community-v2-icon blue"><Users size={27} /></span><div><b>A shared ambition.<br />A new connection.</b><small>Find your people on CareerForge</small></div><i>✓</i></article>
-            <article className="community-v2-conversation"><p><MessageCircle size={15} /> GOOD CONVERSATIONS START HERE</p><h2>What are you<br />working toward?</h2><span>Connect. Share. Grow.</span><b>✓</b></article>
-            <article className="community-v2-resource"><span className="community-v2-icon coral"><BookOpen size={23} /></span><div><b>A little inspiration goes a long way.</b><small>Explore learning resources &amp; events</small></div><ArrowRight size={22} /></article>
-          </div>
-        </section>
-      </section>
-
-      <section className="landing-v2-embedded resources-v2" id="resources">
-        <section className="resources-v2-shell">
-          <header className="resources-v2-heading">
-            <div><p className="resources-v2-kicker"><span>04</span> KEEP MOVING, WITH CLARITY</p><h1>Resources for the<br /><em>road ahead.</em></h1></div>
-            <p>Useful guides, learning paths and campus opportunities—all collected in one calm place.</p>
-          </header>
-          <section className="resources-v2-cards" aria-label="CareerForge resources">
-            <article className="resources-v2-card"><span className="resources-v2-icon"><BookOpen size={23} /></span><p>LEARNING LIBRARY</p><h2>Build the skills your next role needs.</h2><div>Explore focused resources that make each next learning step easier to choose.</div></article>
-            <article className="resources-v2-card"><span className="resources-v2-icon"><FileText size={23} /></span><p>CAREER GUIDES</p><h2>Turn questions into a practical plan.</h2><div>Save useful career guidance, then return to it whenever you are ready.</div></article>
-            <article className="resources-v2-cta"><p>ONE PLACE. EVERY NEXT STEP.</p><h2>Ready when<br />you are.</h2><span>See the full collection of learning resources and events.</span><Button className="resources-v2-open" onClick={() => go("/login/student")}>Open resource library <ArrowRight size={16} /></Button></article>
-          </section>
-        </section>
-      </section>
-    </div>
-  </main>;
-}
-
-function ResourcesLanding({ go }) {
-  const cards = [
-    [BookOpen, "LEARNING LIBRARY", "Build the skills your next role needs.", "Explore focused resources that make each next learning step easier to choose."],
-    [FileText, "CAREER GUIDES", "Turn questions into a practical plan.", "Save useful career guidance, then return to it whenever you are ready."],
-  ];
-  return <main className="resources-v2">
-    <section className="resources-v2-shell">
-      <header className="resources-v2-heading">
-        <div>
-          <p className="resources-v2-kicker"><span>04</span> KEEP MOVING, WITH CLARITY</p>
-          <h1>Resources for the<br /><em>road ahead.</em></h1>
-        </div>
-        <p>Useful guides, learning paths and campus opportunities—all collected in one calm place.</p>
-      </header>
-      <section className="resources-v2-cards" aria-label="CareerForge resources">
-        {cards.map(([Icon, eyebrow, title, copy]) => <article className="resources-v2-card" key={eyebrow}>
-          <span className="resources-v2-icon"><Icon size={23} /></span>
-          <p>{eyebrow}</p>
-          <h2>{title}</h2>
-          <div>{copy}</div>
-        </article>)}
-        <article className="resources-v2-cta">
-          <p>ONE PLACE. EVERY NEXT STEP.</p>
-          <h2>Ready when<br />you are.</h2>
-          <span>See the full collection of learning resources and events.</span>
-          <Button className="resources-v2-open" onClick={() => go("/login/student")}>Open resource library <ArrowRight size={16} /></Button>
-        </article>
-      </section>
-    </section>
-  </main>;
-}
-
-function CommunityLanding({ go }) {
-  return <main className="community-v2">
-    <div className="community-v2-topline" aria-hidden="true" />
-    <section className="community-v2-hero">
-      <div className="community-v2-copy">
-        <p className="community-v2-kicker"><span>03</span> BETTER, TOGETHER</p>
-        <h1>Your people.<br />Your pace.<br /><em>Your next chapter.</em></h1>
-        <p>Find students who get the journey. Share a question, make a connection, and keep each other moving.</p>
-        <Button className="community-v2-button" onClick={() => go("/login/student")}>Find your community <ArrowRight size={16} /></Button>
       </div>
-      <div className="community-v2-visual" aria-label="Community connections preview">
-        <i className="community-v2-orbit one" aria-hidden="true" /><i className="community-v2-orbit two" aria-hidden="true" />
-        <article className="community-v2-connection">
-          <span className="community-v2-icon blue"><Users size={27} /></span>
-          <div><b>A shared ambition.<br />A new connection.</b><small>Find your people on CareerForge</small></div>
-          <i>✓</i>
-        </article>
-        <article className="community-v2-conversation">
-          <p><MessageCircle size={15} /> GOOD CONVERSATIONS START HERE</p>
-          <h2>What are you<br />working toward?</h2>
-          <span>Connect. Share. Grow.</span><b>✓</b>
-        </article>
-        <article className="community-v2-resource">
-          <span className="community-v2-icon coral"><BookOpen size={23} /></span>
-          <div><b>A little inspiration goes a long way.</b><small>Explore learning resources &amp; events</small></div>
-          <ArrowRight size={22} />
-        </article>
+
+      <div className="cf-hero-visual cf-reveal cf-from-right" aria-label="Student building her career at a laptop">
+        <figure className="cf-student-photo"><img src={jobSearchStudentPhoto} alt="Bangladeshi student exploring career opportunities on a laptop" /></figure>
+        <div className="cf-photo-tint" aria-hidden="true" />
+        <article className="cf-photo-story"><span><Target size={16} /></span><div><small>CAREER JOURNEY</small><b>Build a plan that feels like yours.</b></div></article>
+        <article className="cf-floating-card cf-floating-profile"><span><FileText size={16} /></span><div><small>CV VERSION</small><b>Frontend portfolio</b></div><em>Ready</em></article>
+        <article className="cf-floating-card cf-floating-match"><span><Target size={16} /></span><div><small>TOP MATCH</small><b>Junior UI Designer</b></div><strong>92%</strong></article>
       </div>
     </section>
+
+    <section className="cf-value-strip" id="student-tools">
+      <article className="cf-reveal cf-from-bottom" style={{ "--cf-delay": "0ms" }}><span><CircleUserRound size={19} /></span><div><b>Tell your story once</b><p>Keep your education, skills, goals, and experience organised in one profile.</p></div></article>
+      <article className="cf-reveal cf-from-bottom" style={{ "--cf-delay": "120ms" }}><span><FileText size={19} /></span><div><b>Use the right CV</b><p>Create and choose a polished CV version for each opportunity.</p></div></article>
+      <article className="cf-reveal cf-from-bottom" style={{ "--cf-delay": "240ms" }}><span><BriefcaseBusiness size={19} /></span><div><b>Know your next move</b><p>Explore roles and keep every application visible from one place.</p></div></article>
+    </section>
+
+    <section className="cf-section cf-steps-section" id="how-it-works">
+      <div className="cf-section-intro cf-reveal cf-from-left"><p className="cf-eyebrow">A simple career rhythm</p><h2>Small steps.<br /><em>Meaningful progress.</em></h2><p>CareerForge turns a scattered job search into a system you can understand, use, and return to.</p></div>
+      <div className="cf-steps">{steps.map(([number, title, copy], index) => <article className="cf-reveal cf-from-bottom" style={{ "--cf-delay": `${index * 120}ms` }} key={number}><span>{number}</span><h3>{title}</h3><p>{copy}</p><button type="button" onClick={() => go(number === "01" ? "/register" : "/login/student")}>Open tool <ArrowRight size={15} /></button></article>)}</div>
+    </section>
+
+    <section className="cf-feature-panel" id="why-careerforge">
+      <div className="cf-feature-copy cf-reveal cf-from-left"><p className="cf-eyebrow">Designed for momentum</p><h2>Everything you need.<br /><em>Nothing in your way.</em></h2><p>Every screen is designed around a practical question: what will help you make your next career decision with more confidence?</p><Button onClick={() => go("/register")}>Start your profile <ArrowRight size={15} /></Button></div>
+      <div className="cf-action-list cf-reveal cf-from-right" aria-label="CareerForge actions">
+        <header><span>YOUR ACTION PLAN</span><small>This week</small></header>
+        <article><b>01</b><div><strong>Define your target role</strong><small>Set a direction for your search</small></div><span className="cf-status is-done">Done</span></article>
+        <article><b>02</b><div><strong>Build a CV version</strong><small>Make your experience easy to share</small></div><ArrowRight size={16} /></article>
+        <article><b>03</b><div><strong>Review job matches</strong><small>12 opportunities are waiting</small></div><ArrowRight size={16} /></article>
+        <footer><span>ONE PLACE FOR EVERY NEXT STEP</span><ArrowRight size={15} /></footer>
+      </div>
+    </section>
+
+    <section className="cf-final-cta cf-reveal cf-from-bottom">
+      <div><p className="cf-eyebrow">Your career, made clearer</p><h2>Build a future you<br />can <em>move toward.</em></h2><p>Create a student workspace and take the next step with a plan behind you.</p></div>
+      <div className="cf-final-actions"><Button onClick={() => go("/register")}>Create free workspace <ArrowRight size={16} /></Button><button type="button" onClick={() => go("/login/student")}>I already have an account</button></div>
+    </section>
+
+    <footer className="cf-footer cf-reveal cf-fade"><Brand onClick={() => go("/")} /><span>CareerForge · Advanced Object Oriented Programming Laboratory</span><button type="button" onClick={() => go("/login/admin")}>Administrator sign in</button></footer>
   </main>;
 }
 
 function Login({ role, register, go }) {
-  const admin = role === "admin"; const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [message, setMessage] = useState(""); const [submitting, setSubmitting] = useState(false);
+  const admin = role === "admin";
+  const variant = register ? "register" : admin ? "admin" : "student";
+  const authPhoto = register ? registerStudentPhoto : admin ? adminCareerServicesPhoto : studentLoginPhoto;
+  const authPhotoAlt = register ? "Bangladeshi student preparing her career workspace" : admin ? "Bangladeshi career-services administrator at work" : "Bangladeshi student planning a job search";
+  const authView = register
+    ? { eyebrow: "Your career workspace", title: "Start with a clear direction.", copy: "Set up one focused space for your profile, CVs, and the opportunities ahead.", boardLabel: "YOUR FIRST THREE STEPS", boardValue: "01", rows: [[Target, "Set your direction", "Choose a role that interests you", "Start"], [FileText, "Prepare your CV", "Add evidence when you are ready", "Next"], [BriefcaseBusiness, "See matching roles", "Keep every application in view", "Then"]] }
+    : admin
+      ? { eyebrow: "Operations workspace", title: "Keep opportunity moving.", copy: "Publish meaningful roles, manage applications, and support every student journey.", boardLabel: "OPPORTUNITY DESK", boardValue: "12", rows: [[BriefcaseBusiness, "Published roles", "Opportunities ready to discover", "Live"], [Users, "Student applications", "Review every next step", "Review"], [ClipboardCheck, "Platform activity", "Keep the experience on track", "Today"]] }
+      : { eyebrow: "Your career workspace", title: "Make progress feel possible.", copy: "Keep your education, goals, CVs, and professional story together in one place.", boardLabel: "CAREER READINESS", boardValue: "72%", rows: [[CircleUserRound, "Your profile", "Your strengths in one clear view", "Active"], [FileText, "CV version", "A polished document, ready to use", "Ready"], [Target, "Next career move", "Discover opportunities with focus", "Explore"]] };
+  const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [message, setMessage] = useState(""); const [submitting, setSubmitting] = useState(false);
   async function submit(event) { event.preventDefault(); setSubmitting(true); setMessage(""); try { const response = await fetch(`${API_BASE_URL}${register ? "/auth/register" : "/auth/login"}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(register ? { name: name.trim(), email: email.trim(), password } : { email: email.trim(), password, role: admin ? "admin" : "student" }) }); const body = await responseBody(response); localStorage.setItem("careerforge_session", JSON.stringify(body)); go(`/${body.role}/overview`); } catch (error) { setMessage(error.message || "Unable to sign in."); } finally { setSubmitting(false); } }
-  return <main className="auth-page"><button className="back" onClick={() => go("/")}>Back to CareerForge</button><section className="auth-card"><div className="auth-panel"><Brand onClick={() => go("/")} /><p className="eyebrow"><Sparkles size={14} /> {admin ? "Operations workspace" : "Your career workspace"}</p><h1>{admin ? "Keep the platform moving." : "Make progress feel possible."}</h1><p>{admin ? "Create, edit, publish, and close real job opportunities." : "Keep your education, goals, and professional story in one place."}</p><div className="auth-orb" /></div><form className="auth-form" onSubmit={submit}><p className="form-label">{register ? "Student registration" : admin ? "Administrator sign in" : "Student sign in"}</p><h2>{register ? "Create your account" : "Welcome back"}</h2>{register && <label>Full name<input value={name} onChange={(e) => setName(e.target.value)} required /></label>}<label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@example.com" /></label><label>Password<input type="password" minLength="8" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="At least 8 characters" /></label>{message && <p className="form-error">{message}</p>}<Button type="submit" disabled={submitting}>{submitting ? "Please wait..." : register ? "Create account" : "Continue"}<ArrowRight size={16} /></Button>{register ? <button className="text-button" type="button" onClick={() => go("/login/student")}>Already have an account? Sign in</button> : <><button className="text-button" type="button" onClick={() => go(admin ? "/login/student" : "/login/admin")}>Switch to {admin ? "student" : "admin"} sign in</button>{!admin && <button className="text-button" type="button" onClick={() => go("/register")}>New student? Create an account</button>}</>}</form></section></main>;
+  return <main className={`auth-page auth-${variant}`}>
+    <section className="auth-card">
+      <form className="auth-form" onSubmit={submit}>
+        <div className="auth-form-top"><button className="auth-back" type="button" onClick={() => go("/")}>← Back to CareerForge</button><Brand onClick={() => go("/")} /></div>
+        <div className="auth-form-intro"><p className="form-label">{register ? "Student registration" : admin ? "Administrator sign in" : "Student sign in"}</p><h2>{register ? "Create your workspace" : "Welcome back"}</h2><p>{register ? "A few details now, then you can begin building your career space." : "Use your account details to continue where you left off."}</p></div>
+        {register && <label>Full name<input value={name} onChange={(e) => setName(e.target.value)} required /></label>}
+        <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@example.com" /></label>
+        <label>Password<input type="password" minLength="8" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="At least 8 characters" /></label>
+        {message && <p className="form-error">{message}</p>}
+        <Button type="submit" disabled={submitting}>{submitting ? "Please wait..." : register ? "Create workspace" : "Continue"}<ArrowRight size={16} /></Button>
+        <div className="auth-switch">{register ? <button className="text-button" type="button" onClick={() => go("/login/student")}>Already have an account? Sign in</button> : <><button className="text-button" type="button" onClick={() => go(admin ? "/login/student" : "/login/admin")}>Switch to {admin ? "student" : "administrator"} sign in</button>{!admin && <button className="text-button" type="button" onClick={() => go("/register")}>New student? Create an account</button>}</>}</div>
+      </form>
+      <aside className="auth-panel">
+        <img className="auth-photo" src={authPhoto} alt={authPhotoAlt} />
+        <div className="auth-photo-wash" aria-hidden="true" />
+        <div className="auth-panel-inner"><div className="auth-panel-copy"><p className="auth-panel-eyebrow">{authView.eyebrow}</p><h1>{authView.title}</h1><p>{authView.copy}</p></div></div>
+      </aside>
+    </section>
+  </main>;
 }
 
 function StudentProfile() {
@@ -291,7 +231,7 @@ function StudentProfile() {
   useEffect(() => { if (loading) return undefined; const avatar = document.querySelector(".profile-avatar-preview"); if (!avatar || avatar.querySelector(".avatar-photo-picker")) return undefined; const picker = document.createElement("input"); picker.className = "avatar-photo-picker"; picker.type = "file"; picker.accept = "image/png,image/jpeg,image/webp"; picker.disabled = uploadingPhoto; picker.setAttribute("aria-label", uploadingPhoto ? "Profile photo is uploading" : profile.profilePhotoUrl ? "Change profile photo" : "Add profile photo"); picker.addEventListener("change", uploadPhoto); const openPicker = () => { if (!uploadingPhoto) picker.click(); }; const hint = document.createElement("span"); hint.className = "avatar-photo-hint"; hint.textContent = uploadingPhoto ? "Uploading" : profile.profilePhotoUrl ? "Change" : "Add"; avatar.appendChild(picker); avatar.appendChild(hint); avatar.addEventListener("click", openPicker); return () => { avatar.removeEventListener("click", openPicker); picker.remove(); hint.remove(); }; }, [loading, profile.profilePhotoUrl, uploadingPhoto]);
   async function uploadPhoto(event) { const photo = event.target.files?.[0]; if (!photo || uploadingPhoto) return; setUploadingPhoto(true); setNotice(""); try { const form = new FormData(); form.append("photo", photo); const response = await fetch(`${API_BASE_URL}/profiles/${current.id}/photo`, { method: "POST", headers: { "X-User-Id": current.id }, body: form }); const body = await responseBody(response); setProfile({ ...blankProfile, ...body, profilePhotoUrl: body.profilePhotoUrl?.startsWith("/") ? `${API_BASE_URL}${body.profilePhotoUrl}` : body.profilePhotoUrl, graduationYear: body.graduationYear || "", experienceYears: body.experienceYears ?? "" }); setNotice("Profile photo uploaded successfully."); } catch (e) { setNotice(e.message); } finally { event.target.value = ""; setUploadingPhoto(false); } }
   async function save(event) { event.preventDefault(); if (uploadingPhoto) return setNotice("Wait for the profile photo upload to finish before saving."); setSaving(true); setNotice(""); try { const response = await fetch(`${API_BASE_URL}/profiles/${current.id}`, { method: "PUT", headers: { "Content-Type": "application/json", "X-User-Id": current.id }, body: JSON.stringify({ ...profile, profilePhotoUrl: profile.profilePhotoUrl?.startsWith(`${API_BASE_URL}/profiles/`) ? `/profiles/${current.id}/photo` : profile.profilePhotoUrl, graduationYear: profile.graduationYear ? Number(profile.graduationYear) : null, experienceYears: profile.experienceYears === "" || profile.experienceYears == null ? null : Number(profile.experienceYears) }) }); const body = await responseBody(response); setProfile({ ...blankProfile, ...body, profilePhotoUrl: body.profilePhotoUrl?.startsWith("/") ? `${API_BASE_URL}${body.profilePhotoUrl}` : body.profilePhotoUrl, graduationYear: body.graduationYear || "", experienceYears: body.experienceYears ?? "" }); setNotice("Profile saved successfully."); } catch (e) { setNotice(e.message); } finally { setSaving(false); } }
-  return <section className="profile-page"><header className="profile-hero"><div className="profile-identity"><div className="profile-avatar-preview">{profile.profilePhotoUrl ? <img src={profile.profilePhotoUrl} alt="Profile preview" /> : current?.name?.slice(0, 1)?.toUpperCase() || "S"}</div><div><p className="eyebrow"><CircleUserRound size={14} /> YOUR PROFESSIONAL IDENTITY</p><h2>{current?.name || "Build your professional profile"}</h2><p>Give employers a clear picture of your education, direction, and strengths.</p></div></div><div className="profile-completion"><div><b>{loading ? "—" : `${completion}%`}</b><span>profile complete</span></div><i><em style={{ width: `${completion}%` }} /></i><small>{completedFields} of 9 profile details added</small></div></header><form className="data-form profile-form" onSubmit={save}><div className="profile-account-card"><div><span><b>{current?.name || "Your account"}</b><small>Account name</small></span><span><b>{current?.email || "Sign in to load email"}</b><small>Email address</small></span></div><p><ShieldCheck size={16} /> Your profile is private to your CareerForge workspace.</p></div><section className="profile-field-section"><div className="profile-section-title"><span>01</span><div><h3>Academic background</h3><p>Share the study details that frame your current stage.</p></div></div><div className="form-grid"><label>University<input name="university" value={profile.university || ""} onChange={change} placeholder="United International University" /></label><label>Degree / programme<input name="degree" value={profile.degree || ""} onChange={change} placeholder="BSc in Computer Science" /></label><label>Graduation year<input name="graduationYear" value={profile.graduationYear || ""} onChange={change} type="number" min="2000" max="2100" placeholder="2027" /></label><label>Experience (years)<input name="experienceYears" value={profile.experienceYears ?? ""} onChange={change} type="number" min="0" max="60" placeholder="0" /></label></div></section><section className="profile-field-section"><div className="profile-section-title"><span>02</span><div><h3>Career direction</h3><p>Use a target role and location to keep your job search focused.</p></div></div><div className="form-grid"><label>Target role<input name="targetRole" value={profile.targetRole || ""} onChange={change} placeholder="Junior Software Engineer" /></label><label>Location<input name="location" value={profile.location || ""} onChange={change} placeholder="Dhaka, Bangladesh" /></label><label>Profile photo URL <small>(optional)</small><input name="profilePhotoUrl" value={profile.profilePhotoUrl || ""} onChange={change} placeholder="https://..." /></label></div></section><section className="profile-field-section"><div className="profile-section-title"><span>03</span><div><h3>Skills &amp; interests</h3><p>Add the strengths and interests you want employers to see at a glance.</p></div></div><div className="form-grid profile-details-grid"><label>Skills <small>Separate skills with commas</small><textarea name="skills" value={profile.skills || ""} onChange={change} rows="3" placeholder="Java, React, MySQL, Figma" /></label><label>Hobbies &amp; interests <small>What do you enjoy beyond coursework?</small><textarea name="hobbies" value={profile.hobbies || ""} onChange={change} rows="3" placeholder="Photography, volunteering, chess" /></label></div></section><section className="profile-field-section bio-section"><div className="profile-section-title"><span>04</span><div><h3>Professional summary</h3><p>In 2–4 sentences, mention your interests, projects, strengths, and direction.</p></div></div><label className="full-field">Short professional bio<textarea name="bio" value={profile.bio || ""} onChange={change} rows="5" maxLength="500" placeholder="For example: Computer Science student interested in frontend engineering. Built projects with React and Spring Boot, and looking for an internship where I can grow..." /></label><small className="bio-count">{(profile.bio || "").length}/500 characters</small></section>{notice && <p className={notice.includes("success") ? "form-success" : "form-error"}>{notice}</p>}<footer className="profile-save-row"><div><b>Ready to save?</b><small>Your dashboard updates from these details.</small></div><Button type="submit" disabled={saving || loading}><Save size={15} />{saving ? "Saving..." : loading ? "Loading..." : "Save profile"}</Button></footer></form></section>;
+  return <section className="profile-page"><header className="profile-hero"><div className="profile-identity"><div className="profile-avatar-preview">{profile.profilePhotoUrl ? <img src={profile.profilePhotoUrl} alt="Profile preview" /> : current?.name?.slice(0, 1)?.toUpperCase() || "S"}</div><div><h2>{current?.name || "Build your professional profile"}</h2><p>Give employers a clear picture of your education, direction, and strengths.</p></div></div><div className="profile-completion"><div><b>{loading ? "—" : `${completion}%`}</b><span>profile complete</span></div><i><em style={{ width: `${completion}%` }} /></i><small>{completedFields} of 9 profile details added</small></div></header><form className="data-form profile-form" onSubmit={save}><div className="profile-account-card"><div><span><b>{current?.name || "Your account"}</b><small>Account name</small></span><span><b>{current?.email || "Sign in to load email"}</b><small>Email address</small></span></div><p><ShieldCheck size={16} /> Your profile is private to your CareerForge workspace.</p></div><section className="profile-field-section"><div className="profile-section-title"><span>01</span><div><h3>Academic background</h3><p>Share the study details that frame your current stage.</p></div></div><div className="form-grid"><label>University<input name="university" value={profile.university || ""} onChange={change} placeholder="United International University" /></label><label>Degree / programme<input name="degree" value={profile.degree || ""} onChange={change} placeholder="BSc in Computer Science" /></label><label>Graduation year<input name="graduationYear" value={profile.graduationYear || ""} onChange={change} type="number" min="2000" max="2100" placeholder="2027" /></label><label>Experience (years)<input name="experienceYears" value={profile.experienceYears ?? ""} onChange={change} type="number" min="0" max="60" placeholder="0" /></label></div></section><section className="profile-field-section"><div className="profile-section-title"><span>02</span><div><h3>Career direction</h3><p>Use a target role and location to keep your job search focused.</p></div></div><div className="form-grid"><label>Target role<input name="targetRole" value={profile.targetRole || ""} onChange={change} placeholder="Junior Software Engineer" /></label><label>Location<input name="location" value={profile.location || ""} onChange={change} placeholder="Dhaka, Bangladesh" /></label><label>Profile photo URL <small>(optional)</small><input name="profilePhotoUrl" value={profile.profilePhotoUrl || ""} onChange={change} placeholder="https://..." /></label></div></section><section className="profile-field-section"><div className="profile-section-title"><span>03</span><div><h3>Skills &amp; interests</h3><p>Add the strengths and interests you want employers to see at a glance.</p></div></div><div className="form-grid profile-details-grid"><label>Skills <small>Separate skills with commas</small><textarea name="skills" value={profile.skills || ""} onChange={change} rows="3" placeholder="Java, React, MySQL, Figma" /></label><label>Hobbies &amp; interests <small>What do you enjoy beyond coursework?</small><textarea name="hobbies" value={profile.hobbies || ""} onChange={change} rows="3" placeholder="Photography, volunteering, chess" /></label></div></section><section className="profile-field-section bio-section"><div className="profile-section-title"><span>04</span><div><h3>Professional summary</h3><p>In 2–4 sentences, mention your interests, projects, strengths, and direction.</p></div></div><label className="full-field">Short professional bio<textarea name="bio" value={profile.bio || ""} onChange={change} rows="5" maxLength="500" placeholder="For example: Computer Science student interested in frontend engineering. Built projects with React and Spring Boot, and looking for an internship where I can grow..." /></label><small className="bio-count">{(profile.bio || "").length}/500 characters</small></section>{notice && <p className={notice.includes("success") ? "form-success" : "form-error"}>{notice}</p>}<footer className="profile-save-row"><div><b>Ready to save?</b><small>Your dashboard updates from these details.</small></div><Button type="submit" disabled={saving || loading}><Save size={15} />{saving ? "Saving..." : loading ? "Loading..." : "Save profile"}</Button></footer></form></section>;
 }
 
 function CareerVault() {
@@ -547,7 +487,7 @@ function StudentJobs() {
   }
 
   return <section className="student-jobs-page">
-    <div className="content-intro compact"><div><p className="eyebrow"><BriefcaseBusiness size={14} /> Personalized job matches</p><h2>Find jobs that fit your skills.</h2><p>Matches use the skills and target role saved in your profile. Search further by title, location, skills, work mode, or type.</p></div></div>
+    <div className="content-intro compact"><div className="jobs-hero-copy"><h2>Find your next opportunity.</h2><p>Roles are ranked from your target role and skills. Search further by title, location, work mode, or type.</p></div><div className="jobs-hero-stats" aria-label="Your job search summary"><article><small>Profile matches</small><b>{loading ? "—" : allMatches.length}</b><span>ready to explore</span></article><article><small>Applications</small><b>{loading ? "—" : applications.length}</b><span>currently tracked</span></article></div></div>
     <form className="job-search-panel" onSubmit={search}>
       <label className="job-search-main"><Search size={17} /><input name="query" value={filters.query} onChange={changeFilter} placeholder="Search job title or company" /></label>
       <input name="location" value={filters.location} onChange={changeFilter} placeholder="Location" />
@@ -595,9 +535,9 @@ function AdminJobs() {
 function StudentOverview({ go }) {
   const current = getSession(); const [snapshot, setSnapshot] = useState({ profile: blankProfile, applications: [], resumes: [], documents: [], jobs: [] }); const [loading, setLoading] = useState(true);
   useEffect(() => { const headers = { "X-User-Id": current?.id || "" }; if (!current?.id) { setLoading(false); return; } Promise.all([fetch(`${API_BASE_URL}/profiles/${current.id}`, { headers }).then(responseBody).catch(() => blankProfile), fetch(`${API_BASE_URL}/applications`, { headers }).then(responseBody).catch(() => []), fetch(`${API_BASE_URL}/vault/resumes`, { headers }).then(responseBody).catch(() => []), fetch(`${API_BASE_URL}/vault/documents`, { headers }).then(responseBody).catch(() => []), fetch(`${API_BASE_URL}/jobs`).then(responseBody).catch(() => [])]).then(([profile, applications, resumes, documents, jobs]) => setSnapshot({ profile: { ...blankProfile, ...profile }, applications, resumes, documents, jobs })).finally(() => setLoading(false)); }, []);
-  const profileFields = [snapshot.profile.university, snapshot.profile.degree, snapshot.profile.graduationYear, snapshot.profile.experienceYears, snapshot.profile.targetRole, snapshot.profile.location, snapshot.profile.skills, snapshot.profile.hobbies, snapshot.profile.bio].filter((value) => value !== null && value !== undefined && value !== "").length; const readiness = Math.round((profileFields / 9) * 100); const documents = snapshot.resumes.length + snapshot.documents.length; const nextAction = !snapshot.profile.targetRole ? ["Add a target role", "Tell CareerForge what direction you want to explore.", "/student/profile", Target] : documents === 0 ? ["Create your first CV", "Save a CV version before you start applying.", "/student/vault", FileText] : ["Explore job matches", "Find published opportunities that fit your direction.", "/student/jobs", BriefcaseBusiness];
+  const profileFields = [snapshot.profile.university, snapshot.profile.degree, snapshot.profile.graduationYear, snapshot.profile.experienceYears, snapshot.profile.targetRole, snapshot.profile.location, snapshot.profile.skills, snapshot.profile.hobbies, snapshot.profile.bio].filter((value) => value !== null && value !== undefined && value !== "").length; const readiness = Math.round((profileFields / 9) * 100); const documents = snapshot.resumes.length + snapshot.documents.length; const profileComplete = profileFields === 9; const cvComplete = documents > 0; const applicationsStarted = snapshot.applications.length > 0; const nextAction = !snapshot.profile.targetRole ? ["Add a target role", "Tell CareerForge what direction you want to explore.", "/student/profile", Target] : documents === 0 ? ["Create your first CV", "Save a CV version before you start applying.", "/student/vault", FileText] : ["Explore job matches", "Find published opportunities that fit your direction.", "/student/jobs", BriefcaseBusiness];
   const [nextTitle, nextCopy, nextRoute, NextIcon] = nextAction;
-  return <section className="student-overview"><header className="student-overview-head"><div><p className="eyebrow"><Sparkles size={14} /> YOUR CAREER COMMAND CENTER</p><h2>Welcome back, {current?.name?.split(" ")[0] || "Student"}.</h2><p>Here is a clear view of the work that moves your career forward.</p></div><Button className="quiet" onClick={() => go("/student/profile")}>View profile <ArrowRight size={15} /></Button></header><div className="student-dashboard-grid"><article className="readiness-card"><div><p>CAREER READINESS</p><h3>{loading ? "—" : `${readiness}%`}</h3><span>{profileFields}/8 profile details added</span></div><div className="readiness-ring" style={{ "--progress": `${readiness * 3.6}deg` }}><i><Target size={24} /></i></div><footer><span>Complete your profile to improve your next-step recommendations.</span><button onClick={() => go("/student/profile")}>Improve profile <ArrowRight size={14} /></button></footer></article><article className="workspace-summary"><div className="summary-head"><div><p>YOUR WORKSPACE</p><h3>Progress at a glance</h3></div><span>{loading ? "…" : "Live"}</span></div><div className="summary-stats"><button onClick={() => go("/student/vault")}><FileText size={18} /><b>{loading ? "—" : documents}</b><small>CVs &amp; files</small></button><button onClick={() => go("/student/jobs")}><BriefcaseBusiness size={18} /><b>{loading ? "—" : snapshot.jobs.length}</b><small>Open jobs</small></button><button onClick={() => go("/student/jobs")}><ClipboardCheck size={18} /><b>{loading ? "—" : snapshot.applications.length}</b><small>Applications</small></button></div></article><article className="next-step-card"><span><NextIcon size={20} /></span><div><p>NEXT BEST STEP</p><h3>{nextTitle}</h3><small>{nextCopy}</small></div><button onClick={() => go(nextRoute)} aria-label={nextTitle}><ArrowRight size={17} /></button></article><article className="career-path-card"><div className="summary-head"><div><p>CAREER PATH</p><h3>Your application rhythm</h3></div><button onClick={() => go("/student/jobs")}>View jobs</button></div><div className="path-track"><span className={profileFields ? "done" : ""}><i>1</i><b>Profile</b><small>{profileFields ? "In progress" : "Start here"}</small></span><span className={documents ? "done" : ""}><i>2</i><b>CV</b><small>{documents ? "Ready" : "Prepare"}</small></span><span className={snapshot.applications.length ? "done" : ""}><i>3</i><b>Apply</b><small>{snapshot.applications.length ? "Active" : "Discover"}</small></span></div></article></div></section>;
+  return <section className="student-overview"><header className="student-overview-head"><div><h2>Welcome back, {current?.name || "Student"}.</h2><p>Here is a clear view of the work that moves your career forward.</p></div><Button className="quiet" onClick={() => go("/student/profile")}>View profile <ArrowRight size={15} /></Button></header><div className="student-dashboard-grid"><article className="readiness-card"><div><p>CAREER READINESS</p><h3>{loading ? "—" : `${readiness}%`}</h3><span>{profileFields}/9 profile details added</span></div><div className="readiness-ring" style={{ "--progress": `${readiness * 3.6}deg` }}><i><Target size={24} /></i></div><footer><span>Complete your profile to improve your next-step recommendations.</span><button onClick={() => go("/student/profile")}>Improve profile <ArrowRight size={14} /></button></footer></article><article className="workspace-summary"><div className="summary-head"><div><p>YOUR WORKSPACE</p><h3>Progress at a glance</h3></div><span>{loading ? "…" : "Live"}</span></div><div className="summary-stats"><button onClick={() => go("/student/vault")}><FileText size={18} /><b>{loading ? "—" : documents}</b><small>CVs &amp; files</small></button><button onClick={() => go("/student/jobs")}><BriefcaseBusiness size={18} /><b>{loading ? "—" : snapshot.jobs.length}</b><small>Open jobs</small></button><button onClick={() => go("/student/jobs")}><ClipboardCheck size={18} /><b>{loading ? "—" : snapshot.applications.length}</b><small>Applications</small></button></div></article><article className="next-step-card"><span><NextIcon size={20} /></span><div><p>NEXT BEST STEP</p><h3>{nextTitle}</h3><small>{nextCopy}</small></div><button onClick={() => go(nextRoute)} aria-label={nextTitle}><ArrowRight size={17} /></button></article><article className="career-path-card"><div className="summary-head"><div><p>CAREER PATH</p><h3>Your application rhythm</h3></div><button onClick={() => go("/student/jobs")}>View jobs</button></div><div className="path-track"><span className={profileComplete ? "done" : "active"}><i>1</i><b>Profile</b><small>{profileComplete ? "Complete" : "In progress"}</small></span><span className={profileComplete ? cvComplete ? "done" : "active" : "locked"}><i>2</i><b>CV</b><small>{profileComplete ? cvComplete ? "Complete" : "In progress" : "Complete profile first"}</small></span><span className={profileComplete && cvComplete ? applicationsStarted ? "done" : "active" : "locked"}><i>3</i><b>Apply</b><small>{profileComplete && cvComplete ? applicationsStarted ? "Complete" : "In progress" : "Complete CV first"}</small></span></div></article></div></section>;
 }
 
 function StudentEvents({ go }) {
@@ -713,10 +653,12 @@ function StudentChat() {
 }
 
 function Workspace({ role, section, go }) {
-  const admin = role === "admin"; const current = getSession(); const items = admin ? adminItems : studentItems; const label = items.find(([id]) => id === section)?.[1] || "Overview"; const [query, setQuery] = useState(""); const [accountOpen, setAccountOpen] = useState(false); const [workspacePhotoUrl, setWorkspacePhotoUrl] = useState(""); const matches = query.trim() ? items.filter(([id, name]) => `${id} ${name}`.toLowerCase().includes(query.trim().toLowerCase())) : [];
+  const admin = role === "admin"; const current = getSession(); const items = admin ? adminItems : studentItems; const label = items.find(([id]) => id === section)?.[1] || "Overview"; const [query, setQuery] = useState(""); const [accountMenuState, setAccountMenuState] = useState("closed"); const accountOpen = accountMenuState === "open"; const accountVisible = accountMenuState !== "closed"; const [workspacePhotoUrl, setWorkspacePhotoUrl] = useState(""); const matches = query.trim() ? items.filter(([id, name]) => `${id} ${name}`.toLowerCase().includes(query.trim().toLowerCase())) : [];
   useEffect(() => { if (admin || !current?.id) { setWorkspacePhotoUrl(""); return undefined; } let active = true; fetch(`${API_BASE_URL}/profiles/${current.id}`, { headers: { "X-User-Id": current.id } }).then(responseBody).then((body) => { if (!active) return; const value = body.profilePhotoUrl; setWorkspacePhotoUrl(value?.startsWith("/") ? `${API_BASE_URL}${value}?v=${Date.now()}` : value || ""); }).catch(() => { if (active) setWorkspacePhotoUrl(""); }); return () => { active = false; }; }, [admin, current?.id, section]);
   useEffect(() => { const avatar = document.querySelector(".account-control .avatar"); if (!avatar) return; avatar.classList.toggle("has-photo", Boolean(workspacePhotoUrl)); if (workspacePhotoUrl) { avatar.textContent = ""; const image = document.createElement("img"); image.src = workspacePhotoUrl; image.alt = "Profile"; avatar.appendChild(image); } else if (!avatar.textContent.trim()) avatar.textContent = current?.name?.slice(0, 1)?.toUpperCase() || (admin ? "A" : "S"); }, [workspacePhotoUrl, accountOpen, query, current?.name, admin]);
-  useEffect(() => { if (!accountOpen) return undefined; const closeMenu = (event) => { if (!event.target.closest(".account-control")) setAccountOpen(false); }; const closeOnEscape = (event) => { if (event.key === "Escape") setAccountOpen(false); }; document.addEventListener("pointerdown", closeMenu); document.addEventListener("keydown", closeOnEscape); return () => { document.removeEventListener("pointerdown", closeMenu); document.removeEventListener("keydown", closeOnEscape); }; }, [accountOpen]);
+  useEffect(() => { if (!accountOpen) return undefined; const closeMenu = (event) => { if (!event.target.closest(".account-control")) closeAccountMenu(); }; const closeOnEscape = (event) => { if (event.key === "Escape") closeAccountMenu(); }; document.addEventListener("pointerdown", closeMenu); document.addEventListener("keydown", closeOnEscape); return () => { document.removeEventListener("pointerdown", closeMenu); document.removeEventListener("keydown", closeOnEscape); }; }, [accountOpen]);
+  const closeAccountMenu = () => { if (!accountOpen) return; setAccountMenuState("closing"); window.setTimeout(() => setAccountMenuState((state) => state === "closing" ? "closed" : state), 180); };
+  const toggleAccountMenu = () => { if (accountOpen) closeAccountMenu(); else setAccountMenuState("open"); };
   const placeholder = { assessments: [admin ? "Create skill assessments" : "Measure your skills", "Published assessments and performance history will appear here."], vault: ["Career Vault", "Your resume sections and uploaded documents will appear here."], community: ["Community", "Posts, comments, and moderation activity will appear here."], resources: ["Learning resources", "Administrator-published resources will appear here."], events: ["Events", "Upcoming workshops and event registrations will appear here."], students: ["Student directory", "Registered student accounts will appear here."], settings: ["Platform settings", "Safe operational settings will appear here."] };
   const dashboard = <StudentOverview go={go} />;
   const content = admin && section === "overview" ? <AdminOverview go={go} />
@@ -737,11 +679,46 @@ function Workspace({ role, section, go }) {
     : section === "jobs" ? admin ? <AdminJobs /> : <StudentJobs />
     : <EmptyPanel title={placeholder[section]?.[0] || label} copy={placeholder[section]?.[1] || "This section is ready for Spring Boot API data."} />;
   const signOut = () => { localStorage.removeItem("careerforge_session"); go("/"); };
-  return <main className="workspace"><aside className="sidebar"><Brand onClick={() => go("/")} /><div className="sidebar-role">{admin ? "ADMIN WORKSPACE" : "STUDENT WORKSPACE"}</div><nav>{items.map(([id, name, Icon]) => <button className={id === section ? "active" : ""} onClick={() => go(`/${role}/${id}`)} key={id}><Icon size={17} />{name}</button>)}</nav><button className="signout" onClick={signOut}>Sign out</button></aside><div className="workspace-main"><header className="workspace-header"><div><p className="breadcrumb">{admin ? "ADMINISTRATION" : "CAREERFORGE"}</p><h1>{label}</h1></div><div className="top-actions"><ThemeToggle /><div className="workspace-search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search workspace" aria-label="Search workspace" />{matches.length > 0 && <div className="search-results">{matches.map(([id, name, Icon]) => <button key={id} onClick={() => { go(`/${role}/${id}`); setQuery(""); }}><Icon size={15} />{name}</button>)}</div>}{query && matches.length === 0 && <div className="search-results no-results">No matching workspace section.</div>}</div><div className="account-control"><button className="avatar" onClick={() => setAccountOpen(!accountOpen)} aria-label="Open account menu">{current?.name?.slice(0, 1)?.toUpperCase() || (admin ? "A" : "S")}</button>{accountOpen && <div className="account-menu"><b>{current?.name || (admin ? "Administrator" : "Student")}</b><small>{current?.email || "Local session"}</small>{!admin && <button onClick={() => { go("/student/profile"); setAccountOpen(false); }}>My profile</button>}<button onClick={signOut}>Sign out</button></div>}</div></div></header>{content}</div></main>;
+  return <main className={`workspace ${admin ? "admin-workspace" : "student-workspace"}`}>
+    <aside className="sidebar">
+      <Brand onClick={() => go("/")} />
+      <div className="sidebar-role">{admin ? "ADMIN WORKSPACE" : "STUDENT WORKSPACE"}</div>
+      <nav>{items.map(([id, name, Icon]) => <button className={id === section ? "active" : ""} onClick={() => go(`/${role}/${id}`)} key={id}><Icon size={17} />{name}</button>)}</nav>
+      <button className="signout" onClick={signOut}>Sign out</button>
+    </aside>
+    <div className="workspace-main">
+      <header className="workspace-header">
+        <div>{admin && <p className="breadcrumb">ADMINISTRATION</p>}<h1>{label}</h1></div>
+        <div className="top-actions">
+          <div className="workspace-search">
+            <Search size={17} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search workspace" aria-label="Search workspace" />
+            {matches.length > 0 && <div className="search-results">{matches.map(([id, name, Icon]) => <button key={id} onClick={() => { go(`/${role}/${id}`); setQuery(""); }}><Icon size={15} />{name}</button>)}</div>}
+            {query && matches.length === 0 && <div className="search-results no-results">No matching workspace section.</div>}
+          </div>
+          <div className="account-control">
+            <button className="avatar" onClick={toggleAccountMenu} aria-expanded={accountOpen} aria-label="Open account menu">{current?.name?.slice(0, 1)?.toUpperCase() || (admin ? "A" : "S")}</button>
+            {accountVisible && <div className={`account-menu ${accountMenuState === "closing" ? "is-closing" : ""}`} aria-hidden={!accountOpen}>
+              <b>{current?.name || (admin ? "Administrator" : "Student")}</b>
+              <small>{current?.email || "Local session"}</small>
+              {!admin && <button onClick={() => { closeAccountMenu(); go("/student/profile"); }}>My profile</button>}
+              <button onClick={signOut}>Sign out</button>
+            </div>}
+          </div>
+        </div>
+      </header>
+      {content}
+    </div>
+  </main>;
 }
 
 function App() {
   const [route, go] = useRoute();
+  useEffect(() => {
+    if (route !== "/") return undefined;
+    const frame = window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "smooth" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [route]);
   useEffect(() => {
     const timeouts = new WeakMap();
     const dismiss = (toast) => {
@@ -775,11 +752,13 @@ function App() {
     return () => { observer.disconnect(); document.querySelectorAll(".form-success, .form-error").forEach((toast) => window.clearTimeout(timeouts.get(toast))); };
   }, []);
   const pieces = route.split("/").filter(Boolean);
-  if (pieces[0] === "login") return <Login role={pieces[1] === "admin" ? "admin" : "student"} register={false} go={go} />;
-  if (pieces[0] === "register") return <Login role="student" register go={go} />;
-  if (pieces[0] === "resources") return <ResourcesLanding go={go} />;
-  if (pieces[0] === "community") return <CommunityLanding go={go} />;
-  if (pieces[0] === "student" || pieces[0] === "admin") return <Workspace role={pieces[0]} section={pieces[1] || "overview"} go={go} />;
-  return <FinpayLanding go={go} />;
+  const screen = pieces[0] === "login"
+    ? <Login role={pieces[1] === "admin" ? "admin" : "student"} register={false} go={go} />
+    : pieces[0] === "register"
+      ? <Login role="student" register go={go} />
+      : pieces[0] === "student" || pieces[0] === "admin"
+        ? <Workspace role={pieces[0]} section={pieces[1] || "overview"} go={go} />
+        : <FinpayLanding go={go} />;
+  return <div className="route-transition" key={route}>{screen}</div>;
 }
 export default App;
