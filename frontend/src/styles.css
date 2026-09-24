@@ -2529,6 +2529,15 @@ body, .fin-home, .workspace { background: var(--fin-paper); }
 }
 .student-workspace .community-search button:hover,
 .student-workspace .post-comments form button:hover:not(:disabled) { background: #155b5c !important; }
+
+/* Community feed: compact social threads with the newest posts first. */
+.community-post-stream { max-height: 760px; overflow-y: auto; padding-right: 8px; scrollbar-color: #9fb4c2 transparent; scrollbar-width: thin; }
+.community-post-stream::-webkit-scrollbar { width: 7px; }.community-post-stream::-webkit-scrollbar-thumb { border-radius: 99px; background: #9fb4c2; }
+.feed-post header { align-items: flex-start; }.post-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-left: auto; }
+.post-report { border: 1px solid #f1d5cf !important; border-radius: 8px !important; padding: 6px 10px !important; background: #fff7f5 !important; color: #b45749 !important; font-size: 10px !important; font-weight: 800 !important; }.post-report:hover { border-color: #dfa195 !important; background: #fff0ed !important; }
+.feed-post > footer button.active { background: #e7f2f1; color: #176b69; }.post-comments { gap: 9px; }.post-comment-list { display: grid; gap: 7px; max-height: 250px; overflow-y: auto; padding-right: 5px; scrollbar-color: #aebdc8 transparent; scrollbar-width: thin; }.post-comment-list::-webkit-scrollbar { width: 6px; }.post-comment-list::-webkit-scrollbar-thumb { border-radius: 99px; background: #aebdc8; }
+.post-comment-list > p { margin: 0; }.post-comment-list .comment-empty { background: transparent; color: var(--fin-muted); font-size: 11px; font-style: italic; }.post-comments form { position: sticky; bottom: 0; padding-top: 3px; background: #fff; }
+@media (max-width: 620px) { .community-post-stream { max-height: 580px; padding-right: 3px; }.post-header-actions { margin-left: 0; }.feed-post header { grid-template-columns: 38px minmax(0, 1fr); }.post-header-actions { grid-column: 1 / -1; justify-content: flex-start; }.post-comment-list { max-height: 210px; } }
 .student-workspace .connection-list article.selected,
 .student-workspace .chat-contacts .connection-list article.selected {
   border-color: rgba(29, 115, 116, .42) !important;
