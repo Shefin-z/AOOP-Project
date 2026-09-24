@@ -4349,3 +4349,82 @@ body, .fin-home, .workspace { background: var(--fin-paper); }
   .admin-job-source-link,
   .admin-job-source-missing { display: none; }
 }
+
+/* Student event calendar: use the same calm teal hierarchy as the workspace. */
+.student-workspace .student-events-page .events-hero {
+  min-height: 174px;
+  padding: 29px 32px;
+  border-color: rgba(29, 115, 116, .42) !important;
+  background: linear-gradient(118deg, #3c6071 0%, #316b70 56%, #1d7374 100%) !important;
+  box-shadow: 0 17px 34px rgba(25, 79, 87, .15) !important;
+}
+.student-workspace .student-events-page .events-hero .eyebrow,
+.student-workspace .student-events-page .events-hero h2 { color: #fff !important; }
+.student-workspace .student-events-page .events-hero > div > p:last-child { color: rgba(255, 255, 255, .8) !important; }
+.student-workspace .student-events-page .events-hero-date {
+  border-color: rgba(255, 255, 255, .24) !important;
+  background: rgba(255, 255, 255, .12) !important;
+  color: #fff !important;
+  backdrop-filter: blur(6px);
+}
+.student-workspace .student-events-page .events-hero-date b,
+.student-workspace .student-events-page .events-hero-date small { color: #fff !important; }
+.student-workspace .student-event-list {
+  padding: 25px 28px;
+  border-color: rgba(60, 96, 113, .18) !important;
+  box-shadow: 0 12px 26px rgba(25, 79, 87, .06) !important;
+}
+.student-workspace .student-event-list-head h3,
+.student-workspace .student-event-card h3 { color: #3c6071 !important; }
+.student-workspace .student-event-list-head > span {
+  background: #e4f2f1 !important;
+  color: #1d7374 !important;
+}
+.student-workspace .student-event-grid {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.student-workspace .student-event-card {
+  min-height: 248px;
+  padding: 20px;
+  border-color: rgba(60, 96, 113, .18) !important;
+  border-top: 3px solid rgba(29, 115, 116, .55);
+  border-radius: 15px;
+  background: linear-gradient(145deg, #fff 0%, #f4fbfa 100%) !important;
+  box-shadow: 0 8px 19px rgba(25, 79, 87, .045);
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.student-workspace .student-event-card:hover {
+  border-color: rgba(29, 115, 116, .5) !important;
+  box-shadow: 0 14px 26px rgba(25, 79, 87, .1);
+  transform: translateY(-2px);
+}
+.student-workspace .student-event-card-top > span {
+  background: #e4f2f1 !important;
+  color: #1d7374 !important;
+}
+.student-workspace .student-event-card-top small { color: #1d7374 !important; }
+.student-workspace .student-event-card > p { color: rgba(60, 96, 113, .76) !important; }
+.student-workspace .student-event-meta { color: #587889 !important; }
+.student-workspace .student-event-meta svg { color: #1d7374; }
+.student-workspace .student-event-card a {
+  width: fit-content;
+  margin-top: 18px;
+  padding: 8px 10px;
+  border: 1px solid rgba(29, 115, 116, .24);
+  border-radius: 8px;
+  background: #fff;
+  color: #1d7374 !important;
+  font-size: 11px;
+}
+.student-workspace .student-event-card a:hover {
+  border-color: #1d7374;
+  background: #1d7374;
+  color: #fff !important;
+  text-decoration: none;
+}
+@media (max-width: 640px) {
+  .student-workspace .student-events-page .events-hero,
+  .student-workspace .student-event-list { padding: 22px 20px; }
+  .student-workspace .student-event-grid { grid-template-columns: 1fr; }
+}
