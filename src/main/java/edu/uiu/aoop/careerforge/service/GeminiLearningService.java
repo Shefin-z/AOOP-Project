@@ -55,11 +55,18 @@ public class GeminiLearningService {
             HttpRequest httpRequest = HttpRequest.newBuilder(URI.create("https://generativelanguage.googleapis.com/v1beta/models/" + model.trim() + ":generateContent"))
                     .timeout(Duration.ofSeconds(40)).header("Content-Type", "application/json").header("x-goog-api-key", apiKey.trim())
                     .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(request))).build();
-            HttpResponse<String> response = http.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Gemini request failed: " + response.statusCode() + ". Check the API key and model.");
-            String text = mapper.readTree(response.body()).path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
-            if (text.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Gemini did not return a usable response.");
-            return mapper.readTree(text.replace("```json", "").replace("```", "").trim());
+            for (int attempt = 0; attempt < 3; attempt++) {
+                HttpResponse<String> response = http.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 503 && attempt < 2) {
+                    Thread.sleep((attempt + 1L) * 1500L);
+                    continue;
+                }
+                if (response.statusCode() < 200 || response.statusCode() >= 300) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Gemini request failed: " + response.statusCode() + ". Check the API key and model.");
+                String text = mapper.readTree(response.body()).path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
+                if (text.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Gemini did not return a usable response.");
+                return mapper.readTree(text.replace("```json", "").replace("```", "").trim());
+            }
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Gemini is temporarily unavailable. Please try again in a moment.");
         }
         catch (Exception exception) { if (exception instanceof ResponseStatusException responseStatusException) throw responseStatusException; throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not read Gemini's response. Please try again."); }
     }
