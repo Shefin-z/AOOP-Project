@@ -5,6 +5,7 @@ import edu.uiu.aoop.careerforge.dto.JobResponse;
 import edu.uiu.aoop.careerforge.model.Company;
 import edu.uiu.aoop.careerforge.model.Job;
 import edu.uiu.aoop.careerforge.repository.CompanyRepository;
+import edu.uiu.aoop.careerforge.repository.JobApplicationRepository;
 import edu.uiu.aoop.careerforge.repository.JobRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -13,16 +14,18 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 @Service
 @Transactional
 public class JobService {
     private final JobRepository jobs;
     private final CompanyRepository companies;
+    private final JobApplicationRepository applications;
     private final AccessService access;
     private final JobNlpService nlp;
     private final EmbeddingService embeddings;
-    public JobService(JobRepository jobs, CompanyRepository companies, AccessService access, JobNlpService nlp, EmbeddingService embeddings) { this.jobs = jobs; this.companies = companies; this.access = access; this.nlp = nlp; this.embeddings = embeddings; }
+    public JobService(JobRepository jobs, CompanyRepository companies, JobApplicationRepository applications, AccessService access, JobNlpService nlp, EmbeddingService embeddings) { this.jobs = jobs; this.companies = companies; this.applications = applications; this.access = access; this.nlp = nlp; this.embeddings = embeddings; }
     @Transactional(readOnly = true)
     public List<JobResponse> list() { return jobs.findAllByOrderByLastVerifiedAtDescCreatedAtDescIdDesc().stream().map(this::toResponse).toList(); }
     @Transactional(readOnly = true)
@@ -31,6 +34,15 @@ public class JobService {
     public JobResponse create(Long adminId, JobRequest request) { access.requireAdmin(adminId); Job job = new Job(company(request), adminId); apply(job, request); nlp.analyze(job); Job saved = jobs.save(job); embeddings.enqueueJob(saved); return toResponse(saved); }
     public int importFromProvider(Long adminId, JobImportProvider provider) { access.requireAdmin(adminId); return provider.importJobs(); }
     public int closeExpiredJobs() { return jobs.closeExpired(java.time.LocalDate.now()); }
+    public int purgeExpiredJobsAfter(int retentionDays) {
+        java.time.LocalDate cutoff = java.time.LocalDate.now().minusDays(Math.max(1, retentionDays));
+        List<Job> candidates = jobs.findByStatusAndExpiryDateBefore("closed", cutoff);
+        if (candidates.isEmpty()) return 0;
+        Set<Long> appliedJobIds = Set.copyOf(applications.findJobIdsWithApplications(candidates.stream().map(Job::getId).toList()));
+        List<Job> removable = candidates.stream().filter(job -> !appliedJobIds.contains(job.getId())).toList();
+        jobs.deleteAll(removable);
+        return removable.size();
+    }
     public JobResponse update(Long id, Long adminId, JobRequest request) { access.requireAdmin(adminId); Job job = find(id); apply(job, request); nlp.analyze(job); Job saved = jobs.save(job); embeddings.enqueueJob(saved); return toResponse(saved); }
     public void delete(Long id, Long adminId) { access.requireAdmin(adminId); jobs.delete(find(id)); }
     private Job find(Long id) { return jobs.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found.")); }

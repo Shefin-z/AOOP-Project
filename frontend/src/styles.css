@@ -4271,6 +4271,28 @@ body, .fin-home, .workspace { background: var(--fin-paper); }
   box-shadow: 0 8px 16px rgba(145, 59, 45, .25);
 }
 
+/* Keep each job card's edit and delete controls in the same status palette. */
+.admin-workspace .job-list-review .table-actions button {
+  border-color: rgba(185, 116, 25, .28) !important;
+  background: #fff7e9 !important;
+  color: #a46818 !important;
+}
+.admin-workspace .job-list-review .table-actions button:hover {
+  border-color: #b97419 !important;
+  background: #b97419 !important;
+  color: #fff !important;
+}
+.admin-workspace .job-list-closed .table-actions button {
+  border-color: rgba(180, 88, 69, .25) !important;
+  background: #fff2ef !important;
+  color: #a34f40 !important;
+}
+.admin-workspace .job-list-closed .table-actions button:hover {
+  border-color: #b45845 !important;
+  background: #b45845 !important;
+  color: #fff !important;
+}
+
 /* Pagination inherits the visual status of its admin job section. */
 .admin-workspace .job-list-published .job-pagination { border-top-color: rgba(29, 115, 116, .2); }
 .admin-workspace .job-list-published .job-pagination button { border-color: rgba(29, 115, 116, .28); color: var(--admin-teal); }
