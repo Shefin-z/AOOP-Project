@@ -6,7 +6,10 @@ import {
   ShieldCheck, Sparkles, Target, Trash2, Users,
 } from "lucide-react";
 import { AdminApplications, AdminCommunity, AdminContentManager, AdminOverview, AdminStudents } from "./AdminDashboard";
-import studentSuccessPhoto from "./assets/hero-student-success.png";
+import adminCareerServicesPhoto from "./assets/auth-admin-career-services.png";
+import registerStudentPhoto from "./assets/auth-register-student.png";
+import studentLoginPhoto from "./assets/auth-student-login.png";
+import jobSearchStudentPhoto from "./assets/hero-bangladeshi-job-search.png";
 import { StudentResources } from "./StudentResources";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
@@ -23,10 +26,13 @@ function useRoute() {
   const read = () => window.location.hash.replace("#", "") || "/";
   const [route, setRoute] = useState(read);
   useEffect(() => { const update = () => setRoute(read()); window.addEventListener("hashchange", update); return () => window.removeEventListener("hashchange", update); }, []);
-  return [route, (to) => { window.location.hash = to; }];
+  return [route, (to) => {
+    window.location.hash = to;
+    if (to === "/") window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  }];
 }
 
-function Brand({ onClick }) { return <button className="brand" onClick={onClick}><span className="brand-mark"><Sparkles size={16} /></span><span>Career<span>Forge</span></span></button>; }
+function Brand({ onClick }) { return <button className="brand" type="button" onClick={onClick} aria-label="CareerForge home"><span className="brand-wordmark">career<span>forge</span></span></button>; }
 function Button({ children, className = "", ...props }) { return <button className={`button ${className}`} {...props}>{children}</button>; }
 function EmptyPanel({ title, copy }) { return <section className="empty-panel"><span><Sparkles size={21} /></span><h3>{title}</h3><p>{copy}</p></section>; }
 
@@ -69,7 +75,8 @@ function Landing({ go }) {
   </main>;
 }
 
-function FinpayLanding({ go }) {
+/* Previous landing retained in source history; the current implementation is below. */
+/*
   const benefits = [[RefreshCw, "Free career moves", "Create CV versions, explore roles, and make every application easier to manage."], [BriefcaseBusiness, "Multiple pathways", "Keep job matches, applications, documents, and professional goals in a single account."], [ShieldCheck, "Your work stays secure", "Your information is connected to your CareerForge profile and available when you need it."]];
   const scrollToSection = (id) => { const target = document.getElementById(id); if (!target) return; const targetTop = window.scrollY + target.getBoundingClientRect().top; const centeredTop = targetTop - Math.max(20, (window.innerHeight - target.offsetHeight) / 2); window.scrollTo({ top: Math.max(0, centeredTop), behavior: "smooth" }); };
   useEffect(() => {
@@ -89,11 +96,131 @@ function FinpayLanding({ go }) {
     <footer className="fin-footer" data-fin-reveal="up"><Brand onClick={() => go("/")} /><span>CareerForge · Advanced Object Oriented Programming Laboratory</span><button onClick={() => go("/login/admin")}>Administrator sign in</button></footer>
   </main>;
 }
+*/
+
+function FinpayLanding({ go }) {
+  const scrollToSection = (id) => {
+    const section = document.getElementById(id);
+    if (!section) return;
+    const sectionTop = window.scrollY + section.getBoundingClientRect().top;
+    const availableSpace = window.innerHeight - section.offsetHeight;
+    const topInset = id === "student-tools" ? 72 : Math.max(24, availableSpace / 2);
+    window.scrollTo({ top: Math.max(0, sectionTop - topInset), left: 0, behavior: "smooth" });
+  };
+  const steps = [
+    ["01", "Set your direction", "Build a profile around the skills, goals, and experience that matter to you."],
+    ["02", "Prepare your evidence", "Create CV versions and keep the right document ready for each application."],
+    ["03", "Move with clarity", "Discover opportunities, apply with confidence, and keep every next step visible."],
+  ];
+  useEffect(() => {
+    const items = [...document.querySelectorAll(".cf-landing .cf-reveal")];
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { items.forEach((item) => item.classList.add("is-visible")); return undefined; }
+    const updateMotion = () => { const triggerLine = window.innerHeight * .7; const atPageEnd = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4; items.forEach((item) => { const box = item.getBoundingClientRect(); item.classList.toggle("is-visible", (box.top <= triggerLine && box.bottom >= 0) || (atPageEnd && box.top < window.innerHeight)); }); };
+    updateMotion(); window.addEventListener("scroll", updateMotion, { passive: true }); window.addEventListener("resize", updateMotion);
+    return () => { window.removeEventListener("scroll", updateMotion); window.removeEventListener("resize", updateMotion); };
+  }, []);
+
+  return <main className="cf-landing">
+    <header className="cf-header cf-reveal cf-fade">
+      <Brand onClick={() => go("/")} />
+      <nav aria-label="Main navigation">
+        <button type="button" onClick={() => scrollToSection("how-it-works")}>How it works</button>
+        <button type="button" onClick={() => scrollToSection("student-tools")}>Student tools</button>
+        <button type="button" onClick={() => scrollToSection("why-careerforge")}>Why CareerForge</button>
+      </nav>
+      <div className="cf-header-actions">
+        <button className="cf-login" type="button" onClick={() => go("/login/student")}>Sign in</button>
+        <Button onClick={() => go("/register")}>Create workspace <ArrowRight size={15} /></Button>
+      </div>
+    </header>
+
+    <section className="cf-hero">
+      <div className="cf-hero-copy cf-reveal cf-from-left">
+              <p className="cf-eyebrow">Career tools for focused students</p>
+        <h1>Turn your next step<br />into a <em>clear plan.</em></h1>
+        <p className="cf-lede">CareerForge brings your profile, CVs, opportunities, and applications into one calm workspace—so you can spend less time organising and more time moving forward.</p>
+        <div className="cf-hero-actions">
+          <Button onClick={() => go("/register")}>Create your workspace <ArrowRight size={16} /></Button>
+          <button className="cf-text-action" type="button" onClick={() => scrollToSection("how-it-works")}>See how it works <ArrowRight size={15} /></button>
+        </div>
+        <div className="cf-hero-proof" aria-label="CareerForge highlights">
+          <span><ShieldCheck size={16} /> One secure workspace</span>
+          <span><FileText size={16} /> CVs ready to use</span>
+          <span><BriefcaseBusiness size={16} /> Real opportunities</span>
+        </div>
+      </div>
+
+      <div className="cf-hero-visual cf-reveal cf-from-right" aria-label="Student building her career at a laptop">
+        <figure className="cf-student-photo"><img src={jobSearchStudentPhoto} alt="Bangladeshi student exploring career opportunities on a laptop" /></figure>
+        <div className="cf-photo-tint" aria-hidden="true" />
+        <article className="cf-photo-story"><span><Target size={16} /></span><div><small>CAREER JOURNEY</small><b>Build a plan that feels like yours.</b></div></article>
+        <article className="cf-floating-card cf-floating-profile"><span><FileText size={16} /></span><div><small>CV VERSION</small><b>Frontend portfolio</b></div><em>Ready</em></article>
+        <article className="cf-floating-card cf-floating-match"><span><Target size={16} /></span><div><small>TOP MATCH</small><b>Junior UI Designer</b></div><strong>92%</strong></article>
+      </div>
+    </section>
+
+    <section className="cf-value-strip" id="student-tools">
+      <article className="cf-reveal cf-from-bottom" style={{ "--cf-delay": "0ms" }}><span><CircleUserRound size={19} /></span><div><b>Tell your story once</b><p>Keep your education, skills, goals, and experience organised in one profile.</p></div></article>
+      <article className="cf-reveal cf-from-bottom" style={{ "--cf-delay": "120ms" }}><span><FileText size={19} /></span><div><b>Use the right CV</b><p>Create and choose a polished CV version for each opportunity.</p></div></article>
+      <article className="cf-reveal cf-from-bottom" style={{ "--cf-delay": "240ms" }}><span><BriefcaseBusiness size={19} /></span><div><b>Know your next move</b><p>Explore roles and keep every application visible from one place.</p></div></article>
+    </section>
+
+    <section className="cf-section cf-steps-section" id="how-it-works">
+      <div className="cf-section-intro cf-reveal cf-from-left"><p className="cf-eyebrow">A simple career rhythm</p><h2>Small steps.<br /><em>Meaningful progress.</em></h2><p>CareerForge turns a scattered job search into a system you can understand, use, and return to.</p></div>
+      <div className="cf-steps">{steps.map(([number, title, copy], index) => <article className="cf-reveal cf-from-bottom" style={{ "--cf-delay": `${index * 120}ms` }} key={number}><span>{number}</span><h3>{title}</h3><p>{copy}</p><button type="button" onClick={() => go(number === "01" ? "/register" : "/login/student")}>Open tool <ArrowRight size={15} /></button></article>)}</div>
+    </section>
+
+    <section className="cf-feature-panel" id="why-careerforge">
+      <div className="cf-feature-copy cf-reveal cf-from-left"><p className="cf-eyebrow">Designed for momentum</p><h2>Everything you need.<br /><em>Nothing in your way.</em></h2><p>Every screen is designed around a practical question: what will help you make your next career decision with more confidence?</p><Button onClick={() => go("/register")}>Start your profile <ArrowRight size={15} /></Button></div>
+      <div className="cf-action-list cf-reveal cf-from-right" aria-label="CareerForge actions">
+        <header><span>YOUR ACTION PLAN</span><small>This week</small></header>
+        <article><b>01</b><div><strong>Define your target role</strong><small>Set a direction for your search</small></div><span className="cf-status is-done">Done</span></article>
+        <article><b>02</b><div><strong>Build a CV version</strong><small>Make your experience easy to share</small></div><ArrowRight size={16} /></article>
+        <article><b>03</b><div><strong>Review job matches</strong><small>12 opportunities are waiting</small></div><ArrowRight size={16} /></article>
+        <footer><span>ONE PLACE FOR EVERY NEXT STEP</span><ArrowRight size={15} /></footer>
+      </div>
+    </section>
+
+    <section className="cf-final-cta cf-reveal cf-from-bottom">
+      <div><p className="cf-eyebrow">Your career, made clearer</p><h2>Build a future you<br />can <em>move toward.</em></h2><p>Create a student workspace and take the next step with a plan behind you.</p></div>
+      <div className="cf-final-actions"><Button onClick={() => go("/register")}>Create free workspace <ArrowRight size={16} /></Button><button type="button" onClick={() => go("/login/student")}>I already have an account</button></div>
+    </section>
+
+    <footer className="cf-footer cf-reveal cf-fade"><Brand onClick={() => go("/")} /><span>CareerForge · Advanced Object Oriented Programming Laboratory</span><button type="button" onClick={() => go("/login/admin")}>Administrator sign in</button></footer>
+  </main>;
+}
 
 function Login({ role, register, go }) {
-  const admin = role === "admin"; const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [message, setMessage] = useState(""); const [submitting, setSubmitting] = useState(false);
+  const admin = role === "admin";
+  const variant = register ? "register" : admin ? "admin" : "student";
+  const authPhoto = register ? registerStudentPhoto : admin ? adminCareerServicesPhoto : studentLoginPhoto;
+  const authPhotoAlt = register ? "Bangladeshi student preparing her career workspace" : admin ? "Bangladeshi career-services administrator at work" : "Bangladeshi student planning a job search";
+  const authView = register
+    ? { eyebrow: "Your career workspace", title: "Start with a clear direction.", copy: "Set up one focused space for your profile, CVs, and the opportunities ahead.", boardLabel: "YOUR FIRST THREE STEPS", boardValue: "01", rows: [[Target, "Set your direction", "Choose a role that interests you", "Start"], [FileText, "Prepare your CV", "Add evidence when you are ready", "Next"], [BriefcaseBusiness, "See matching roles", "Keep every application in view", "Then"]] }
+    : admin
+      ? { eyebrow: "Operations workspace", title: "Keep opportunity moving.", copy: "Publish meaningful roles, manage applications, and support every student journey.", boardLabel: "OPPORTUNITY DESK", boardValue: "12", rows: [[BriefcaseBusiness, "Published roles", "Opportunities ready to discover", "Live"], [Users, "Student applications", "Review every next step", "Review"], [ClipboardCheck, "Platform activity", "Keep the experience on track", "Today"]] }
+      : { eyebrow: "Your career workspace", title: "Make progress feel possible.", copy: "Keep your education, goals, CVs, and professional story together in one place.", boardLabel: "CAREER READINESS", boardValue: "72%", rows: [[CircleUserRound, "Your profile", "Your strengths in one clear view", "Active"], [FileText, "CV version", "A polished document, ready to use", "Ready"], [Target, "Next career move", "Discover opportunities with focus", "Explore"]] };
+  const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [message, setMessage] = useState(""); const [submitting, setSubmitting] = useState(false);
   async function submit(event) { event.preventDefault(); setSubmitting(true); setMessage(""); try { const response = await fetch(`${API_BASE_URL}${register ? "/auth/register" : "/auth/login"}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(register ? { name: name.trim(), email: email.trim(), password } : { email: email.trim(), password, role: admin ? "admin" : "student" }) }); const body = await responseBody(response); localStorage.setItem("careerforge_session", JSON.stringify(body)); go(`/${body.role}/overview`); } catch (error) { setMessage(error.message || "Unable to sign in."); } finally { setSubmitting(false); } }
-  return <main className="auth-page"><button className="back" onClick={() => go("/")}>Back to CareerForge</button><section className="auth-card"><div className="auth-panel"><Brand onClick={() => go("/")} /><p className="eyebrow"><Sparkles size={14} /> {admin ? "Operations workspace" : "Your career workspace"}</p><h1>{admin ? "Keep the platform moving." : "Make progress feel possible."}</h1><p>{admin ? "Create, edit, publish, and close real job opportunities." : "Keep your education, goals, and professional story in one place."}</p><div className="auth-orb" /></div><form className="auth-form" onSubmit={submit}><p className="form-label">{register ? "Student registration" : admin ? "Administrator sign in" : "Student sign in"}</p><h2>{register ? "Create your account" : "Welcome back"}</h2>{register && <label>Full name<input value={name} onChange={(e) => setName(e.target.value)} required /></label>}<label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@example.com" /></label><label>Password<input type="password" minLength="8" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="At least 8 characters" /></label>{message && <p className="form-error">{message}</p>}<Button type="submit" disabled={submitting}>{submitting ? "Please wait..." : register ? "Create account" : "Continue"}<ArrowRight size={16} /></Button>{register ? <button className="text-button" type="button" onClick={() => go("/login/student")}>Already have an account? Sign in</button> : <><button className="text-button" type="button" onClick={() => go(admin ? "/login/student" : "/login/admin")}>Switch to {admin ? "student" : "admin"} sign in</button>{!admin && <button className="text-button" type="button" onClick={() => go("/register")}>New student? Create an account</button>}</>}</form></section></main>;
+  return <main className={`auth-page auth-${variant}`}>
+    <section className="auth-card">
+      <form className="auth-form" onSubmit={submit}>
+        <div className="auth-form-top"><button className="auth-back" type="button" onClick={() => go("/")}>← Back to CareerForge</button><Brand onClick={() => go("/")} /></div>
+        <div className="auth-form-intro"><p className="form-label">{register ? "Student registration" : admin ? "Administrator sign in" : "Student sign in"}</p><h2>{register ? "Create your workspace" : "Welcome back"}</h2><p>{register ? "A few details now, then you can begin building your career space." : "Use your account details to continue where you left off."}</p></div>
+        {register && <label>Full name<input value={name} onChange={(e) => setName(e.target.value)} required /></label>}
+        <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@example.com" /></label>
+        <label>Password<input type="password" minLength="8" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="At least 8 characters" /></label>
+        {message && <p className="form-error">{message}</p>}
+        <Button type="submit" disabled={submitting}>{submitting ? "Please wait..." : register ? "Create workspace" : "Continue"}<ArrowRight size={16} /></Button>
+        <div className="auth-switch">{register ? <button className="text-button" type="button" onClick={() => go("/login/student")}>Already have an account? Sign in</button> : <><button className="text-button" type="button" onClick={() => go(admin ? "/login/student" : "/login/admin")}>Switch to {admin ? "student" : "administrator"} sign in</button>{!admin && <button className="text-button" type="button" onClick={() => go("/register")}>New student? Create an account</button>}</>}</div>
+      </form>
+      <aside className="auth-panel">
+        <img className="auth-photo" src={authPhoto} alt={authPhotoAlt} />
+        <div className="auth-photo-wash" aria-hidden="true" />
+        <div className="auth-panel-inner"><div className="auth-panel-copy"><p className="auth-panel-eyebrow">{authView.eyebrow}</p><h1>{authView.title}</h1><p>{authView.copy}</p></div></div>
+      </aside>
+    </section>
+  </main>;
 }
 
 function StudentProfile() {
@@ -556,6 +683,11 @@ function Workspace({ role, section, go }) {
 function App() {
   const [route, go] = useRoute();
   useEffect(() => {
+    if (route !== "/") return undefined;
+    const frame = window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "smooth" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [route]);
+  useEffect(() => {
     const timeouts = new WeakMap();
     const dismiss = (toast) => {
       window.clearTimeout(timeouts.get(toast));
@@ -588,9 +720,13 @@ function App() {
     return () => { observer.disconnect(); document.querySelectorAll(".form-success, .form-error").forEach((toast) => window.clearTimeout(timeouts.get(toast))); };
   }, []);
   const pieces = route.split("/").filter(Boolean);
-  if (pieces[0] === "login") return <Login role={pieces[1] === "admin" ? "admin" : "student"} register={false} go={go} />;
-  if (pieces[0] === "register") return <Login role="student" register go={go} />;
-  if (pieces[0] === "student" || pieces[0] === "admin") return <Workspace role={pieces[0]} section={pieces[1] || "overview"} go={go} />;
-  return <FinpayLanding go={go} />;
+  const screen = pieces[0] === "login"
+    ? <Login role={pieces[1] === "admin" ? "admin" : "student"} register={false} go={go} />
+    : pieces[0] === "register"
+      ? <Login role="student" register go={go} />
+      : pieces[0] === "student" || pieces[0] === "admin"
+        ? <Workspace role={pieces[0]} section={pieces[1] || "overview"} go={go} />
+        : <FinpayLanding go={go} />;
+  return <div className="route-transition" key={route}>{screen}</div>;
 }
 export default App;
