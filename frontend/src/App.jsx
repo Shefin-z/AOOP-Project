@@ -15,7 +15,7 @@ import { StudentResources } from "./StudentResources";
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 const Sparkles = Target;
 const studentItems = [["overview", "Overview", LayoutDashboard], ["profile", "My profile", CircleUserRound], ["jobs", "Job matches", BriefcaseBusiness], ["assessments", "Assessments", ClipboardCheck], ["vault", "Career Vault", FileText], ["community", "Community", MessageCircle], ["connect", "Connect", Users], ["chat", "Chat", MessageCircle], ["resources", "Resources", BookOpen], ["events", "Events", CalendarDays]];
-const adminItems = [["overview", "Overview", LayoutDashboard], ["profile", "My profile", CircleUserRound], ["students", "Users", Users], ["jobs", "Jobs", BriefcaseBusiness], ["applications", "Applications", FileText], ["assessments", "Assessments", ClipboardCheck], ["community", "Community", MessageCircle], ["resources", "Resources", BookOpen], ["events", "Events", CalendarDays], ["settings", "Settings", Settings]];
+const adminItems = [["overview", "Overview", LayoutDashboard], ["profile", "My profile", CircleUserRound], ["students", "Users", Users], ["jobs", "Jobs", BriefcaseBusiness], ["applications", "Applications", FileText], ["community", "Community", MessageCircle], ["resources", "Resources", BookOpen], ["events", "Events", CalendarDays], ["settings", "Settings", Settings]];
 const blankProfile = { university: "", degree: "", graduationYear: "", experienceYears: "", targetRole: "", location: "", bio: "", skills: "", hobbies: "", profilePhotoUrl: "" };
 const blankJob = { companyName: "", companyWebsite: "", companyLocation: "", title: "", location: "", employmentType: "full_time", workMode: "hybrid", salaryText: "", description: "", expiryDate: "", status: "draft", minExperienceYears: "", maxExperienceYears: "" };
 const blankResumeContent = { fullName: "", email: "", phone: "", location: "", headline: "", summary: "", skills: "", education: "", experience: "", projects: "" };
@@ -731,14 +731,14 @@ function Workspace({ role, section, go }) {
   useEffect(() => { if (!accountOpen) return undefined; const closeMenu = (event) => { if (!event.target.closest(".account-control")) closeAccountMenu(); }; const closeOnEscape = (event) => { if (event.key === "Escape") closeAccountMenu(); }; document.addEventListener("pointerdown", closeMenu); document.addEventListener("keydown", closeOnEscape); return () => { document.removeEventListener("pointerdown", closeMenu); document.removeEventListener("keydown", closeOnEscape); }; }, [accountOpen]);
   const closeAccountMenu = () => { if (!accountOpen) return; setAccountMenuState("closing"); window.setTimeout(() => setAccountMenuState((state) => state === "closing" ? "closed" : state), 180); };
   const toggleAccountMenu = () => { if (accountOpen) closeAccountMenu(); else setAccountMenuState("open"); };
-  const placeholder = { assessments: [admin ? "Create skill assessments" : "Measure your skills", "Published assessments and performance history will appear here."], vault: ["Career Vault", "Your resume sections and uploaded documents will appear here."], community: ["Community", "Posts, comments, and moderation activity will appear here."], resources: ["Learning resources", "Administrator-published resources will appear here."], events: ["Events", "Upcoming workshops and event registrations will appear here."], students: ["Student directory", "Registered student accounts will appear here."], settings: ["Platform settings", "Safe operational settings will appear here."] };
+  const placeholder = { assessments: [admin ? "Assessments unavailable" : "Measure your skills", admin ? "Assessment management is available only in the student learning workspace." : "Published assessments and performance history will appear here."], vault: ["Career Vault", "Your resume sections and uploaded documents will appear here."], community: ["Community", "Posts, comments, and moderation activity will appear here."], resources: ["Learning resources", "Administrator-published resources will appear here."], events: ["Events", "Upcoming workshops and event registrations will appear here."], students: ["Student directory", "Registered student accounts will appear here."], settings: ["Platform settings", "Safe operational settings will appear here."] };
   const dashboard = <StudentOverview go={go} />;
   const content = admin && section === "overview" ? <AdminOverview go={go} />
     : admin && section === "profile" ? <AdminProfile />
     : admin && section === "students" ? <AdminStudents />
     : admin && section === "applications" ? <AdminApplications />
     : admin && section === "community" ? <AdminCommunity />
-    : admin && ["assessments", "resources", "events"].includes(section) ? <AdminContentManager kind={section} />
+    : admin && ["resources", "events"].includes(section) ? <AdminContentManager kind={section} />
     : section === "overview" ? dashboard
     : section === "profile" && !admin ? <StudentProfile />
     : section === "assessments" && !admin ? <LearningPaths />

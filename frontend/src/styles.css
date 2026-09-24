@@ -2800,23 +2800,25 @@ body, .fin-home, .workspace { background: var(--fin-paper); }
 .student-workspace .account-menu b { color: #3c6071 !important; }
 .student-workspace .account-menu small { color: rgba(60, 96, 113, .68) !important; }
 .student-workspace .account-menu button:not(:last-child) {
-  background: #1d7374 !important;
-  color: #fff !important;
+  background: #edf6f5 !important;
+  color: #1d7374 !important;
 }
 .student-workspace .account-menu button:not(:last-child):hover {
-  background: #155b5c !important;
+  background: #1d7374 !important;
   color: #fff !important;
   transform: translateY(-1px);
 }
 .student-workspace .account-menu button:last-child {
-  background: #edf6f5 !important;
-  color: #1d7374 !important;
+  background: #fff0ed !important;
+  color: #b65d4b !important;
 }
 .student-workspace .account-menu button:last-child:hover {
-  background: #dcefed !important;
-  color: #155b5c !important;
+  background: #b65d4b !important;
+  color: #fff !important;
   transform: translateY(-1px);
 }
+.student-workspace .signout { color: #b65d4b !important; }
+.student-workspace .signout:hover { background: #fff0ed !important; color: #a84e3c !important; }
 .student-workspace .account-menu.is-closing {
   pointer-events: none;
   animation: studentAccountMenuOut .18s cubic-bezier(.4, 0, 1, 1) both;
