@@ -38,8 +38,9 @@ public class LearningPathService {
     private final LearningAttemptRepository attempts;
     private final AccessService access;
     private final GeminiLearningService gemini;
+    private final GroqLearningService groq;
     private final ObjectMapper mapper;
-    public LearningPathService(LearningPathRepository paths, LearningLevelRepository levels, LearningAttemptRepository attempts, AccessService access, GeminiLearningService gemini, ObjectMapper mapper) { this.paths = paths; this.levels = levels; this.attempts = attempts; this.access = access; this.gemini = gemini; this.mapper = mapper; }
+    public LearningPathService(LearningPathRepository paths, LearningLevelRepository levels, LearningAttemptRepository attempts, AccessService access, GeminiLearningService gemini, GroqLearningService groq, ObjectMapper mapper) { this.paths = paths; this.levels = levels; this.attempts = attempts; this.access = access; this.gemini = gemini; this.groq = groq; this.mapper = mapper; }
 
     @Transactional(readOnly = true)
     public List<LearningPathResponse> list(Long userId) { access.requireStudent(userId); return paths.findByUserIdOrderByCreatedAtDesc(userId).stream().map(path -> response(path, userId)).toList(); }
@@ -49,13 +50,13 @@ public class LearningPathService {
         for (int number = 1; number <= request.levelCount(); number++) levels.save(new LearningLevel(path, number));
         return response(path, userId);
     }
-    public LearningRecommendationResponse recommend(Long userId, String topic, String pathType) { access.requireStudent(userId); GeminiLearningService.Recommendation recommendation = gemini.recommend(topic.trim(), pathType); return new LearningRecommendationResponse(recommendation.recommendedLevels(), recommendation.reason()); }
+    public LearningRecommendationResponse recommend(Long userId, String topic, String pathType) { access.requireStudent(userId); GeminiLearningService.Recommendation recommendation; try { recommendation = gemini.recommend(topic.trim(), pathType); } catch (ResponseStatusException exception) { recommendation = groq.recommend(topic.trim(), pathType); } return new LearningRecommendationResponse(recommendation.recommendedLevels(), recommendation.reason()); }
     public LearningPathResponse get(Long userId, Long pathId) { access.requireStudent(userId); return response(path(userId, pathId), userId); }
     public void delete(Long userId, Long pathId) { access.requireStudent(userId); paths.delete(path(userId, pathId)); }
     public LearningQuizResponse quiz(Long userId, Long pathId, int levelNumber) {
         access.requireStudent(userId); LearningPath path = path(userId, pathId); LearningLevel level = level(path, levelNumber); int unlocked = nextUnlocked(path, userId);
         if (levelNumber > unlocked) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Pass the previous level with at least 70% to unlock this one.");
-        if (level.getQuestionSet() == null || questions(level).path("assessmentVersion").asInt() < 2) { GeminiLearningService.GeneratedQuiz generated; try { generated = gemini.generateQuiz(path.getTopic(), path.getPathType(), levelNumber, path.getLevelCount()); } catch (ResponseStatusException exception) { if (exception.getReason() != null && exception.getReason().contains("not configured")) throw exception; generated = fallbackQuiz(path.getTopic(), levelNumber); } try { level.setQuestionSet(mapper.writeValueAsString(Map.of("assessmentVersion", 2, "title", generated.title(), "summary", generated.summary(), "questions", generated.questions()))); levels.save(level); } catch (Exception exception) { throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not save the generated questions."); } }
+        if (level.getQuestionSet() == null || questions(level).path("assessmentVersion").asInt() < 2) { GeminiLearningService.GeneratedQuiz generated; try { generated = gemini.generateQuiz(path.getTopic(), path.getPathType(), levelNumber, path.getLevelCount()); } catch (ResponseStatusException geminiFailure) { try { generated = groq.generateQuiz(path.getTopic(), path.getPathType(), levelNumber, path.getLevelCount()); } catch (ResponseStatusException groqFailure) { generated = fallbackQuiz(path.getTopic(), levelNumber); } } try { level.setQuestionSet(mapper.writeValueAsString(Map.of("assessmentVersion", 2, "title", generated.title(), "summary", generated.summary(), "questions", generated.questions()))); levels.save(level); } catch (Exception exception) { throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not save the generated questions."); } }
         return quizResponse(level);
     }
     public LearningQuizResponse regenerate(Long userId, Long pathId, int levelNumber) {
