@@ -2,6 +2,8 @@ package edu.uiu.aoop.careerforge.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import edu.uiu.aoop.careerforge.dto.LearningAttemptRequest;
 import edu.uiu.aoop.careerforge.dto.LearningAttemptResponse;
 import edu.uiu.aoop.careerforge.dto.LearningPathRequest;
@@ -53,7 +55,7 @@ public class LearningPathService {
     public LearningQuizResponse quiz(Long userId, Long pathId, int levelNumber) {
         access.requireStudent(userId); LearningPath path = path(userId, pathId); LearningLevel level = level(path, levelNumber); int unlocked = nextUnlocked(path, userId);
         if (levelNumber > unlocked) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Pass the previous level with at least 70% to unlock this one.");
-        if (level.getQuestionSet() == null) { GeminiLearningService.GeneratedQuiz generated = gemini.generateQuiz(path.getTopic(), path.getPathType(), levelNumber, path.getLevelCount()); try { level.setQuestionSet(mapper.writeValueAsString(Map.of("title", generated.title(), "summary", generated.summary(), "questions", generated.questions()))); levels.save(level); } catch (Exception exception) { throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not save the generated questions."); } }
+        if (level.getQuestionSet() == null || questions(level).path("assessmentVersion").asInt() < 2) { GeminiLearningService.GeneratedQuiz generated; try { generated = gemini.generateQuiz(path.getTopic(), path.getPathType(), levelNumber, path.getLevelCount()); } catch (ResponseStatusException exception) { if (exception.getReason() != null && exception.getReason().contains("not configured")) throw exception; generated = fallbackQuiz(path.getTopic(), levelNumber); } try { level.setQuestionSet(mapper.writeValueAsString(Map.of("assessmentVersion", 2, "title", generated.title(), "summary", generated.summary(), "questions", generated.questions()))); levels.save(level); } catch (Exception exception) { throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not save the generated questions."); } }
         return quizResponse(level);
     }
     public LearningAttemptResponse submit(Long userId, Long pathId, int levelNumber, LearningAttemptRequest request) {
@@ -63,10 +65,13 @@ public class LearningPathService {
         if (!questions.isArray() || questions.size() != request.answers().size()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Answer every question before submitting.");
         int correct = 0; List<LearningAttemptResponse.QuestionResult> results = new java.util.ArrayList<>();
         for (int index = 0; index < questions.size(); index++) {
-            JsonNode question = questions.get(index); int selectedIndex = request.answers().get(index); int correctIndex = question.path("answerIndex").asInt(-1); JsonNode options = question.path("options"); boolean answerCorrect = correctIndex == selectedIndex;
+            JsonNode question = questions.get(index); String submittedAnswer = request.answers().get(index); String type = question.path("type").asText("MCQ"); JsonNode options = question.path("options");
+            int selectedIndex = parseOptionIndex(submittedAnswer); int correctIndex = question.path("answerIndex").asInt(-1);
+            boolean answerCorrect = "SHORT_ANSWER".equals(type) ? matchesKeywords(submittedAnswer, question.path("expectedKeywords")) : correctIndex == selectedIndex;
             if (answerCorrect) correct++;
-            String selectedAnswer = selectedIndex >= 0 && selectedIndex < options.size() ? options.path(selectedIndex).asText() : "No answer selected";
-            results.add(new LearningAttemptResponse.QuestionResult(index + 1, question.path("prompt").asText(), selectedAnswer, options.path(correctIndex).asText(), answerCorrect, question.path("explanation").asText("Review this concept before you retry.")));
+            String selectedAnswer = "SHORT_ANSWER".equals(type) ? submittedAnswer : selectedIndex >= 0 && selectedIndex < options.size() ? options.path(selectedIndex).asText() : "No answer selected";
+            String correctAnswer = "SHORT_ANSWER".equals(type) ? question.path("sampleAnswer").asText("Include the key concepts in your explanation.") : options.path(correctIndex).asText();
+            results.add(new LearningAttemptResponse.QuestionResult(index + 1, question.path("prompt").asText(), selectedAnswer, correctAnswer, answerCorrect, question.path("explanation").asText("Review this concept before you retry.")));
         }
         BigDecimal percentage = BigDecimal.valueOf(correct * 100.0 / questions.size()).setScale(2, RoundingMode.HALF_UP); boolean passed = percentage.compareTo(PASSING_SCORE) >= 0;
         try { attempts.save(new LearningAttempt(level, userId, correct, questions.size(), percentage, passed, mapper.writeValueAsString(request.answers()))); } catch (Exception exception) { throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not save this level attempt."); }
@@ -89,7 +94,26 @@ public class LearningPathService {
     private JsonNode questions(LearningLevel level) { if (level.getQuestionSet() == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Open the level first so Gemini can generate its questions."); try { return mapper.readTree(level.getQuestionSet()); } catch (Exception exception) { throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Saved questions are invalid."); } }
     private LearningQuizResponse quizResponse(LearningLevel level) {
         JsonNode root = questions(level); JsonNode items = root.path("questions");
-        List<LearningQuizResponse.Question> questions = java.util.stream.IntStream.range(0, items.size()).mapToObj(index -> { JsonNode item = items.get(index); List<String> options = new java.util.ArrayList<>(); item.path("options").forEach(option -> options.add(option.asText())); return new LearningQuizResponse.Question(index, item.path("prompt").asText(), options); }).toList();
+        List<LearningQuizResponse.Question> questions = java.util.stream.IntStream.range(0, items.size()).mapToObj(index -> { JsonNode item = items.get(index); List<String> options = new java.util.ArrayList<>(); item.path("options").forEach(option -> options.add(option.asText())); String type = item.path("type").asText("MCQ"); String answerHint = "SHORT_ANSWER".equals(type) ? "Mention the key concepts in your own words." : ""; return new LearningQuizResponse.Question(index, type, item.path("prompt").asText(), item.path("codeSnippet").asText(), options, answerHint); }).toList();
         return new LearningQuizResponse(level.getLevelNumber(), root.path("title").asText("Level " + level.getLevelNumber()), root.path("summary").asText(), questions);
+    }
+    private int parseOptionIndex(String answer) { try { return Integer.parseInt(answer); } catch (Exception exception) { return -1; } }
+    private boolean matchesKeywords(String answer, JsonNode keywords) {
+        if (answer == null || answer.isBlank() || !keywords.isArray()) return false;
+        String normalized = answer.toLowerCase(); int matches = 0;
+        for (JsonNode keyword : keywords) if (!keyword.asText().isBlank() && normalized.contains(keyword.asText().toLowerCase())) matches++;
+        return matches >= Math.min(2, keywords.size());
+    }
+    private GeminiLearningService.GeneratedQuiz fallbackQuiz(String topic, int levelNumber) {
+        ArrayNode items = mapper.createArrayNode();
+        items.add(objectiveQuestion("MCQ", "Which is the best first step when learning " + topic + "?", "", List.of("Understand the core concepts and practise small examples", "Skip directly to advanced topics", "Memorise answers without practising", "Avoid feedback"), 0, "A strong foundation and short practice cycles build reliable skill."));
+        items.add(objectiveQuestion("MCQ", "Which habit helps you improve in " + topic + " most consistently?", "", List.of("Practise regularly and review mistakes", "Only study once before an exam", "Ignore errors", "Copy solutions without understanding them"), 0, "Consistent practice and review reveal what to improve next."));
+        items.add(objectiveQuestion("DEBUGGING", "Review this code. What should be fixed first?", "int total = 10;\nint average = total / 0;\nSystem.out.println(average);", List.of("Avoid division by zero", "Rename the variable", "Remove the print statement", "Add another variable"), 0, "Division by zero causes a runtime error and must be guarded."));
+        items.add(objectiveQuestion("SCENARIO", "You are building a small " + topic + " project and the result is not what you expected. What is the best next action?", "", List.of("Reproduce the issue, inspect the inputs, and test one change at a time", "Change many things at once", "Ignore the result", "Start over without checking the cause"), 0, "A small, repeatable investigation makes problems easier to solve."));
+        ObjectNode shortAnswer = items.addObject(); shortAnswer.put("type", "SHORT_ANSWER"); shortAnswer.put("prompt", "In your own words, explain one useful concept you have learned about " + topic + " and give a practical example."); shortAnswer.putArray("expectedKeywords").add("concept").add("example").add("practice"); shortAnswer.put("sampleAnswer", "A good answer names a concept, explains it clearly, and shows how it can be used in practice."); shortAnswer.put("explanation", "Strong explanations connect a concept to a real example and practical use.");
+        return new GeminiLearningService.GeneratedQuiz(topic + " foundations", "Gemini is temporarily busy, so this level uses a focused practice set while keeping your progress available.", items);
+    }
+    private ObjectNode objectiveQuestion(String type, String prompt, String codeSnippet, List<String> options, int answerIndex, String explanation) {
+        ObjectNode question = mapper.createObjectNode(); question.put("type", type); question.put("prompt", prompt); question.put("codeSnippet", codeSnippet); ArrayNode optionNodes = question.putArray("options"); options.forEach(optionNodes::add); question.put("answerIndex", answerIndex); question.put("explanation", explanation); return question;
     }
 }
