@@ -590,16 +590,35 @@ function StudentOverview({ go }) {
 }
 
 function StudentEvents({ go }) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetch(`${API_BASE_URL}/events`)
+      .then(responseBody)
+      .then((items) => { if (active) setEvents(Array.isArray(items) ? items : []); })
+      .catch((error) => { if (active) setNotice(error.message || "Events could not be loaded right now."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const eventDate = (value) => {
+    if (!value) return "Date to be announced";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "Date to be announced" : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  };
+
   return <section className="student-events-page">
     <header className="events-hero">
       <div><p className="eyebrow"><CalendarDays size={14} /> CAREER CALENDAR</p><h2>Make room for the moments that move you forward.</h2><p>CareerForge gathers workshops, employer sessions, and campus opportunities in one calm calendar.</p></div>
-      <div className="events-hero-date"><CalendarDays size={23} /><span><b>Stay ready</b><small>New events appear here</small></span></div>
+      <div className="events-hero-date"><CalendarDays size={23} /><span><b>{loading ? "Loading events" : `${events.length} published event${events.length === 1 ? "" : "s"}`}</b><small>Stay ready for what is next</small></span></div>
     </header>
-    <section className="events-empty-state content-card">
-      <span className="events-empty-icon"><CalendarDays size={28} /></span>
-      <div><p className="eyebrow">YOUR UPCOMING EVENTS</p><h3>No events have been published yet.</h3><p>When a CareerForge administrator publishes a workshop, employer session, or deadline reminder, you will see it here.</p></div>
-      <Button className="quiet" onClick={() => go("/student/resources")}>Explore resources <ArrowRight size={15} /></Button>
-    </section>
+    {notice && <p className="form-error">{notice}</p>}
+    {loading ? <section className="events-empty-state content-card"><span className="events-empty-icon"><RefreshCw size={28} /></span><div><p className="eyebrow">YOUR UPCOMING EVENTS</p><h3>Loading published events…</h3><p>Checking the CareerForge calendar for the latest workshops and opportunities.</p></div></section>
+      : events.length ? <section className="student-event-list content-card"><div className="student-event-list-head"><div><p className="eyebrow">YOUR UPCOMING EVENTS</p><h3>Plan your next opportunity.</h3><p>These events were published by the CareerForge team.</p></div><span>{events.length} upcoming</span></div><div className="student-event-grid">{events.map((event) => <article className="student-event-card" key={event.id}><div className="student-event-card-top"><span><CalendarDays size={18} /></span><small>{event.category || "Career event"}</small></div><h3>{event.title}</h3>{event.description && <p>{event.description}</p>}<div className="student-event-meta"><span><CalendarDays size={14} /> {eventDate(event.startsAt)}</span>{event.location && <span><MapPin size={14} /> {event.location}</span>}{event.capacity && <span><Users size={14} /> {event.capacity} places</span>}</div>{event.eventUrl && <a href={event.eventUrl} target="_blank" rel="noreferrer">Open event details <ArrowRight size={14} /></a>}</article>)}</div></section>
+      : <section className="events-empty-state content-card"><span className="events-empty-icon"><CalendarDays size={28} /></span><div><p className="eyebrow">YOUR UPCOMING EVENTS</p><h3>No events have been published yet.</h3><p>When a CareerForge administrator publishes a workshop, employer session, or deadline reminder, you will see it here.</p></div><Button className="quiet" onClick={() => go("/student/resources")}>Explore resources <ArrowRight size={15} /></Button></section>}
     <section className="event-ready-grid">
       <article><span><CircleUserRound size={19} /></span><div><b>Keep your profile current</b><p>Make it easy to join events and share your professional direction.</p><button onClick={() => go("/student/profile")}>Update profile <ArrowRight size={14} /></button></div></article>
       <article><span><FileText size={19} /></span><div><b>Bring your best CV</b><p>Save a current CV so you are ready when an employer opportunity arrives.</p><button onClick={() => go("/student/vault")}>Open Career Vault <ArrowRight size={14} /></button></div></article>
