@@ -38,6 +38,7 @@ public class AdminDashboardController {
     public void studentStatus(@RequestHeader(name = "X-User-Id", required = false) Long adminId, @PathVariable Long studentId, @Valid @RequestBody StudentStatusRequest request) { dashboard.updateStudentStatus(adminId, studentId, request.status()); }
     @GetMapping("/admin/applications") public List<Map<String, Object>> applications(@RequestHeader(name = "X-User-Id", required = false) Long id) { return dashboard.applications(id); }
     @GetMapping("/admin/content/{kind}") public List<Map<String, Object>> content(@RequestHeader(name = "X-User-Id", required = false) Long id, @PathVariable String kind) { return dashboard.content(id, kind); }
+    @GetMapping("/events") public List<Map<String, Object>> publishedEvents() { return dashboard.publishedEvents(); }
     @PostMapping("/admin/content/{kind}") @ResponseStatus(HttpStatus.CREATED)
     public Map<String, Object> create(@RequestHeader(name = "X-User-Id", required = false) Long id, @PathVariable String kind, @RequestBody AdminContentRequest request) { return dashboard.createContent(id, kind, request); }
     @PutMapping("/admin/content/{kind}/{itemId}")

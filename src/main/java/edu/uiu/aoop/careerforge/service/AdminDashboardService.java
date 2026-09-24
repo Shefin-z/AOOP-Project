@@ -82,6 +82,24 @@ public class AdminDashboardService {
         return jdbc.queryForList(selectSql(kind));
     }
 
+    /**
+     * Events are authored by administrators but are part of the student-facing
+     * calendar once they have been published.  Keep this query separate from
+     * the admin content list so drafts and cancelled events never leak into the
+     * student workspace.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> publishedEvents() {
+        return jdbc.queryForList("""
+                select id, title, description, category, location,
+                       event_url as eventUrl, starts_at as startsAt,
+                       ends_at as endsAt, capacity, created_at as createdAt
+                from events
+                where status = 'published'
+                order by starts_at asc, created_at desc
+                """);
+    }
+
     public Map<String, Object> createContent(Long adminId, String kind, AdminContentRequest request) {
         access.requireAdmin(adminId);
         validate(kind, request);
