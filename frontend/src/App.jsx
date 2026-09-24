@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowRight, BarChart3, BookOpen, BriefcaseBusiness, Building2, CalendarDays,
+  ArrowRight, BadgeCheck, BarChart3, BookOpen, BriefcaseBusiness, Building2, CalendarDays,
   ChevronRight, CircleUserRound, ClipboardCheck, FileText, GraduationCap, LayoutDashboard,
   Download, MapPin, MessageCircle, Pencil, Plus, RefreshCw, Save, Search, Settings, Star, Upload,
   ShieldCheck, Target, Trash2, Users,
 } from "lucide-react";
-import { AdminApplications, AdminCommunity, AdminContentManager, AdminOverview, AdminStudents } from "./AdminDashboard";
+import { AdminApplications, AdminCommunity, AdminContentManager, AdminOverview, AdminProfile, AdminStudents } from "./AdminDashboard";
 import adminCareerServicesPhoto from "./assets/auth-admin-career-services.png";
 import registerStudentPhoto from "./assets/auth-register-student.png";
 import studentLoginPhoto from "./assets/auth-student-login.png";
@@ -15,7 +15,7 @@ import { StudentResources } from "./StudentResources";
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 const Sparkles = Target;
 const studentItems = [["overview", "Overview", LayoutDashboard], ["profile", "My profile", CircleUserRound], ["jobs", "Job matches", BriefcaseBusiness], ["assessments", "Assessments", ClipboardCheck], ["vault", "Career Vault", FileText], ["community", "Community", MessageCircle], ["connect", "Connect", Users], ["chat", "Chat", MessageCircle], ["resources", "Resources", BookOpen], ["events", "Events", CalendarDays]];
-const adminItems = [["overview", "Overview", LayoutDashboard], ["students", "Students", Users], ["jobs", "Jobs", BriefcaseBusiness], ["applications", "Applications", FileText], ["assessments", "Assessments", ClipboardCheck], ["community", "Community", MessageCircle], ["resources", "Resources", BookOpen], ["events", "Events", CalendarDays], ["settings", "Settings", Settings]];
+const adminItems = [["overview", "Overview", LayoutDashboard], ["profile", "My profile", CircleUserRound], ["students", "Users", Users], ["jobs", "Jobs", BriefcaseBusiness], ["applications", "Applications", FileText], ["assessments", "Assessments", ClipboardCheck], ["community", "Community", MessageCircle], ["resources", "Resources", BookOpen], ["events", "Events", CalendarDays], ["settings", "Settings", Settings]];
 const blankProfile = { university: "", degree: "", graduationYear: "", experienceYears: "", targetRole: "", location: "", bio: "", skills: "", hobbies: "", profilePhotoUrl: "" };
 const blankJob = { companyName: "", companyWebsite: "", companyLocation: "", title: "", location: "", employmentType: "full_time", workMode: "hybrid", salaryText: "", description: "", expiryDate: "", status: "draft", minExperienceYears: "", maxExperienceYears: "" };
 const blankResumeContent = { fullName: "", email: "", phone: "", location: "", headline: "", summary: "", skills: "", education: "", experience: "", projects: "" };
@@ -47,7 +47,7 @@ function useRoute() {
   }];
 }
 
-function Brand({ onClick }) { return <button className="brand" type="button" onClick={onClick} aria-label="CareerForge home"><span className="brand-wordmark">career<span>forge</span></span></button>; }
+function Brand({ onClick, ariaLabel = "CareerForge home" }) { return <button className="brand" type="button" onClick={onClick} aria-label={ariaLabel}><span className="brand-wordmark">career<span>forge</span></span></button>; }
 function Button({ children, className = "", ...props }) { return <button className={`button ${className}`} {...props}>{children}</button>; }
 function EmptyPanel({ title, copy }) { return <section className="empty-panel"><span><Sparkles size={21} /></span><h3>{title}</h3><p>{copy}</p></section>; }
 
@@ -559,10 +559,10 @@ function AdminJobs() {
 
 function StudentOverview({ go }) {
   const current = getSession(); const [snapshot, setSnapshot] = useState({ profile: blankProfile, applications: [], resumes: [], documents: [], jobs: [] }); const [loading, setLoading] = useState(true);
-  useEffect(() => { const headers = { "X-User-Id": current?.id || "" }; if (!current?.id) { setLoading(false); return; } Promise.all([fetch(`${API_BASE_URL}/profiles/${current.id}`, { headers }).then(responseBody).catch(() => blankProfile), fetch(`${API_BASE_URL}/applications`, { headers }).then(responseBody).catch(() => []), fetch(`${API_BASE_URL}/vault/resumes`, { headers }).then(responseBody).catch(() => []), fetch(`${API_BASE_URL}/vault/documents`, { headers }).then(responseBody).catch(() => []), fetch(`${API_BASE_URL}/jobs`).then(responseBody).catch(() => [])]).then(([profile, applications, resumes, documents, jobs]) => setSnapshot({ profile: { ...blankProfile, ...profile }, applications, resumes, documents, jobs })).finally(() => setLoading(false)); }, []);
+  useEffect(() => { const headers = { "X-User-Id": current?.id || "" }; if (!current?.id) { setLoading(false); return; } Promise.all([fetch(`${API_BASE_URL}/profiles/${current.id}`, { headers }).then(responseBody).catch(() => blankProfile), fetch(`${API_BASE_URL}/applications`, { headers }).then(responseBody).catch(() => []), fetch(`${API_BASE_URL}/vault/resumes`, { headers }).then(responseBody).catch(() => []), fetch(`${API_BASE_URL}/vault/documents`, { headers }).then(responseBody).catch(() => []), fetch(`${API_BASE_URL}/jobs/matches`, { headers }).then(responseBody).catch(() => [])]).then(([profile, applications, resumes, documents, jobs]) => setSnapshot({ profile: { ...blankProfile, ...profile }, applications, resumes, documents, jobs })).finally(() => setLoading(false)); }, []);
   const profileFields = [snapshot.profile.university, snapshot.profile.degree, snapshot.profile.graduationYear, snapshot.profile.experienceYears, snapshot.profile.targetRole, snapshot.profile.location, snapshot.profile.skills, snapshot.profile.hobbies, snapshot.profile.bio].filter((value) => value !== null && value !== undefined && value !== "").length; const readiness = Math.round((profileFields / 9) * 100); const documents = snapshot.resumes.length + snapshot.documents.length; const profileComplete = profileFields === 9; const cvComplete = documents > 0; const applicationsStarted = snapshot.applications.length > 0; const nextAction = !snapshot.profile.targetRole ? ["Add a target role", "Tell CareerForge what direction you want to explore.", "/student/profile", Target] : documents === 0 ? ["Create your first CV", "Save a CV version before you start applying.", "/student/vault", FileText] : ["Explore job matches", "Find published opportunities that fit your direction.", "/student/jobs", BriefcaseBusiness];
   const [nextTitle, nextCopy, nextRoute, NextIcon] = nextAction;
-  return <section className="student-overview"><header className="student-overview-head"><div><h2>Welcome back, {current?.name || "Student"}.</h2><p>Here is a clear view of the work that moves your career forward.</p></div><Button className="quiet" onClick={() => go("/student/profile")}>View profile <ArrowRight size={15} /></Button></header><div className="student-dashboard-grid"><article className="readiness-card"><div><p>CAREER READINESS</p><h3>{loading ? "—" : `${readiness}%`}</h3><span>{profileFields}/9 profile details added</span></div><div className="readiness-ring" style={{ "--progress": `${readiness * 3.6}deg` }}><i><Target size={24} /></i></div><footer><span>Complete your profile to improve your next-step recommendations.</span><button onClick={() => go("/student/profile")}>Improve profile <ArrowRight size={14} /></button></footer></article><article className="workspace-summary"><div className="summary-head"><div><p>YOUR WORKSPACE</p><h3>Progress at a glance</h3></div><span>{loading ? "…" : "Live"}</span></div><div className="summary-stats"><button onClick={() => go("/student/vault")}><FileText size={18} /><b>{loading ? "—" : documents}</b><small>CVs &amp; files</small></button><button onClick={() => go("/student/jobs")}><BriefcaseBusiness size={18} /><b>{loading ? "—" : snapshot.jobs.length}</b><small>Open jobs</small></button><button onClick={() => go("/student/jobs")}><ClipboardCheck size={18} /><b>{loading ? "—" : snapshot.applications.length}</b><small>Applications</small></button></div></article><article className="next-step-card"><span><NextIcon size={20} /></span><div><p>NEXT BEST STEP</p><h3>{nextTitle}</h3><small>{nextCopy}</small></div><button onClick={() => go(nextRoute)} aria-label={nextTitle}><ArrowRight size={17} /></button></article><article className="career-path-card"><div className="summary-head"><div><p>CAREER PATH</p><h3>Your application rhythm</h3></div><button onClick={() => go("/student/jobs")}>View jobs</button></div><div className="path-track"><span className={profileComplete ? "done" : "active"}><i>1</i><b>Profile</b><small>{profileComplete ? "Complete" : "In progress"}</small></span><span className={profileComplete ? cvComplete ? "done" : "active" : "locked"}><i>2</i><b>CV</b><small>{profileComplete ? cvComplete ? "Complete" : "In progress" : "Complete profile first"}</small></span><span className={profileComplete && cvComplete ? applicationsStarted ? "done" : "active" : "locked"}><i>3</i><b>Apply</b><small>{profileComplete && cvComplete ? applicationsStarted ? "Complete" : "In progress" : "Complete CV first"}</small></span></div></article></div></section>;
+  return <section className="student-overview"><header className="student-overview-head"><div><h2>Welcome back, {current?.name || "Student"}.</h2><p>Here is a clear view of the work that moves your career forward.</p></div><Button className="quiet" onClick={() => go("/student/profile")}>View profile <ArrowRight size={15} /></Button></header><div className="student-dashboard-grid"><article className={`readiness-card${profileComplete ? " is-complete" : ""}`}><div><p>{profileComplete ? "CAREER READY" : "CAREER READINESS"}</p><h3>{loading ? "—" : `${readiness}%`}</h3><span>{profileComplete ? "All 9 profile details complete" : `${profileFields}/9 profile details added`}</span></div><div className="readiness-ring" style={{ "--progress": `${readiness * 3.6}deg` }}><i>{profileComplete ? <BadgeCheck size={25} /> : <Target size={24} />}</i></div><footer><span>{profileComplete ? "Profile complete — your career recommendations can now stay focused on your goals." : "Complete your profile to improve your next-step recommendations."}</span><button onClick={() => go("/student/profile")}>{profileComplete ? "View profile" : "Improve profile"} <ArrowRight size={14} /></button></footer></article><article className="workspace-summary"><div className="summary-head"><div><p>YOUR WORKSPACE</p><h3>Progress at a glance</h3></div><span>{loading ? "…" : "Live"}</span></div><div className="summary-stats"><button onClick={() => go("/student/vault")}><FileText size={18} /><b>{loading ? "—" : documents}</b><small>CVs &amp; files</small></button><button onClick={() => go("/student/jobs")}><BriefcaseBusiness size={18} /><b>{loading ? "—" : snapshot.jobs.length}</b><small>Your job matches</small></button><button onClick={() => go("/student/jobs")}><ClipboardCheck size={18} /><b>{loading ? "—" : snapshot.applications.length}</b><small>Applications</small></button></div></article><article className="next-step-card"><span><NextIcon size={20} /></span><div><p>NEXT BEST STEP</p><h3>{nextTitle}</h3><small>{nextCopy}</small></div><button onClick={() => go(nextRoute)} aria-label={nextTitle}><ArrowRight size={17} /></button></article><article className="career-path-card"><div className="summary-head"><div><p>CAREER PATH</p><h3>Your application rhythm</h3></div><button onClick={() => go("/student/jobs")}>View jobs</button></div><div className="path-track"><span className={profileComplete ? "done" : "active"}><i>1</i><b>Profile</b><small>{profileComplete ? "Complete" : "In progress"}</small></span><span className={profileComplete ? cvComplete ? "done" : "active" : "locked"}><i>2</i><b>CV</b><small>{profileComplete ? cvComplete ? "Complete" : "In progress" : "Complete profile first"}</small></span><span className={profileComplete && cvComplete ? applicationsStarted ? "done" : "active" : "locked"}><i>3</i><b>Apply</b><small>{profileComplete && cvComplete ? applicationsStarted ? "Complete" : "In progress" : "Complete CV first"}</small></span></div></article></div></section>;
 }
 
 function StudentEvents({ go }) {
@@ -681,8 +681,9 @@ function StudentChat() {
 }
 
 function Workspace({ role, section, go }) {
-  const admin = role === "admin"; const current = getSession(); const items = admin ? adminItems : studentItems; const label = items.find(([id]) => id === section)?.[1] || "Overview"; const [query, setQuery] = useState(""); const [accountMenuState, setAccountMenuState] = useState("closed"); const accountOpen = accountMenuState === "open"; const accountVisible = accountMenuState !== "closed"; const [workspacePhotoUrl, setWorkspacePhotoUrl] = useState(""); const matches = query.trim() ? items.filter(([id, name]) => `${id} ${name}`.toLowerCase().includes(query.trim().toLowerCase())) : [];
-  useEffect(() => { if (admin || !current?.id) { setWorkspacePhotoUrl(""); return undefined; } let active = true; fetch(`${API_BASE_URL}/profiles/${current.id}`, { headers: { "X-User-Id": current.id } }).then(responseBody).then((body) => { if (!active) return; const value = body.profilePhotoUrl; setWorkspacePhotoUrl(value?.startsWith("/") ? `${API_BASE_URL}${value}?v=${Date.now()}` : value || ""); }).catch(() => { if (active) setWorkspacePhotoUrl(""); }); return () => { active = false; }; }, [admin, current?.id, section]);
+  const admin = role === "admin"; const [sessionVersion, refreshSession] = useState(0); const current = getSession(); const items = admin ? adminItems : studentItems; const label = items.find(([id]) => id === section)?.[1] || "Overview"; const [query, setQuery] = useState(""); const [accountMenuState, setAccountMenuState] = useState("closed"); const accountOpen = accountMenuState === "open"; const accountVisible = accountMenuState !== "closed"; const [workspacePhotoUrl, setWorkspacePhotoUrl] = useState(""); const matches = query.trim() ? items.filter(([id, name]) => `${id} ${name}`.toLowerCase().includes(query.trim().toLowerCase())) : [];
+  useEffect(() => { const update = () => refreshSession((version) => version + 1); window.addEventListener("careerforge-session-updated", update); return () => window.removeEventListener("careerforge-session-updated", update); }, []);
+  useEffect(() => { if (!current?.id) { setWorkspacePhotoUrl(""); return undefined; } const profileEndpoint = admin ? `${API_BASE_URL}/account/profile` : `${API_BASE_URL}/profiles/${current.id}`; let active = true; fetch(profileEndpoint, { headers: { "X-User-Id": current.id } }).then(responseBody).then((body) => { if (!active) return; const value = body.profilePhotoUrl; setWorkspacePhotoUrl(value?.startsWith("/") ? `${API_BASE_URL}${value}` : value || ""); }).catch(() => { if (active) setWorkspacePhotoUrl(""); }); return () => { active = false; }; }, [admin, current?.id, sessionVersion]);
   useEffect(() => { const avatar = document.querySelector(".account-control .avatar"); if (!avatar) return; avatar.classList.toggle("has-photo", Boolean(workspacePhotoUrl)); if (workspacePhotoUrl) { avatar.textContent = ""; const image = document.createElement("img"); image.src = workspacePhotoUrl; image.alt = "Profile"; avatar.appendChild(image); } else if (!avatar.textContent.trim()) avatar.textContent = current?.name?.slice(0, 1)?.toUpperCase() || (admin ? "A" : "S"); }, [workspacePhotoUrl, accountOpen, query, current?.name, admin]);
   useEffect(() => { if (!accountOpen) return undefined; const closeMenu = (event) => { if (!event.target.closest(".account-control")) closeAccountMenu(); }; const closeOnEscape = (event) => { if (event.key === "Escape") closeAccountMenu(); }; document.addEventListener("pointerdown", closeMenu); document.addEventListener("keydown", closeOnEscape); return () => { document.removeEventListener("pointerdown", closeMenu); document.removeEventListener("keydown", closeOnEscape); }; }, [accountOpen]);
   const closeAccountMenu = () => { if (!accountOpen) return; setAccountMenuState("closing"); window.setTimeout(() => setAccountMenuState((state) => state === "closing" ? "closed" : state), 180); };
@@ -690,6 +691,7 @@ function Workspace({ role, section, go }) {
   const placeholder = { assessments: [admin ? "Create skill assessments" : "Measure your skills", "Published assessments and performance history will appear here."], vault: ["Career Vault", "Your resume sections and uploaded documents will appear here."], community: ["Community", "Posts, comments, and moderation activity will appear here."], resources: ["Learning resources", "Administrator-published resources will appear here."], events: ["Events", "Upcoming workshops and event registrations will appear here."], students: ["Student directory", "Registered student accounts will appear here."], settings: ["Platform settings", "Safe operational settings will appear here."] };
   const dashboard = <StudentOverview go={go} />;
   const content = admin && section === "overview" ? <AdminOverview go={go} />
+    : admin && section === "profile" ? <AdminProfile />
     : admin && section === "students" ? <AdminStudents />
     : admin && section === "applications" ? <AdminApplications />
     : admin && section === "community" ? <AdminCommunity />
@@ -709,7 +711,7 @@ function Workspace({ role, section, go }) {
   const signOut = () => { localStorage.removeItem("careerforge_session"); go("/"); };
   return <main className={`workspace ${admin ? "admin-workspace" : "student-workspace"}`}>
     <aside className="sidebar">
-      <Brand onClick={() => go("/")} />
+      <Brand onClick={() => go(`/${role}/overview`)} ariaLabel="Go to workspace overview" />
       <div className="sidebar-role">{admin ? "ADMIN WORKSPACE" : "STUDENT WORKSPACE"}</div>
       <nav>{items.map(([id, name, Icon]) => <button className={id === section ? "active" : ""} onClick={() => go(`/${role}/${id}`)} key={id}><Icon size={17} />{name}</button>)}</nav>
       <button className="signout" onClick={signOut}>Sign out</button>
@@ -729,7 +731,7 @@ function Workspace({ role, section, go }) {
             {accountVisible && <div className={`account-menu ${accountMenuState === "closing" ? "is-closing" : ""}`} aria-hidden={!accountOpen}>
               <b>{current?.name || (admin ? "Administrator" : "Student")}</b>
               <small>{current?.email || "Local session"}</small>
-              {!admin && <button onClick={() => { closeAccountMenu(); go("/student/profile"); }}>My profile</button>}
+              <button onClick={() => { closeAccountMenu(); go(`/${role}/profile`); }}>My profile</button>
               <button onClick={signOut}>Sign out</button>
             </div>}
           </div>
@@ -742,6 +744,8 @@ function Workspace({ role, section, go }) {
 
 function App() {
   const [route, go] = useRoute();
+  const storedSession = getSession();
+  const storedRole = storedSession?.role === "admin" || storedSession?.role === "student" ? storedSession.role : null;
   useEffect(() => {
     if (route !== "/") return undefined;
     const frame = window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "smooth" }));
@@ -786,7 +790,7 @@ function App() {
       ? <Login role="student" register go={go} />
       : pieces[0] === "student" || pieces[0] === "admin"
         ? <Workspace role={pieces[0]} section={pieces[1] || "overview"} go={go} />
-        : <FinpayLanding go={go} />;
+        : storedRole ? <Workspace role={storedRole} section="overview" go={go} /> : <FinpayLanding go={go} />;
   return <div className="route-transition" key={route}>{screen}</div>;
 }
 export default App;
