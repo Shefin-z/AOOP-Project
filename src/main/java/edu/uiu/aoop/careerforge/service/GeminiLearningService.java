@@ -5,21 +5,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 
 @Service
 public class GeminiLearningService {
     private final ObjectMapper mapper;
-    private final RestTemplate http = new RestTemplate();
+    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     @Value("${gemini.api-key:}") private String apiKey;
     @Value("${gemini.model:gemini-2.5-flash}") private String model;
     public GeminiLearningService(ObjectMapper mapper) { this.mapper = mapper; }
@@ -52,13 +51,16 @@ public class GeminiLearningService {
         ArrayNode contents = request.putArray("contents");
         contents.addObject().putArray("parts").addObject().put("text", prompt);
         ObjectNode generationConfig = request.putObject("generationConfig"); generationConfig.put("temperature", 0.25); generationConfig.put("responseMimeType", "application/json");
-        HttpHeaders headers = new HttpHeaders(); headers.setContentType(MediaType.APPLICATION_JSON); headers.set("x-goog-api-key", apiKey.trim());
         try {
-            ResponseEntity<JsonNode> response = http.exchange("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", HttpMethod.POST, new HttpEntity<>(request, headers), JsonNode.class);
-            String text = response.getBody() == null ? "" : response.getBody().path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
+            HttpRequest httpRequest = HttpRequest.newBuilder(URI.create("https://generativelanguage.googleapis.com/v1beta/models/" + model.trim() + ":generateContent"))
+                    .timeout(Duration.ofSeconds(40)).header("Content-Type", "application/json").header("x-goog-api-key", apiKey.trim())
+                    .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(request))).build();
+            HttpResponse<String> response = http.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Gemini request failed: " + response.statusCode() + ". Check the API key and model.");
+            String text = mapper.readTree(response.body()).path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
             if (text.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Gemini did not return a usable response.");
             return mapper.readTree(text.replace("```json", "").replace("```", "").trim());
-        } catch (RestClientResponseException exception) { throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Gemini request failed: " + exception.getStatusCode() + ". Check the API key and model."); }
+        }
         catch (Exception exception) { if (exception instanceof ResponseStatusException responseStatusException) throw responseStatusException; throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not read Gemini's response. Please try again."); }
     }
     private int clamp(int value) { return Math.max(1, Math.min(50, value)); }
