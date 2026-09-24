@@ -18,10 +18,12 @@ import java.util.Map;
 public class AdminDashboardService {
     private final JdbcTemplate jdbc;
     private final AccessService access;
+    private final ProfileService profiles;
 
-    public AdminDashboardService(JdbcTemplate jdbc, AccessService access) {
+    public AdminDashboardService(JdbcTemplate jdbc, AccessService access, ProfileService profiles) {
         this.jdbc = jdbc;
         this.access = access;
+        this.profiles = profiles;
     }
 
     @Transactional(readOnly = true)
@@ -42,10 +44,15 @@ public class AdminDashboardService {
         access.requireAdmin(adminId);
         return jdbc.queryForList("""
                 select u.id, u.name, u.email, u.status, u.created_at as createdAt,
-                       p.university, p.degree, p.target_role as targetRole, p.location
+                       p.university, p.degree, p.target_role as targetRole, p.location, p.profile_photo_url as profilePhotoUrl
                 from users u left join student_profiles p on p.user_id = u.id
                 where u.role = 'student' order by u.created_at desc
-                """);
+                """).stream().map(row -> {
+            Map<String, Object> student = new LinkedHashMap<>(row);
+            Long studentId = ((Number) student.get("id")).longValue();
+            student.put("profilePhotoUrl", profiles.publicPhotoUrl(studentId, (String) student.get("profilePhotoUrl")));
+            return student;
+        }).toList();
     }
 
     public void updateStudentStatus(Long adminId, Long studentId, String status) {

@@ -71,4 +71,5 @@ public class User {
     public Role getRole() { return role; }
     public UserStatus getStatus() { return status; }
     public void setStatus(UserStatus status) { this.status = status; }
+    public void updateAccount(String name, String email) { this.name = name; this.email = email; }
 }
