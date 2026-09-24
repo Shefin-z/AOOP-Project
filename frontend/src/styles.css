@@ -467,7 +467,7 @@ body, .fin-home, .workspace { background: var(--fin-paper); }
 .quiz-format { display: flex; gap: 9px; align-items: center; margin: 12px 0; color: #47667d; font-size: 12px; }
 .quiz-format > span, .question-type > span { border-radius: 999px; background: #e7f3f1; color: #17676b; font-size: 10px; font-weight: 800; letter-spacing: .04em; padding: 5px 8px; text-transform: uppercase; }
 .quiz-format small { color: #718499; }
-.quiz-question > .question-type { display: flex; grid-template-columns: none; padding: 12px 15px 0; }
+.quiz-question > .question-type { display: flex; grid-template-columns: none; padding: 22px 20px 12px; }
 .question-code { margin: 0 13px 2px; padding: 14px; overflow-x: auto; border: 1px solid #dbe6e9; border-radius: 10px; background: #102b40; color: #e4f2f6; font: 12px/1.55 Consolas, "Courier New", monospace; white-space: pre-wrap; }
 .quiz-question > .short-answer { display: grid; grid-template-columns: 1fr; gap: 7px; padding: 13px; }
 .short-answer textarea { width: 100%; min-height: 112px; resize: vertical; border: 1px solid #b9cbd5; border-radius: 10px; padding: 11px; color: #17364d; font: inherit; }
