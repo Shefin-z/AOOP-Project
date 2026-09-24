@@ -83,7 +83,8 @@ public class ProfileService {
         if (trimmed.startsWith(UPLOADED_PHOTO_PREFIX)) return null;
         return trimmed;
     }
-    private String publicPhotoUrl(Long userId, String value) { return isUploadedPhoto(value) ? "/profiles/" + userId + "/photo" : value; }
+    /** Returns a browser-safe image URL without exposing uploaded-file storage names. */
+    public String publicPhotoUrl(Long userId, String value) { return isUploadedPhoto(value) ? "/profiles/" + userId + "/photo" : value; }
     private boolean isUploadedPhoto(String value) { return value != null && value.startsWith(UPLOADED_PHOTO_PREFIX); }
     private void deleteUploadedPhoto(Long userId, String value) { if (!isUploadedPhoto(value)) return; try { Files.deleteIfExists(photoPath(userId, value.substring(UPLOADED_PHOTO_PREFIX.length()))); } catch (IOException ignored) { } }
     private Path photoPath(Long userId, String filename) {

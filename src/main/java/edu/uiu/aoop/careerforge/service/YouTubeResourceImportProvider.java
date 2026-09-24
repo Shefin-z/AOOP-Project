@@ -99,6 +99,7 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
                 Map<String, Object> playlist = new LinkedHashMap<>();
                 playlist.put("id", playlistId); playlist.put("title", clean(snippet.path("title").asText())); playlist.put("description", clean(snippet.path("description").asText()));
                 playlist.put("providerName", clean(snippet.path("channelTitle").asText())); playlist.put("thumbnailUrl", thumbnail(snippet));
+                playlist.put("videoCount", candidate.videoCount());
                 playlist.put("resourceUrl", "https://www.youtube.com/playlist?list=" + playlistId); results.add(playlist);
             }
             List<Map<String, Object>> immutableResults = List.copyOf(results);
@@ -170,7 +171,7 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
             double engagement = Math.min(1d, Math.log10(averageEngagement * 10000d + 1d) / 4d);
             double depth = Math.min(1d, Math.log10(itemCounts.getOrDefault(playlistId, 0) + 1d) / 3d);
             double score = 0.55d * relevance + 0.25d * popularity + 0.12d * engagement + 0.08d * depth;
-            ranked.add(new Candidate(item, score));
+            ranked.add(new Candidate(item, score, itemCounts.getOrDefault(playlistId, 0)));
         }
         ranked.sort(Comparator.comparingDouble(Candidate::score).reversed());
         return ranked;
@@ -278,7 +279,7 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
             // of any fallback result without favouring one of those three.
             double score = 0.20d * relevance + 0.28d * popularity + 0.12d * engagement
                     + 0.25d * channelAuthority + 0.10d * depth + 0.05d * studentCandidate.languagePreference();
-            ranked.add(new Candidate(item, score));
+            ranked.add(new Candidate(item, score, itemCounts.getOrDefault(playlistId, 0)));
         }
         ranked.sort(Comparator.comparingDouble(Candidate::score).reversed());
         return ranked;
@@ -418,7 +419,7 @@ public class YouTubeResourceImportProvider implements ResourceImportProvider {
     private String clean(String value) { return value == null ? "" : value.trim(); }
     private String limit(String value, int length) { return value.substring(0, Math.min(value.length(), length)); }
 
-    private record Candidate(JsonNode item, double score) {}
+    private record Candidate(JsonNode item, double score, int videoCount) {}
     private record StudentSearchCandidate(JsonNode item, double searchRelevance, double languagePreference) {}
     private record CachedStudentSearch(List<Map<String, Object>> results, long createdAt) {
         private boolean isExpired() { return System.currentTimeMillis() - createdAt >= STUDENT_SEARCH_CACHE_MILLIS; }

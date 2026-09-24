@@ -10,7 +10,9 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
@@ -21,10 +23,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper json;
     private final CommunityChatService community;
     private final ExecutorService communityChatExecutor;
+    private final ChatPresenceService presence;
     private final ConcurrentHashMap<Long, CopyOnWriteArraySet<WebSocketSession>> sessionsByUser = new ConcurrentHashMap<>();
 
-    public ChatWebSocketHandler(ObjectMapper json, CommunityChatService community, ExecutorService communityChatExecutor) {
-        this.json = json; this.community = community; this.communityChatExecutor = communityChatExecutor;
+    public ChatWebSocketHandler(ObjectMapper json, CommunityChatService community, ExecutorService communityChatExecutor, ChatPresenceService presence) {
+        this.json = json; this.community = community; this.communityChatExecutor = communityChatExecutor; this.presence = presence;
     }
 
     @Override public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -32,7 +35,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         if (userId == null) { session.close(CloseStatus.NOT_ACCEPTABLE.withReason("A student session is required.")); return; }
         try { community.openSocket(userId); } catch (Exception ignored) { session.close(CloseStatus.NOT_ACCEPTABLE.withReason("A valid student session is required.")); return; }
         sessionsByUser.computeIfAbsent(userId, ignored -> new CopyOnWriteArraySet<>()).add(session);
+        presence.connected(userId);
         send(session, json.writeValueAsString(java.util.Map.of("type", "connected")));
+        broadcastPresence(userId);
     }
 
     @Override protected void handleTextMessage(WebSocketSession session, TextMessage message) {
@@ -58,7 +63,24 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         Long userId = userId(session);
         if (userId == null) return;
         CopyOnWriteArraySet<WebSocketSession> sessions = sessionsByUser.get(userId);
-        if (sessions != null) { sessions.remove(session); if (sessions.isEmpty()) sessionsByUser.remove(userId, sessions); }
+        if (sessions != null) {
+            sessions.remove(session);
+            boolean wentOffline = presence.disconnected(userId);
+            if (sessions.isEmpty()) sessionsByUser.remove(userId, sessions);
+            if (wentOffline) broadcastPresence(userId);
+        }
+    }
+
+    private void broadcastPresence(Long userId) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("type", "presence");
+            payload.put("userId", userId);
+            payload.put("online", presence.isOnline(userId));
+            payload.put("lastActiveAt", presence.lastActiveAt(userId));
+            String packet = json.writeValueAsString(payload);
+            community.connectedStudents(userId).forEach(recipient -> sessionsByUser.getOrDefault(recipient, new CopyOnWriteArraySet<>()).forEach(target -> send(target, packet)));
+        } catch (Exception ignored) { }
     }
 
     private void send(WebSocketSession session, String payload) { try { synchronized (session) { if (session.isOpen()) session.sendMessage(new TextMessage(payload)); } } catch (Exception ignored) { } }
